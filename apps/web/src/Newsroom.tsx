@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { GraphicItem, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
+import type { GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import {
   AlertTriangle,
   ArrowDown,
@@ -63,7 +63,7 @@ type Props = {
 // =====================================================================
 // PANEL PERSIAPAN (PREPARATION / RUNDOWN MANAGEMENT)
 // =====================================================================
-export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSetup }: Props) {
+export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSetup, master }: Props) {
   const [editing, setEditing] = useState<RundownItem | "new" | null>(null);
   const [pending, setPending] = useState(false);
   const [search, setSearch] = useState("");
@@ -381,6 +381,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
         <StoryEditor
           item={editing === "new" ? null : editing}
           rundown={rundown}
+          master={master}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             await reload();
@@ -484,11 +485,13 @@ type DraftGraphic = {
 function StoryEditor({
   item,
   rundown,
+  master,
   onClose,
   onSaved
 }: {
   item: RundownItem | null;
   rundown: Rundown;
+  master?: MasterOverlayState;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -496,38 +499,113 @@ function StoryEditor({
   const [slug, setSlug] = useState(item?.slug || `NEWS-${rundown.items.length + 1}`);
   const [format, setFormat] = useState(item?.format || "PKG");
   const [seconds, setSeconds] = useState(item?.estimatedDurationSeconds || 60);
-  const [graphics, setGraphics] = useState<DraftGraphic[]>(
-    () => item?.graphics.map((g) => ({ ...g, draftFields: { ...g.draftFields } })) || []
-  );
+  const [graphics, setGraphics] = useState<DraftGraphic[]>(() => {
+    if (item && item.graphics.length > 0) {
+      return item.graphics.map((g) => ({ ...g, draftFields: { ...g.draftFields } }));
+    }
+    // Default otomatis untuk Berita Baru: langsung tampilkan 1 cue HEADLINE siap isi
+    return [
+      {
+        templateType: "HEADLINE",
+        status: "READY",
+        sortOrder: 0,
+        draftFields: {
+          headline: item?.title || "",
+          kicker: "",
+          subline: "",
+          location: "",
+          contentMode: "headline",
+          layoutStyle: "sub",
+          showLocation: "true",
+          showKicker: "false",
+          visualTemplate: "cnn"
+        }
+      }
+    ];
+  });
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (!item) {
+      api<HeadlineDefaults>("/api/settings/headline-defaults")
+        .then((def) => {
+          if (def) {
+            setGraphics((gs) => {
+              if (gs.length > 0 && gs[0]?.templateType === "HEADLINE" && !gs[0].draftFields.headline) {
+                return gs.map((g, idx) =>
+                  idx === 0
+                    ? {
+                        ...g,
+                        draftFields: {
+                          ...g.draftFields,
+                          headline: def.headline || g.draftFields.headline || "",
+                          location: def.location || g.draftFields.location || "",
+                          kicker: def.kicker || g.draftFields.kicker || "",
+                          subline: def.subline || g.draftFields.subline || "",
+                          showKicker: def.kicker ? "true" : "false"
+                        }
+                      }
+                    : g
+                );
+              }
+              return gs;
+            });
+            if (def.headline && !title) {
+              setTitle(def.headline);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [item]);
+
+  function handleTitleChange(newTitle: string) {
+    setTitle(newTitle);
+    setGraphics((gs) => {
+      if (gs.length > 0 && gs[0] && (gs[0].templateType === "HEADLINE" || gs[0].templateType === "BREAKING")) {
+        const currentHeadline = gs[0].draftFields.headline || "";
+        if (!currentHeadline || currentHeadline === title) {
+          return gs.map((g, i) =>
+            i === 0 ? { ...g, draftFields: { ...g.draftFields, headline: newTitle } } : g
+          );
+        }
+      }
+      return gs;
+    });
+  }
+
   function add(type: TemplateType) {
     const base = graphics.find((g) => g.templateType === "HEADLINE")?.draftFields;
-    setGraphics((gs) => [
-      ...gs,
-      {
-        templateType: type,
-        status: "READY",
-        sortOrder: gs.length,
-        draftFields:
-          type === "REPORTER"
-            ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub", showLocation: "false", visualTemplate: "cnn" }
-            : type === "LOCATION"
-            ? { location: base?.location || "", contentMode: "location", layoutStyle: "single", showLocation: "true", visualTemplate: "cnn" }
-            : {
-                headline: base?.headline || title,
-                kicker: "",
-                subline: "",
-                location: base?.location || "",
-                contentMode: "headline",
-                layoutStyle: "sub",
-                showLocation: "true",
-                showKicker: "false",
-                visualTemplate: "cnn"
-              }
-      }
-    ]);
+    setGraphics((gs) => {
+      const newIndex = gs.length;
+      setPreviewIndex(newIndex);
+      return [
+        ...gs,
+        {
+          templateType: type,
+          status: "READY",
+          sortOrder: newIndex,
+          draftFields:
+            type === "REPORTER"
+              ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub", showLocation: "false", visualTemplate: "cnn" }
+              : type === "LOCATION"
+              ? { location: base?.location || "", contentMode: "location", layoutStyle: "single", showLocation: "true", visualTemplate: "cnn" }
+              : {
+                  headline: base?.headline || title,
+                  kicker: "",
+                  subline: "",
+                  location: base?.location || "",
+                  contentMode: "headline",
+                  layoutStyle: "sub",
+                  showLocation: "true",
+                  showKicker: "false",
+                  visualTemplate: "cnn"
+                }
+        }
+      ];
+    });
   }
 
   function addTieredFlow() {
@@ -582,10 +660,23 @@ function StoryEditor({
   }
 
   function field(index: number, key: string, value: string) {
+    setPreviewIndex(index);
     setGraphics((gs) =>
       gs.map((g, i) => (i === index ? { ...g, draftFields: { ...g.draftFields, [key]: value } } : g))
     );
   }
+
+  const currentPreviewCue = graphics[previewIndex] || graphics[0] || null;
+  const effectivePreviewFields = currentPreviewCue
+    ? {
+        ...currentPreviewCue.draftFields,
+        headline:
+          currentPreviewCue.draftFields.headline ||
+          (currentPreviewCue.templateType === "HEADLINE" ? title : "") ||
+          "",
+        showLocation: currentPreviewCue.draftFields.location ? "true" : "false"
+      }
+    : null;
 
   return (
     <div className="nr-modal-backdrop">
@@ -639,7 +730,7 @@ function StoryEditor({
                   required
                   maxLength={120}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="Masukkan judul berita utama..."
                 />
               </label>
@@ -862,6 +953,55 @@ function StoryEditor({
                   <span>Belum ada CG pada berita ini. Klik tombol di atas untuk menambahkan.</span>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Panel Preview Siaran Real-Time (WYSIWYG) */}
+          <div className="editor-card story-preview-card">
+            <div className="story-preview-header">
+              <div className="preview-header-left">
+                <span className="dot-led green pulse" />
+                <div>
+                  <h3 className="section-title">PREVIEW GRAFIS SIARAN (REAL-TIME)</h3>
+                  <span className="preview-subtitle">
+                    Visual siaran langsung (WYSIWYG 1080p) otomatis merespons teks yang diisi pada form di atas
+                  </span>
+                </div>
+              </div>
+
+              {graphics.length > 1 && (
+                <div className="preview-cue-switcher">
+                  <span className="preview-switch-label">Preview Cue:</span>
+                  <div className="preview-switch-pills">
+                    {graphics.map((g, i) => (
+                      <button
+                        key={g.id || i}
+                        type="button"
+                        className={`preview-pill-btn ${previewIndex === i ? "active" : ""}`}
+                        onClick={() => setPreviewIndex(i)}
+                      >
+                        #{i + 1} {g.templateType === "REPORTER" ? "Narasumber" : g.templateType === "LOCATION" ? "Lokasi" : "Headline"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="story-preview-screen-wrapper">
+              <BroadcastPreviewBox
+                graphic={
+                  currentPreviewCue
+                    ? { id: "draft-preview", templateType: currentPreviewCue.templateType }
+                    : null
+                }
+                fields={effectivePreviewFields}
+                master={master}
+                emptyText="Ketik headline pada form di atas untuk melihat visual siaran..."
+              />
+            </div>
+            <div className="story-preview-caption">
+              <span>● Visual di atas adalah representasi langsung (*alpha overlay*) di layar siaran.</span>
             </div>
           </div>
         </div>
@@ -1260,12 +1400,8 @@ export function Production({
       event.preventDefault();
       if (action === "clear-all") void command("clear-all");
       else if (action === "logo" || action === "full") void base(action);
-      else if (action === "name") quick("cg");
       else if (action === "headline" || action === "location" || action === "detail") quick(action);
-      else if (action === "toggle-location") toggleLiveLocation();
-      else if (action === "toggle-detail") toggleLiveDetail();
       else if (action === "take" && cue && !quickDirty) void command("take", cue);
-      else if (action === "take-next") void takeAndNext();
       else if (action === "update" && cue?.id === live.onAirGraphicId && cue && !quickDirty) void command("update", cue);
       else if (action === "clear") void command("clear");
       else if (action === "next") stepCue(1);

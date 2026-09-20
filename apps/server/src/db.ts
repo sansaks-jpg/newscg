@@ -2,8 +2,8 @@ import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { AppSettings, GraphicItem, MasterOverlayState, Rundown, RundownItem, TemplateType, VmixMapping } from "@newscg/shared";
-import { defaultMasterOverlayState } from "@newscg/shared";
+import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem, TemplateType, VmixMapping } from "@newscg/shared";
+import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
 
 const dbPath = resolve(process.cwd(), process.env.DATABASE_PATH || "./data/newscg.db");
 mkdirSync(dirname(dbPath), { recursive: true });
@@ -164,6 +164,20 @@ export function saveMasterOverlay(patch: Partial<MasterOverlayState>): MasterOve
   const current = getMasterOverlay();
   const updated = { ...current, ...patch };
   db.prepare("INSERT INTO settings(key, value) VALUES('master_overlay', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(updated));
+  return updated;
+}
+
+export function getHeadlineDefaults(): HeadlineDefaults {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'headline_defaults'").get() as any;
+  if (!row) return defaultHeadlineDefaults;
+  const parsed = json(row.value) as any;
+  return { ...defaultHeadlineDefaults, ...(parsed || {}) };
+}
+
+export function saveHeadlineDefaults(patch: Partial<HeadlineDefaults>): HeadlineDefaults {
+  const current = getHeadlineDefaults();
+  const updated = { ...current, ...patch };
+  db.prepare("INSERT INTO settings(key, value) VALUES('headline_defaults', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(updated));
   return updated;
 }
 

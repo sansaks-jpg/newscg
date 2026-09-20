@@ -48,19 +48,21 @@ import type {
   RundownItem,
   TemplateType,
   TimezoneMode,
-  VmixInput
+  VmixInput,
+  HeadlineDefaults
 } from "@newscg/shared";
-import { defaultMasterOverlayState } from "@newscg/shared";
+import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
 import { api, mutate } from "./api";
 import TemplatePreview from "./TemplatePreview";
 import OverlayWindow from "./OverlayWindow";
-import { Preparation, Production } from "./Newsroom";
+import { Preparation } from "./Newsroom";
+import { SimpleProductionEditor } from "./SimpleProductionEditor";
 import { AutoSquishText } from "./AutoSquishText";
 import { BroadcastTemplateInfo } from "./VisualTemplatePicker";
 import { BroadcastPreviewBox, BroadcastClock } from "./BroadcastGraphic";
 import { BroadcastTicker } from "./BroadcastTicker";
 
-type View = "live" | "rundown" | "graphics" | "settings";
+type View = "editor" | "rundown" | "settings";
 const templateMeta: Record<TemplateType, { label: string; icon: any; accent: string }> = {
   HEADLINE: { label: "Headline", icon: MonitorPlay, accent: "#f1f3f6" },
   REPORTER: { label: "Reporter / Pembawa Acara", icon: UserRound, accent: "#4e8cff" },
@@ -91,7 +93,7 @@ export default function App() {
     return <OverlayWindow />;
   }
 
-  const [view, setView] = useState<View>("live");
+  const [view, setView] = useState<View>("editor");
   const [rundowns, setRundowns] = useState<Rundown[]>([]);
   const [activeId, setActiveId] = useState(() => localStorage.getItem("newscg-active-rundown") || "");
   useEffect(() => { if (activeId) localStorage.setItem("newscg-active-rundown", activeId); }, [activeId]);
@@ -235,7 +237,7 @@ export default function App() {
     <div className="app-shell-zero-scroll">
       <header className="unified-topbar">
         <div className="topbar-left">
-          <button className="brand-compact" onClick={() => setView("live")}>
+          <button className="brand-compact" onClick={() => setView("editor")}>
             <span className="brand-mark">N</span>
             <span className="brand-text">
               <b>NewsCG</b>
@@ -262,9 +264,8 @@ export default function App() {
         <nav className="topbar-nav-tabs">
           {(
             [
-              ["live", Radio, "Produksi"],
+              ["editor", PencilLine, "Editor CG"],
               ["rundown", LayoutList, "Persiapan"],
-              ["graphics", PencilLine, "Editor CG"],
               ["settings", Settings, "Pengaturan"]
             ] as const
           ).map(([id, Icon, label]) => (
@@ -275,7 +276,7 @@ export default function App() {
             >
               <Icon size={14} />
               <span>{label}</span>
-              {id === "live" && live.onAirGraphicId ? <span className="tab-pulse-dot" /> : null}
+              {id === "editor" && live.onAirGraphicId ? <span className="tab-pulse-dot" /> : null}
             </button>
           ))}
         </nav>
@@ -317,9 +318,8 @@ export default function App() {
       </header>
 
       <main className="main-content-zero-scroll">
-        {view === "live" && (
-          <Production
-            onPrepare={() => setView("rundown")}
+        {view === "editor" && (
+          <SimpleProductionEditor
             rundown={active}
             rundowns={rundowns}
             onRundown={setActiveId}
@@ -327,6 +327,7 @@ export default function App() {
             toast={setToast}
             master={master}
             live={live}
+            onUpdateMaster={updateMaster}
             onSetup={() => setShowSetupModal(true)}
           />
         )}
@@ -340,15 +341,6 @@ export default function App() {
             master={master}
             live={live}
             onSetup={() => setShowSetupModal(true)}
-          />
-        )}
-        {view === "graphics" && (
-          <GraphicsEditor
-            graphic={selected}
-            all={graphics}
-            master={master}
-            onChoose={choose}
-            onSave={saveGraphic}
           />
         )}
         {view === "settings" && settings && (
@@ -1345,21 +1337,48 @@ function SettingsView({
   const [inputs, setInputs] = useState<VmixInput[]>([]);
   const [testing, setTesting] = useState(false);
   const [masterForm, setMasterForm] = useState<MasterOverlayState>(master);
+  const [headlineDefaults, setHeadlineDefaults] = useState<HeadlineDefaults>(defaultHeadlineDefaults);
+  const [savingHeadline, setSavingHeadline] = useState(false);
   const masterLogoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setForm(value), [value]);
   useEffect(() => setMasterForm(master), [master]);
+  useEffect(() => {
+    api<HeadlineDefaults>("/api/settings/headline-defaults")
+      .then((d) => {
+        if (d) setHeadlineDefaults(d);
+      })
+      .catch(() => {});
+  }, []);
 
   async function save() {
     await mutate("/api/settings", "PATCH", form);
     await onUpdateMaster(masterForm);
+    await saveHeadlineDefaultsData();
     await onSaved();
     toast("Semua pengaturan berhasil disimpan");
   }
 
   async function saveMaster() {
     await onUpdateMaster(masterForm);
-    toast("Pengaturan default siaran berhasil disimpan");
+    toast("Pengaturan default elemen master berhasil disimpan");
+  }
+
+  async function saveHeadlineDefaultsData() {
+    setSavingHeadline(true);
+    try {
+      const updated = await mutate<HeadlineDefaults>(
+        "/api/settings/headline-defaults",
+        "PATCH",
+        headlineDefaults
+      );
+      setHeadlineDefaults(updated);
+      toast("Pengaturan default headline berita berhasil disimpan");
+    } catch (e: any) {
+      toast(e.message || "Gagal menyimpan default headline");
+    } finally {
+      setSavingHeadline(false);
+    }
   }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1643,41 +1662,86 @@ function SettingsView({
             )}
           </div>
 
-          {/* Subgrup 5: Pratinjau Interaktif Ticker Langsung */}
-          <div style={{ marginTop: 12, marginBottom: 14 }}>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 800,
-                color: "#38bdf8",
-                textTransform: "uppercase",
-                letterSpacing: 0.8,
-                display: "block",
-                marginBottom: 6
-              }}
-            >
-              ⚡ PRATINJAU LANGSUNG TICKER (BADGE FIT & ANIMASI BERPUTAR):
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              borderTop: "1px solid #1e293b",
+              paddingTop: 12,
+              marginTop: 10
+            }}
+          >
+            <button className="primary-small" onClick={saveMaster}>
+              <Save size={13} /> Simpan Default Master
+            </button>
+            <span style={{ fontSize: 10, color: "#64748b" }}>
+              Perubahan identitas grafis tersimpan ke database & terkirim ke overlay siaran.
             </span>
-            <div
-              className="cg-ticker-bar cnn-template"
-              style={{
-                position: "relative",
-                height: 46,
-                borderRadius: 6,
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "stretch",
-                border: "1px solid #334155"
-              }}
-            >
-              <div className="cg-ticker-badge" style={{ height: "100%", fontSize: 18 }}>
-                <span>{masterForm.brandText || "CNNINDONESIA.COM"}</span>
-              </div>
-              <BroadcastTicker text={masterForm.tickerText || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"} />
-              <div className="cg-ticker-clock" style={{ height: "100%", fontSize: 20 }}>
-                <BroadcastClock timezone={masterForm.timezone} customLabel={masterForm.customTimezoneLabel} />
-              </div>
-            </div>
+          </div>
+        </div>
+
+        {/* 2. KARTU PENGATURAN DEFAULT HEADLINE BERITA */}
+        <div className="settings-card headline-defaults-card">
+          <h3>
+            <FileJson size={17} />
+            Pengaturan Default Headline Berita
+          </h3>
+          <p>
+            Nilai awal bawaan saat membuat berita baru pada tab Persiapan. Berita yang sudah dibuat sebelumnya tetap mempertahankan datanya masing-masing.
+          </p>
+
+          <div className="form-grid" style={{ marginBottom: 12 }}>
+            <label className="wide">
+              <span>Default Headline / Judul Utama</span>
+              <input
+                value={headlineDefaults.headline}
+                placeholder="Contoh: BERITA UTAMA HARI INI"
+                maxLength={120}
+                onChange={(e) =>
+                  setHeadlineDefaults({ ...headlineDefaults, headline: e.target.value })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="form-grid" style={{ marginBottom: 12 }}>
+            <label>
+              <span>Default Lokasi</span>
+              <input
+                value={headlineDefaults.location}
+                placeholder="Contoh: JAKARTA"
+                maxLength={60}
+                onChange={(e) =>
+                  setHeadlineDefaults({ ...headlineDefaults, location: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              <span>Default Topik / Kicker</span>
+              <input
+                value={headlineDefaults.kicker}
+                placeholder="Contoh: BREAKING NEWS"
+                maxLength={60}
+                onChange={(e) =>
+                  setHeadlineDefaults({ ...headlineDefaults, kicker: e.target.value })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="form-grid" style={{ marginBottom: 14 }}>
+            <label className="wide">
+              <span>Default Detail / Subline Keterangan</span>
+              <input
+                value={headlineDefaults.subline}
+                placeholder="Contoh: Keterangan tambahan berita..."
+                maxLength={160}
+                onChange={(e) =>
+                  setHeadlineDefaults({ ...headlineDefaults, subline: e.target.value })
+                }
+              />
+            </label>
           </div>
 
           <div
@@ -1689,11 +1753,15 @@ function SettingsView({
               paddingTop: 12
             }}
           >
-            <button className="primary-small" onClick={saveMaster}>
-              <Save size={13} /> Simpan Pengaturan Default Siaran
+            <button
+              className="primary-small"
+              onClick={saveHeadlineDefaultsData}
+              disabled={savingHeadline}
+            >
+              <Save size={13} /> {savingHeadline ? "Menyimpan..." : "Simpan Default Headline"}
             </button>
             <span style={{ fontSize: 10, color: "#64748b" }}>
-              Perubahan langsung tersimpan ke database & terkirim ke overlay siaran.
+              Tersimpan permanen di database server sebagai template awal materi baru.
             </span>
           </div>
         </div>

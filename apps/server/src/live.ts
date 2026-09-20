@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { GraphicItem, LiveState, MasterOverlayState, OverlayEvent } from "@newscg/shared";
+import type { GraphicItem, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
 import { getGraphic, getMasterOverlay, getOnAir, getSettingsInternal, logAction, markGraphicPushed, saveMasterOverlay, saveOnAir } from "./db.js";
 import { HttpVmixAdapter, MockVmixAdapter, type VmixAdapter } from "./vmix.js";
 
@@ -119,7 +119,7 @@ export async function listInputs() {
   return adapter().listInputs();
 }
 
-export function take(graphicId: string, idempotencyKey: string) {
+export function take(graphicId: string, idempotencyKey: string, options?: { presentation?: "clean" }) {
   return enqueue(idempotencyKey, async () => {
     const requestId = randomUUID();
     const graphic = getGraphic(graphicId);
@@ -130,17 +130,21 @@ export function take(graphicId: string, idempotencyKey: string) {
     // Mode 1: Web Overlay (Singular.live style)
     if (settings.outputMode !== "vmix-gt") {
       try {
-        markGraphicPushed(graphic.id, graphic.draftFields);
-        saveOnAir(graphic.id, "web-overlay", settings.overlayNumber || 1, graphic.draftFields, "confirmed");
+        const effectiveFields = options?.presentation === "clean"
+          ? { ...graphic.draftFields, showLocation: "false", showKicker: "false", layoutStyle: "single" }
+          : graphic.draftFields;
+
+        markGraphicPushed(graphic.id, effectiveFields);
+        saveOnAir(graphic.id, "web-overlay", settings.overlayNumber || 1, effectiveFields, "confirmed");
         live = {
           ...live,
           commandStatus: "confirmed",
           onAirGraphicId: graphic.id,
           actualOverlayInputGuid: "web-overlay",
-          onAirSnapshot: graphic.draftFields,
+          onAirSnapshot: effectiveFields,
           error: null
         };
-        broadcastOverlayEvent({ type: "TAKE", graphic, fields: graphic.draftFields, master: getMasterOverlay() });
+        broadcastOverlayEvent({ type: "TAKE", graphic, fields: effectiveFields, master: getMasterOverlay() });
         logAction("TAKE", "confirmed", `${graphic.templateType} terkonfirmasi ON AIR (Web Overlay)`, graphic.id, requestId);
         return {
           requestId,
@@ -213,10 +217,17 @@ export function updateLive(graphicId: string, idempotencyKey: string) {
       live = { ...live, commandStatus: "pending", error: null };
 
       if (settings.outputMode !== "vmix-gt") {
-        markGraphicPushed(graphic.id, graphic.draftFields);
-        saveOnAir(graphic.id, "web-overlay", settings.overlayNumber || 1, graphic.draftFields, "confirmed");
-        live = { ...live, commandStatus: "confirmed", onAirSnapshot: graphic.draftFields, lastActionAt: new Date().toISOString() };
-        broadcastOverlayEvent({ type: "UPDATE", graphicId: graphic.id, fields: graphic.draftFields, master: getMasterOverlay() });
+        const existingSnapshot = (current.snapshot as Record<string, string>) || {};
+        const effectiveFields: Record<string, string> = {
+          ...graphic.draftFields
+        };
+        if (existingSnapshot.showLocation !== undefined) effectiveFields.showLocation = existingSnapshot.showLocation;
+        if (existingSnapshot.showKicker !== undefined) effectiveFields.showKicker = existingSnapshot.showKicker;
+        if (existingSnapshot.layoutStyle !== undefined) effectiveFields.layoutStyle = existingSnapshot.layoutStyle;
+        markGraphicPushed(graphic.id, effectiveFields);
+        saveOnAir(graphic.id, "web-overlay", settings.overlayNumber || 1, effectiveFields, "confirmed");
+        live = { ...live, commandStatus: "confirmed", onAirSnapshot: effectiveFields, lastActionAt: new Date().toISOString() };
+        broadcastOverlayEvent({ type: "UPDATE", graphicId: graphic.id, fields: effectiveFields, master: getMasterOverlay() });
         logAction("UPDATE", "confirmed", "Konten ON AIR diperbarui (Web Overlay)", graphic.id, requestId);
         return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: "web-overlay", timestamp: new Date().toISOString(), error: null, state: publicState() };
       }
@@ -242,6 +253,89 @@ export function updateLive(graphicId: string, idempotencyKey: string) {
       live = { ...live, commandStatus: "failed", error: e.message };
       logAction("UPDATE", "failed", e.message, graphicId, requestId);
       return { requestId, commandStatus: "failed", actualOverlayInputGuid: current?.inputGuid || null, timestamp: new Date().toISOString(), error: e.message, state: publicState() };
+    }
+  });
+}
+
+export function takeVariantLive(
+  graphicId: string,
+  action: LiveVariantAction,
+  idempotencyKey: string
+) {
+  return enqueue(idempotencyKey, async () => {
+    const requestId = randomUUID();
+    const graphic = getGraphic(graphicId);
+    const current = getOnAir();
+    const settings = getSettingsInternal();
+
+    try {
+      if (!graphic || !current || current.graphicId !== graphicId) {
+        throw new Error("Perubahan varian diblokir: grafis ini tidak sedang ON AIR");
+      }
+
+      const currentSnapshot = (current.snapshot as Record<string, string>) || { ...graphic.draftFields };
+      const updatedSnapshot = { ...currentSnapshot };
+
+      if (action === "clean-headline") {
+        updatedSnapshot.showLocation = "false";
+        updatedSnapshot.showKicker = "false";
+        updatedSnapshot.layoutStyle = "single";
+      } else if (action === "toggle-location") {
+        const hasLocation = Boolean(graphic.draftFields.location?.trim());
+        if (!hasLocation) {
+          throw new Error("Data lokasi belum tersedia pada berita ini");
+        }
+        const isCurrentShown = currentSnapshot.showLocation !== "false";
+        updatedSnapshot.showLocation = isCurrentShown ? "false" : "true";
+      } else if (action === "toggle-kicker") {
+        const hasKicker = Boolean(graphic.draftFields.kicker?.trim());
+        if (!hasKicker) {
+          throw new Error("Topik/kicker belum tersedia pada berita ini");
+        }
+        const isCurrentShown = currentSnapshot.showKicker !== "false";
+        updatedSnapshot.showKicker = isCurrentShown ? "false" : "true";
+      } else if (action === "toggle-detail") {
+        const hasDetail = Boolean(graphic.draftFields.subline?.trim());
+        if (!hasDetail) {
+          throw new Error("Detail/subline belum tersedia pada berita ini");
+        }
+        const isCurrentSub = currentSnapshot.layoutStyle === "sub";
+        updatedSnapshot.layoutStyle = isCurrentSub ? "single" : "sub";
+      }
+
+      saveOnAir(graphic.id, current.inputGuid || "web-overlay", settings.overlayNumber || 1, updatedSnapshot, "confirmed");
+      live = {
+        ...live,
+        commandStatus: "confirmed",
+        onAirSnapshot: updatedSnapshot,
+        lastActionAt: new Date().toISOString()
+      };
+      broadcastOverlayEvent({
+        type: "UPDATE",
+        graphicId: graphic.id,
+        fields: updatedSnapshot,
+        master: getMasterOverlay()
+      });
+      logAction("VARIANT", "confirmed", `Varian ${action} diterapkan pada ${graphic.id}`, graphic.id, requestId);
+      return {
+        requestId,
+        commandStatus: "confirmed",
+        actualOverlayInputGuid: current.inputGuid || "web-overlay",
+        timestamp: new Date().toISOString(),
+        error: null,
+        state: publicState()
+      };
+    } catch (e: any) {
+      live = { ...live, commandStatus: "failed", error: e.message };
+      logAction("VARIANT", "failed", e.message, graphicId, requestId);
+      return {
+        requestId,
+        commandStatus: "failed",
+        actualOverlayInputGuid: current?.inputGuid || null,
+        timestamp: new Date().toISOString(),
+        error: e.message,
+        state: publicState()
+      };
     }
   });
 }

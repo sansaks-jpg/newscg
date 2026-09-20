@@ -156,4 +156,29 @@ export type LiveState = {
   onAirGraphicId: string | null; actualOverlayInputGuid: string | null; onAirSnapshot: Record<string, string> | null;
   lastActionAt: string | null; error: string | null; mode: "mock" | "http"; outputMode: OutputMode;
   overlayClientsCount: number;
+};export type HeadlineVisibility = {
+  showLocation: boolean;
+  showKicker: boolean;
+  showDetail: boolean;
+};
+
+export type LiveVariantAction =
+  | "clean-headline"
+  | "toggle-location"
+  | "toggle-kicker"
+  | "toggle-detail";
+
+export const headlineDefaultsSchema = z.object({
+  headline: z.string().trim().max(120).default(""),
+  location: z.string().trim().max(60).default(""),
+  kicker: z.string().trim().max(60).default(""),
+  subline: z.string().trim().max(160).default("")
+});
+export type HeadlineDefaults = z.infer<typeof headlineDefaultsSchema>;
+
+export const defaultHeadlineDefaults: HeadlineDefaults = {
+  headline: "",
+  location: "",
+  kicker: "",
+  subline: ""
 };
