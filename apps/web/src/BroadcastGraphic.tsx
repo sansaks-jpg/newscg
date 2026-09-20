@@ -6,6 +6,12 @@ import { BroadcastTicker } from "./BroadcastTicker";
 import { useLayerPresence } from "./useLayerPresence";
 import { AutoSquishText } from "./AutoSquishText";
 
+export type GhostFields = {
+  location?: string;
+  kicker?: string;
+  subline?: string;
+};
+
 export function BroadcastGraphic({
   type,
   fields,
@@ -14,7 +20,9 @@ export function BroadcastGraphic({
   isMini = false,
   visualTemplate,
   contentKey = 0,
-  exitAll = false
+  exitAll = false,
+  ghostPreview = false,
+  ghostFields = null
 }: {
   type?: TemplateType | null;
   fields?: Record<string, string> | null;
@@ -24,6 +32,8 @@ export function BroadcastGraphic({
   visualTemplate?: string;
   contentKey?: string | number;
   exitAll?: boolean;
+  ghostPreview?: boolean;
+  ghostFields?: GhostFields | null;
 }) {
   const cnn = true;
   const logoLayer = useLayerPresence(master.showLogo && !exitAll);
@@ -74,6 +84,24 @@ export function BroadcastGraphic({
     effectiveFields.layoutStyle === "single" ||
     (!hasSubline && effectiveFields.layoutStyle !== "sub");
 
+  // Ghost elements (Bayangan abu-abu transparan untuk monitor standby preview)
+  const ghostLocationText =
+    ghostPreview && !locationLayer.present && Boolean(ghostFields?.location?.trim())
+      ? ghostFields!.location!.trim()
+      : null;
+
+  const ghostKickerText =
+    ghostPreview && !kickerLayer.present && contentMode === "headline" && Boolean(ghostFields?.kicker?.trim())
+      ? ghostFields!.kicker!.trim()
+      : null;
+
+  const ghostSublineText =
+    ghostPreview && !hasSubline && contentMode === "headline" && Boolean(ghostFields?.subline?.trim())
+      ? ghostFields!.subline!.trim()
+      : null;
+
+  const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText;
+
   const brandText = master.brandText || effectiveFields.brand || "CNNINDONESIA.COM";
   const tickerText =
     master.tickerText ||
@@ -82,12 +110,17 @@ export function BroadcastGraphic({
 
   return (
     <>
-      {/* 1. Location Tag di Pojok Kiri Atas (Muncul jika ada lokasi luar studio & showLocation true) */}
-      {locationLayer.present && (
+      {/* 1. Location Tag di Pojok Kiri Atas (Aktif atau Bayangan Ghost) */}
+      {locationLayer.present ? (
         <div key={`location-${contentKey}`} className={`cg-location-tag ${cnn ? "cnn-template" : ""} ${isExiting || locationLayer.exiting ? "cg-exit" : ""} ${isMini ? "mini" : ""}`}>
           <span>{effectiveFields.location || lastLocation}</span>
         </div>
-      )}
+      ) : ghostLocationText ? (
+        <div key="location-ghost" className={`cg-location-tag cg-ghost-element ${cnn ? "cnn-template" : ""} ${isMini ? "mini" : ""}`} title="Lokasi (Belum Aktif — Tekan L lalu Spasi)">
+          <span className="cg-ghost-pill">[L]</span>
+          <span>{ghostLocationText}</span>
+        </div>
+      ) : null}
 
       {/* 2. Lower Third Grafis Siaran */}
       <div
@@ -96,16 +129,21 @@ export function BroadcastGraphic({
         {/* Layer Konten (Kicker & Main White Box) — Tampil jika ada materi ON AIR */}
         {hasContent && (
           <div key={contentKey} className={`cg-content-layer ${exitClass}`}>
-            {/* Kicker Tab di Atas Kotak Putih (Opsional sesuai Gambar 5 / Gambar 3) */}
-            {kickerLayer.present && (
+            {/* Kicker Tab di Atas Kotak Putih (Opsional sesuai Gambar 5 / Gambar 3 — Aktif atau Bayangan Ghost) */}
+            {kickerLayer.present ? (
               <div className={`cg-kicker-tab ${kickerLayer.exiting ? "cg-kicker-out" : ""}`}>
                 <AutoSquishText text={effectiveFields.kicker || lastKicker || kickerText} minScale={0.7} />
               </div>
-            )}
+            ) : ghostKickerText ? (
+              <div className="cg-kicker-tab cg-ghost-element" title="Topik (Belum Aktif — Tekan T lalu Spasi)">
+                <span className="cg-ghost-pill">[T]</span>
+                <AutoSquishText text={ghostKickerText} minScale={0.7} />
+              </div>
+            ) : null}
 
             {/* Kotak Utama Putih */}
-            <div className={`cg-main-box ${isSingleLayout ? "single-layout" : ""} ${contentMode}`}>
-              <div className={`cg-text-area ${isSingleLayout ? "single-layout" : ""} ${contentMode}`}>
+            <div className={`cg-main-box ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
+              <div className={`cg-text-area ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
                 {/* Varian A: Paragraf / Keterangan Tunggal (Gambar 3 - Sentence Case Wardah Style) */}
                 {contentMode === "paragraph" ? (
                   <div className="cg-paragraph-row">
@@ -136,7 +174,7 @@ export function BroadcastGraphic({
                       </div>
                     )}
                   </div>
-                ) : isSingleLayout ? (
+                ) : isEffectiveSingleLayout ? (
                   /* Varian C: Headline Tunggal Gede Semua (Gambar 5 - Studio Style) */
                   <div className="cg-headline-row-single">
                     <AutoSquishText
@@ -146,7 +184,7 @@ export function BroadcastGraphic({
                     />
                   </div>
                 ) : (
-                  /* Varian D: Headline Utama + Subline Keterangan */
+                  /* Varian D: Headline Utama + Subline Keterangan (Aktif atau Bayangan Ghost) */
                   <>
                     <div className="cg-headline-row">
                       <AutoSquishText
@@ -155,7 +193,7 @@ export function BroadcastGraphic({
                         className="cg-headline-squish"
                       />
                     </div>
-                    {sublineText && (
+                    {sublineText ? (
                       <div className="cg-subline-row">
                         <AutoSquishText
                           text={sublineText}
@@ -163,7 +201,16 @@ export function BroadcastGraphic({
                           className="cg-subline-squish"
                         />
                       </div>
-                    )}
+                    ) : ghostSublineText ? (
+                      <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu Spasi)">
+                        <span className="cg-ghost-pill">[D]</span>
+                        <AutoSquishText
+                          text={ghostSublineText}
+                          minScale={0.45}
+                          className="cg-subline-squish"
+                        />
+                      </div>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -282,7 +329,9 @@ export function BroadcastPreviewBox({
   emptyText,
   isExiting = false,
   visualTemplate,
-  animationKey = 0
+  animationKey = 0,
+  ghostPreview = false,
+  ghostFields = null
 }: {
   graphic: any;
   fields: Record<string, string> | null;
@@ -291,6 +340,8 @@ export function BroadcastPreviewBox({
   isExiting?: boolean;
   visualTemplate?: string;
   animationKey?: number;
+  ghostPreview?: boolean;
+  ghostFields?: GhostFields | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.2);
@@ -364,6 +415,8 @@ export function BroadcastPreviewBox({
             isExiting={isExiting}
             visualTemplate="cnn"
             contentKey={`${graphic?.id || "preview"}-cnn-${animationKey}`}
+            ghostPreview={ghostPreview}
+            ghostFields={ghostFields}
           />
         </div>
 

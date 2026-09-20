@@ -166,9 +166,9 @@ export function SimpleProductionEditor({
     });
 
     setComposition({
-      showLocation: f.showLocation !== "false" && Boolean(f.location?.trim()),
-      showKicker: f.showKicker !== "false" && Boolean(f.kicker?.trim()),
-      showDetail: f.layoutStyle === "sub" && Boolean(f.subline?.trim())
+      showLocation: f.showLocation === "true" && Boolean(f.location?.trim()),
+      showKicker: f.showKicker === "true" && Boolean(f.kicker?.trim()),
+      showDetail: f.showDetail === "true" && Boolean(f.subline?.trim())
     });
     setSaveStatus("idle");
   }, [selectedCue?.id]);
@@ -187,6 +187,7 @@ export function SimpleProductionEditor({
           subline: draftToSave.subline.trim(),
           showLocation: compToSave.showLocation ? "true" : "false",
           showKicker: compToSave.showKicker ? "true" : "false",
+          showDetail: compToSave.showDetail ? "true" : "false",
           layoutStyle: compToSave.showDetail ? "sub" : "single"
         };
         await mutate(`/api/graphics/${selectedCue.id}`, "PATCH", {
@@ -563,6 +564,7 @@ export function SimpleProductionEditor({
     subline: miniDraft.subline,
     showLocation: composition.showLocation ? "true" : "false",
     showKicker: composition.showKicker ? "true" : "false",
+    showDetail: composition.showDetail ? "true" : "false",
     layoutStyle: composition.showDetail ? "sub" : "single"
   };
 
@@ -733,6 +735,12 @@ export function SimpleProductionEditor({
               fields={effectivePreviewFields}
               master={stagedMaster}
               emptyText="PILIH BERITA DARI DAFTAR"
+              ghostPreview={true}
+              ghostFields={{
+                location: miniDraft.location,
+                kicker: miniDraft.kicker,
+                subline: miniDraft.subline
+              }}
             />
           </div>
 

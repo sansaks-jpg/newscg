@@ -184,3 +184,67 @@
 @media (prefers-reduced-motion: reduce) {
   .cg-ticker-bar, .cg-logo-box.standalone, .cg-standalone-live-badge { animation-duration: 1ms !important; }
 }
+
+/* =====================================================================
+   GHOST ELEMENT PREVIEW (Standby Preview Helpers)
+   Elemen bayangan abu-abu transparan untuk L (Lokasi), T (Topik), D (Detail)
+   Hanya aktif pada monitor Standby Preview, tidak muncul di ON AIR.
+   ===================================================================== */
+
+/* 1. Lokasi Ghost */
+.cnn-template.cg-location-tag.cg-ghost-element {
+  background: rgba(15, 23, 42, 0.72) !important;
+  border: 2px dashed rgba(148, 163, 184, 0.75) !important;
+  color: rgba(226, 232, 240, 0.7) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  animation: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* 2. Kicker / Topik Ghost */
+.cnn-template .cg-kicker-tab.cg-ghost-element {
+  background: rgba(15, 23, 42, 0.72) !important;
+  border: 2px dashed rgba(148, 163, 184, 0.75) !important;
+  border-bottom: none !important;
+  color: rgba(226, 232, 240, 0.7) !important;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3) !important;
+  animation: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* 3. Detail / Subline Ghost */
+.cnn-template .cg-subline-row.cg-ghost-element {
+  color: rgba(100, 116, 139, 0.8) !important;
+  border-top: 2px dashed rgba(148, 163, 184, 0.45) !important;
+  padding-top: 4px !important;
+  margin-top: 3px !important;
+  font-style: italic;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  animation: none !important;
+}
+
+/* Badge hotkey penanda [L], [T], [D] */
+.cg-ghost-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  background: rgba(148, 163, 184, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75em;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
