@@ -69,27 +69,30 @@ export function SimpleProductionEditor({
 }: Props) {
   const items = rundown?.items || [];
 
-  // Pilihan berita aktif di sidebar
-  const [selectedItemId, setSelectedItemId] = useState<string>(() => {
-    return sessionStorage.getItem("simple-cued-story") || items[0]?.id || "";
+  // Pilihan berita aktif di sidebar (null jika dibersihkan via ESC)
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(() => {
+    return sessionStorage.getItem("simple-cued-story") || items[0]?.id || null;
   });
 
-  const selectedItem = items.find((i) => i.id === selectedItemId) || items[0] || null;
+  const selectedItem = selectedItemId ? (items.find((i) => i.id === selectedItemId) || null) : null;
 
   // Cue terpilih dalam berita tersebut
-  const [selectedCueId, setSelectedCueId] = useState<string>(() => {
-    return sessionStorage.getItem("simple-cued-cue") || "";
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(() => {
+    return sessionStorage.getItem("simple-cued-cue") || null;
   });
 
-  const selectedCue: GraphicItem | null =
-    selectedItem?.graphics.find((g) => g.id === selectedCueId) ||
-    selectedItem?.graphics.find((g) => g.templateType === "HEADLINE") ||
-    selectedItem?.graphics[0] ||
-    null;
+  const selectedCue: GraphicItem | null = selectedItem
+    ? (selectedItem.graphics.find((g) => g.id === selectedCueId) ||
+       selectedItem.graphics.find((g) => g.templateType === "HEADLINE") ||
+       selectedItem.graphics[0] ||
+       null)
+    : null;
 
   useEffect(() => {
     if (selectedItem?.id) {
       sessionStorage.setItem("simple-cued-story", selectedItem.id);
+    } else {
+      sessionStorage.removeItem("simple-cued-story");
     }
   }, [selectedItem?.id]);
 
@@ -97,6 +100,9 @@ export function SimpleProductionEditor({
     if (selectedCue?.id) {
       sessionStorage.setItem("simple-cued-cue", selectedCue.id);
       setSelectedCueId(selectedCue.id);
+    } else {
+      sessionStorage.removeItem("simple-cued-cue");
+      setSelectedCueId(null);
     }
   }, [selectedCue?.id]);
 
@@ -221,7 +227,24 @@ export function SimpleProductionEditor({
     (direction: -1 | 1) => {
       if (!items.length) return;
       const currentIndex = items.findIndex((i) => i.id === selectedItem?.id);
-      if (currentIndex === -1) return;
+      if (currentIndex === -1) {
+        const targetIndex = direction === 1 ? 0 : items.length - 1;
+        const targetItem = items[targetIndex];
+        if (targetItem) {
+          setSelectedItemId(targetItem.id);
+          const firstHeadline =
+            targetItem.graphics.find((g) => g.templateType === "HEADLINE") ||
+            targetItem.graphics[0];
+          if (firstHeadline) {
+            setSelectedCueId(firstHeadline.id);
+          }
+          const el = itemRefs.current[targetItem.id];
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+        return;
+      }
       const targetIndex = currentIndex + direction;
       if (targetIndex >= 0 && targetIndex < items.length) {
         const targetItem = items[targetIndex];
@@ -349,18 +372,36 @@ export function SimpleProductionEditor({
     }
   }, [selectedCue, isSelectedOnAir, busy, miniDraft, composition, flushSaveDraft, isMasterChanged, onUpdateMaster, stagedMaster, reload, toast]);
 
-  // Perintah Live: CLEAR CG
+  // Perintah Live & Preview: CLEAR CG & UNSELECT BERITA (Esc / C)
   const executeClear = useCallback(async () => {
-    if (busy || !live.onAirGraphicId) return;
-    setBusy(true);
-    try {
-      await mutate("/api/live/clear", "POST", {}, true);
-      await reload();
-      toast("CLEAR CG terkonfirmasi — Lower third dinonaktifkan");
-    } catch (e: any) {
-      toast(e.message);
-    } finally {
-      setBusy(false);
+    if (busy) return;
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // 1. Unselect dan kosongkan preview berita (tidak memilih apapun di preview)
+    setSelectedItemId(null);
+    setSelectedCueId(null);
+    setMiniDraft({ headline: "", location: "", kicker: "", subline: "" });
+    setComposition({ showLocation: false, showKicker: false, showDetail: false });
+    sessionStorage.removeItem("simple-cued-story");
+    sessionStorage.removeItem("simple-cued-cue");
+
+    // 2. Hapus visual di siaran langsung secara langsung jika ada yang tayang ON AIR
+    if (live.onAirGraphicId) {
+      setBusy(true);
+      try {
+        await mutate("/api/live/clear", "POST", {}, true);
+        await reload();
+        toast("CLEAR — Visual siaran dinonaktifkan & preview dikosongkan");
+      } catch (e: any) {
+        toast(e.message);
+      } finally {
+        setBusy(false);
+      }
+    } else {
+      toast("CLEAR — Preview dikosongkan (tidak memilih berita)");
     }
   }, [busy, live.onAirGraphicId, reload, toast]);
 
@@ -556,17 +597,19 @@ export function SimpleProductionEditor({
   ]);
 
   // Efektif preview field yang dikirim ke renderer
-  const effectivePreviewFields: Record<string, string> = {
-    ...(selectedCue?.draftFields || {}),
-    headline: miniDraft.headline,
-    location: miniDraft.location,
-    kicker: miniDraft.kicker,
-    subline: miniDraft.subline,
-    showLocation: composition.showLocation ? "true" : "false",
-    showKicker: composition.showKicker ? "true" : "false",
-    showDetail: composition.showDetail ? "true" : "false",
-    layoutStyle: composition.showDetail ? "sub" : "single"
-  };
+  const effectivePreviewFields: Record<string, string> | null = selectedCue
+    ? {
+        ...(selectedCue.draftFields || {}),
+        headline: miniDraft.headline,
+        location: miniDraft.location,
+        kicker: miniDraft.kicker,
+        subline: miniDraft.subline,
+        showLocation: composition.showLocation ? "true" : "false",
+        showKicker: composition.showKicker ? "true" : "false",
+        showDetail: composition.showDetail ? "true" : "false",
+        layoutStyle: composition.showDetail ? "sub" : "single"
+      }
+    : null;
 
   // Label On-Air sekarang
   const onAirGraphic = items
@@ -725,22 +768,22 @@ export function SimpleProductionEditor({
             <div className="preview-meta-badge">
               <span className="stage-tag">STANDBY</span>
               <span className="cue-name">
-                {selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "Belum ada berita"}
+                {selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "TIDAK ADA BERITA TERPILIH"}
               </span>
-              <span className="cue-type">{selectedCue?.templateType || "CG"}</span>
+              <span className="cue-type">{selectedCue?.templateType || "OFF"}</span>
             </div>
 
             <BroadcastPreviewBox
               graphic={selectedCue}
               fields={effectivePreviewFields}
               master={stagedMaster}
-              emptyText="PILIH BERITA DARI DAFTAR"
-              ghostPreview={true}
-              ghostFields={{
+              emptyText="LAYAR BERSIH — TEKAN ↑ / ↓ UNTUK MEMILIH BERITA"
+              ghostPreview={Boolean(selectedCue)}
+              ghostFields={selectedCue ? {
                 location: miniDraft.location,
                 kicker: miniDraft.kicker,
                 subline: miniDraft.subline
-              }}
+              } : null}
             />
           </div>
 
@@ -872,8 +915,9 @@ export function SimpleProductionEditor({
           <button
             type="button"
             className="action-btn btn-clear"
-            disabled={busy || !live.onAirGraphicId}
+            disabled={busy || (!live.onAirGraphicId && !selectedCue)}
             onClick={executeClear}
+            title="Kosongkan siaran ON AIR & unselect preview (Esc / C)"
           >
             <div className="btn-inner">
               <X size={15} />
@@ -927,8 +971,9 @@ export function SimpleProductionEditor({
               <label>Headline Utama</label>
               <input
                 type="text"
-                placeholder="Masukkan judul berita utama..."
+                placeholder={selectedCue ? "Masukkan judul berita utama..." : "Pilih berita dari daftar untuk mengedit..."}
                 maxLength={120}
+                disabled={!selectedCue}
                 value={miniDraft.headline}
                 onChange={(e) => handleMiniDraftChange("headline", e.target.value)}
               />
@@ -938,8 +983,9 @@ export function SimpleProductionEditor({
               <label>Lokasi Siaran</label>
               <input
                 type="text"
-                placeholder="Contoh: Jakarta Pusat"
+                placeholder={selectedCue ? "Contoh: Jakarta Pusat" : "-"}
                 maxLength={60}
+                disabled={!selectedCue}
                 value={miniDraft.location}
                 onChange={(e) => handleMiniDraftChange("location", e.target.value)}
               />
@@ -949,8 +995,9 @@ export function SimpleProductionEditor({
               <label>Topik / Kicker (Atas)</label>
               <input
                 type="text"
-                placeholder="Contoh: BREAKING NEWS"
+                placeholder={selectedCue ? "Contoh: BREAKING NEWS" : "-"}
                 maxLength={60}
+                disabled={!selectedCue}
                 value={miniDraft.kicker}
                 onChange={(e) => handleMiniDraftChange("kicker", e.target.value)}
               />
@@ -960,8 +1007,9 @@ export function SimpleProductionEditor({
               <label>Detail / Subline Keterangan</label>
               <input
                 type="text"
-                placeholder="Penjelasan ringkas poin berita..."
+                placeholder={selectedCue ? "Penjelasan ringkas poin berita..." : "-"}
                 maxLength={160}
+                disabled={!selectedCue}
                 value={miniDraft.subline}
                 onChange={(e) => handleMiniDraftChange("subline", e.target.value)}
               />
