@@ -13,6 +13,43 @@ beforeAll(async () => {
   if (existsSync(testDb)) rmSync(testDb, { force: true });
   dbModule = await import("./db.js");
   dbModule.seedIfEmpty();
+  const rundowns = dbModule.getRundowns();
+  if (rundowns.length > 0 && rundowns[0]) {
+    const item = dbModule.createItem(rundowns[0].id, {
+      slug: "HEADLINE-01",
+      title: "Tenggelamnya KM Virgo Transport 8",
+      format: "VO",
+      estimatedDurationSeconds: 90,
+      sortOrder: 1
+    });
+    if (item) {
+      dbModule.createGraphic(item.id, {
+        id: "CG-201",
+        templateType: "HEADLINE",
+        sortOrder: 1,
+        status: "READY",
+        draftFields: {
+          kicker: "TENGGELAMNYA KM VIRGO TRANSPORT 8",
+          headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA",
+          subline: "Salah Satu Keluarga Korban Tak Menemukan Data Ayahnya di Data Penumpang",
+          location: "Surabaya, Jawa Timur",
+          ticker: "BERITA SIARAN TERVERIFIKASI",
+          brand: "CNNINDONESIA.COM"
+        }
+      });
+      dbModule.createGraphic(item.id, {
+        id: "CG-301",
+        templateType: "REPORTER",
+        sortOrder: 2,
+        status: "READY",
+        draftFields: {
+          name: "SANDI ARDIANSYAH",
+          role: "REPORTER",
+          location: "JAKARTA TIMUR"
+        }
+      });
+    }
+  }
   liveModule = await import("./live.js");
 });
 

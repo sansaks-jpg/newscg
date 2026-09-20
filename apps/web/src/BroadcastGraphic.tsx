@@ -74,13 +74,11 @@ export function BroadcastGraphic({
     effectiveFields.layoutStyle === "single" ||
     (!hasSubline && effectiveFields.layoutStyle !== "sub");
 
-  const brandText = effectiveFields.brand || master.brandText || "CNNINDONESIA.COM";
+  const brandText = master.brandText || effectiveFields.brand || "CNNINDONESIA.COM";
   const tickerText =
-    effectiveFields.ticker ||
     master.tickerText ||
-    (isReporter
-      ? "LAPORAN LANGSUNG DARI STUDIO / LOKASI KEJADIAN"
-      : "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI");
+    effectiveFields.ticker ||
+    "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI";
 
   return (
     <>

@@ -1,11 +1,38 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { getHeadlineDefaults, getOnAir, getRundowns, saveHeadlineDefaults, saveSettings, seedIfEmpty } from "../src/db.js";
+import { createGraphic, createItem, getHeadlineDefaults, getOnAir, getRundowns, saveHeadlineDefaults, saveSettings, seedIfEmpty } from "../src/db.js";
 import { take, takeVariantLive, updateLive } from "../src/live.js";
 
 describe("Live variant & headline defaults API (branch simple)", () => {
   beforeAll(() => {
     seedIfEmpty();
     saveSettings({ outputMode: "web" });
+    const rundowns = getRundowns();
+    const hasGraphic = rundowns.flatMap((r) => r.items).flatMap((i) => i.graphics).length > 0;
+    if (!hasGraphic && rundowns.length > 0 && rundowns[0]) {
+      const item = createItem(rundowns[0].id, {
+        slug: "TEST-HEADLINE",
+        title: "Tenggelamnya KM Virgo Transport 8",
+        format: "VO",
+        estimatedDurationSeconds: 90,
+        sortOrder: 1
+      });
+      if (item) {
+        createGraphic(item.id, {
+          id: "CG-TEST-201",
+          templateType: "HEADLINE",
+          sortOrder: 1,
+          status: "READY",
+          draftFields: {
+            kicker: "TENGGELAMNYA KM VIRGO TRANSPORT 8",
+            headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA",
+            subline: "Salah Satu Keluarga Korban Tak Menemukan Data Ayahnya di Data Penumpang",
+            location: "Surabaya, Jawa Timur",
+            ticker: "BERITA SIARAN TERVERIFIKASI",
+            brand: "CNNINDONESIA.COM"
+          }
+        });
+      }
+    }
   });
 
   it("manages headline defaults via db functions", () => {

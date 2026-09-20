@@ -59,9 +59,9 @@
 .cnn-template .cg-cnn-sub { font-size: 38px; line-height: 1; font-weight: 400; letter-spacing: -1px; margin-top: 4px; }
 .cnn-template .cg-brand-cnn { width: 184px; height: 86px; object-fit: contain; }
 .cnn-template .cg-custom-logo-img { max-width: 196px; max-height: 126px; }
-.cnn-template .cg-standalone-live-badge { width: var(--cg-logo-width); height: 64px; justify-content: center; padding: 0; margin: 0; border-radius: 0; box-shadow: none; background: linear-gradient(#f21212,#c00); font: 500 46px/1 Arial,sans-serif; letter-spacing: 5px; animation: cnn-text-in 300ms both; }
+.cnn-template .cg-standalone-live-badge { width: var(--cg-logo-width); height: 64px; justify-content: center; padding: 0; margin: 0; border-radius: 0; box-shadow: none; background: linear-gradient(#f21212,#c00); font: 500 46px/1 Arial,sans-serif; letter-spacing: 5px; }
 .cnn-template .live-dot { display: none; }
-.cnn-template .cg-ticker-bar { height: 56px; margin-top: 6px; border-radius: 0 0 14px 14px; background: linear-gradient(#303030,#060606); opacity: 1; animation: cnn-text-in 320ms both; }
+.cnn-template .cg-ticker-bar { height: 56px; margin-top: 6px; border-radius: 0 0 14px 14px; background: linear-gradient(#303030,#060606); opacity: 1; }
 .cnn-template .cg-ticker-badge {
   width: max-content;
   max-width: 520px;

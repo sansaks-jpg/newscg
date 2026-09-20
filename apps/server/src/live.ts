@@ -203,7 +203,11 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
   });
 }
 
-export function updateLive(graphicId: string, idempotencyKey: string) {
+export function updateLive(
+  graphicId: string,
+  idempotencyKey: string,
+  options?: { syncComposition?: boolean }
+) {
   return enqueue(idempotencyKey, async () => {
     const requestId = randomUUID();
     const graphic = getGraphic(graphicId);
@@ -221,9 +225,12 @@ export function updateLive(graphicId: string, idempotencyKey: string) {
         const effectiveFields: Record<string, string> = {
           ...graphic.draftFields
         };
-        if (existingSnapshot.showLocation !== undefined) effectiveFields.showLocation = existingSnapshot.showLocation;
-        if (existingSnapshot.showKicker !== undefined) effectiveFields.showKicker = existingSnapshot.showKicker;
-        if (existingSnapshot.layoutStyle !== undefined) effectiveFields.layoutStyle = existingSnapshot.layoutStyle;
+        // Jika syncComposition tidak diset, pertahankan visibilitas lama dari snapshot
+        if (!options?.syncComposition) {
+          if (existingSnapshot.showLocation !== undefined) effectiveFields.showLocation = existingSnapshot.showLocation;
+          if (existingSnapshot.showKicker !== undefined) effectiveFields.showKicker = existingSnapshot.showKicker;
+          if (existingSnapshot.layoutStyle !== undefined) effectiveFields.layoutStyle = existingSnapshot.layoutStyle;
+        }
         markGraphicPushed(graphic.id, effectiveFields);
         saveOnAir(graphic.id, "web-overlay", settings.overlayNumber || 1, effectiveFields, "confirmed");
         live = { ...live, commandStatus: "confirmed", onAirSnapshot: effectiveFields, lastActionAt: new Date().toISOString() };

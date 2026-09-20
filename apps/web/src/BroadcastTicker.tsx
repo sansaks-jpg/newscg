@@ -29,7 +29,6 @@ export function BroadcastTicker({ text }: { text: string }) {
   return (
     <div className={`cg-ticker-content ${changing ? "ticker-changing" : ""}`}>
       <div
-        key={displayText}
         className="cg-ticker-track"
         style={{
           "--ticker-duration": `${durationSec}s`

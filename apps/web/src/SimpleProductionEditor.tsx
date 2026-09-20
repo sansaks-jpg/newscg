@@ -228,42 +228,62 @@ export function SimpleProductionEditor({
     [items, selectedItem]
   );
 
-  // Perintah Live: TAKE
-  const executeTake = useCallback(
+  // Perintah Live Utama: COMMIT TO AIR (TAKE / UPDATE via SPASI)
+  const executeCommitToAir = useCallback(
     async (options?: { presentation?: "clean" }) => {
       if (!selectedCue || busy) return;
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
-        await flushSaveDraft(miniDraft, composition);
       }
+      await flushSaveDraft(miniDraft, composition);
       setBusy(true);
       try {
-        const body: any = { graphicId: selectedCue.id };
-        if (options?.presentation === "clean") {
-          body.presentation = "clean";
+        if (isSelectedOnAir) {
+          // Grafis ini sedang ON AIR: perbarui teks dan sinkronkan varian komposisi (L, T, D)
+          await mutate(
+            "/api/live/update",
+            "POST",
+            { graphicId: selectedCue.id, syncComposition: true },
+            true
+          );
+          await reload();
+          toast("ON AIR DIPERBARUI — Perubahan preview ditayangkan");
+        } else {
+          // Grafis belum ON AIR: tayangkan dengan animasi masuk
+          const body: any = { graphicId: selectedCue.id };
+          if (options?.presentation === "clean") {
+            body.presentation = "clean";
+          }
+          await mutate("/api/live/take", "POST", body, true);
+          await reload();
+          toast("TAKE terkonfirmasi — Grafis tayang ON AIR");
         }
-        await mutate("/api/live/take", "POST", body, true);
-        await reload();
-        toast("TAKE terkonfirmasi — Grafis tayang ON AIR");
       } catch (e: any) {
         toast(e.message);
       } finally {
         setBusy(false);
       }
     },
-    [selectedCue, busy, miniDraft, composition, flushSaveDraft, reload, toast]
+    [selectedCue, isSelectedOnAir, busy, miniDraft, composition, flushSaveDraft, reload, toast]
   );
 
-  // Perintah Live: UPDATE LIVE
+  const executeTake = executeCommitToAir;
+
+  // Perintah Live: UPDATE LIVE Manual
   const executeUpdate = useCallback(async () => {
     if (!selectedCue || !isSelectedOnAir || busy) return;
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
-      await flushSaveDraft(miniDraft, composition);
     }
+    await flushSaveDraft(miniDraft, composition);
     setBusy(true);
     try {
-      await mutate("/api/live/update", "POST", { graphicId: selectedCue.id }, true);
+      await mutate(
+        "/api/live/update",
+        "POST",
+        { graphicId: selectedCue.id, syncComposition: true },
+        true
+      );
       await reload();
       toast("UPDATE LIVE terkonfirmasi — Teks siaran diperbarui");
     } catch (e: any) {
@@ -327,116 +347,71 @@ export function SimpleProductionEditor({
     }
   }, [busy, master.showTicker, master.showLiveBadge, onUpdateMaster, toast]);
 
-  // Aksi Quick Action Headline (H)
-  const actionHeadline = useCallback(async () => {
+  // Aksi Quick Action Headline (H) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
+  const actionHeadline = useCallback(() => {
     if (!selectedCue) return;
-    if (isSelectedOnAir) {
-      // Jika sudah on air, reset ke clean headline tanpa animasi masuk ulang
-      try {
-        await mutate(
-          "/api/live/variant",
-          "POST",
-          { graphicId: selectedCue.id, action: "clean-headline" as LiveVariantAction },
-          true
-        );
-        setComposition({ showLocation: false, showKicker: false, showDetail: false });
-        await reload();
-      } catch (e: any) {
-        toast(e.message);
-      }
-    } else {
-      // Jika belum on air, take sebagai clean headline
-      setComposition({ showLocation: false, showKicker: false, showDetail: false });
-      await executeTake({ presentation: "clean" });
-    }
-  }, [selectedCue, isSelectedOnAir, reload, toast, executeTake]);
+    const nextComp = { showLocation: false, showKicker: false, showDetail: false };
+    setComposition(nextComp);
+    void flushSaveDraft(miniDraft, nextComp);
+    toast("Preview: Headline Bersih (Tekan SPASI untuk tayang)");
+  }, [selectedCue, miniDraft, flushSaveDraft, toast]);
 
-  // Aksi Quick Action Lokasi (L)
-  const actionToggleLocation = useCallback(async () => {
+  // Aksi Quick Action Lokasi (L) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
+  const actionToggleLocation = useCallback(() => {
     if (!selectedCue) return;
     const hasLoc = Boolean(miniDraft.location.trim());
     if (!hasLoc) {
       toast("Data lokasi belum diisi");
       return;
     }
+    const nextVal = !composition.showLocation;
+    const nextComp = { ...composition, showLocation: nextVal };
+    setComposition(nextComp);
+    void flushSaveDraft(miniDraft, nextComp);
+    toast(
+      nextVal
+        ? "Preview: Lokasi AKTIF (Tekan SPASI untuk tayang)"
+        : "Preview: Lokasi NONAKTIF (Tekan SPASI untuk tayang)"
+    );
+  }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
-    if (isSelectedOnAir) {
-      try {
-        await mutate(
-          "/api/live/variant",
-          "POST",
-          { graphicId: selectedCue.id, action: "toggle-location" as LiveVariantAction },
-          true
-        );
-        setComposition((c) => ({ ...c, showLocation: !c.showLocation }));
-        await reload();
-      } catch (e: any) {
-        toast(e.message);
-      }
-    } else {
-      const nextComp = { ...composition, showLocation: !composition.showLocation };
-      setComposition(nextComp);
-      void flushSaveDraft(miniDraft, nextComp);
-    }
-  }, [selectedCue, miniDraft, isSelectedOnAir, composition, reload, toast, flushSaveDraft]);
-
-  // Aksi Quick Action Topik (T)
-  const actionToggleTopic = useCallback(async () => {
+  // Aksi Quick Action Topik (T) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
+  const actionToggleTopic = useCallback(() => {
     if (!selectedCue) return;
     const hasKicker = Boolean(miniDraft.kicker.trim());
     if (!hasKicker) {
       toast("Topik / Kicker belum diisi");
       return;
     }
+    const nextVal = !composition.showKicker;
+    const nextComp = { ...composition, showKicker: nextVal };
+    setComposition(nextComp);
+    void flushSaveDraft(miniDraft, nextComp);
+    toast(
+      nextVal
+        ? "Preview: Topik AKTIF (Tekan SPASI untuk tayang)"
+        : "Preview: Topik NONAKTIF (Tekan SPASI untuk tayang)"
+    );
+  }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
-    if (isSelectedOnAir) {
-      try {
-        await mutate(
-          "/api/live/variant",
-          "POST",
-          { graphicId: selectedCue.id, action: "toggle-kicker" as LiveVariantAction },
-          true
-        );
-        setComposition((c) => ({ ...c, showKicker: !c.showKicker }));
-        await reload();
-      } catch (e: any) {
-        toast(e.message);
-      }
-    } else {
-      const nextComp = { ...composition, showKicker: !composition.showKicker };
-      setComposition(nextComp);
-      void flushSaveDraft(miniDraft, nextComp);
-    }
-  }, [selectedCue, miniDraft, isSelectedOnAir, composition, reload, toast, flushSaveDraft]);
-
-  // Aksi Quick Action Detail (D)
-  const actionToggleDetail = useCallback(async () => {
+  // Aksi Quick Action Detail (D) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
+  const actionToggleDetail = useCallback(() => {
     if (!selectedCue) return;
     const hasDetail = Boolean(miniDraft.subline.trim());
     if (!hasDetail) {
       toast("Detail / Subline belum diisi");
       return;
     }
-
-    if (isSelectedOnAir) {
-      try {
-        await mutate(
-          "/api/live/variant",
-          "POST",
-          { graphicId: selectedCue.id, action: "toggle-detail" as LiveVariantAction },
-          true
-        );
-        setComposition((c) => ({ ...c, showDetail: !c.showDetail }));
-        await reload();
-      } catch (e: any) {
-        toast(e.message);
-      }
-    } else {
-      const nextComp = { ...composition, showDetail: !composition.showDetail };
-      setComposition(nextComp);
-      void flushSaveDraft(miniDraft, nextComp);
-    }
-  }, [selectedCue, miniDraft, isSelectedOnAir, composition, reload, toast, flushSaveDraft]);
+    const nextVal = !composition.showDetail;
+    const nextComp = { ...composition, showDetail: nextVal };
+    setComposition(nextComp);
+    void flushSaveDraft(miniDraft, nextComp);
+    toast(
+      nextVal
+        ? "Preview: Detail AKTIF (Tekan SPASI untuk tayang)"
+        : "Preview: Detail NONAKTIF (Tekan SPASI untuk tayang)"
+    );
+  }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
   // Keyboard Shortcuts Listener
   useEffect(() => {
@@ -674,10 +649,12 @@ export function SimpleProductionEditor({
           </div>
         </div>
 
-        {/* Monitor Pratinjau 16:9 */}
+        {/* Monitor Pratinjau Dual Deck (Standby Stage Preview + Mini Live Monitor) */}
         <div className="production-preview-deck">
+          {/* 1. MONITOR UTAMA: STANDBY STAGE PREVIEW */}
           <div className="preview-screen-wrapper">
             <div className="preview-meta-badge">
+              <span className="stage-tag">STANDBY</span>
               <span className="cue-name">
                 {selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "Belum ada berita"}
               </span>
@@ -691,16 +668,55 @@ export function SimpleProductionEditor({
               emptyText="PILIH BERITA DARI DAFTAR"
             />
           </div>
+
+          {/* 2. MONITOR KECIL: LIVE ON AIR MONITOR */}
+          <aside className="live-mini-panel" aria-label="Mini Monitor Siaran Langsung">
+            <div className="live-mini-header">
+              <div className="live-mini-badge">
+                <span className={`dot-led ${live.onAirGraphicId ? "red pulse" : "green"}`} />
+                <span>ON AIR MONITOR</span>
+              </div>
+              {live.onAirGraphicId && (
+                <button
+                  type="button"
+                  className="live-mini-clear-btn"
+                  onClick={executeClear}
+                  title="Kosongkan grafis ON AIR sekarang (Esc / C)"
+                >
+                  <X size={11} />
+                  <span>CLEAR</span>
+                </button>
+              )}
+            </div>
+
+            <div className={`live-mini-screen-wrapper ${live.onAirGraphicId ? "is-on-air" : ""}`}>
+              <BroadcastPreviewBox
+                graphic={onAirGraphic}
+                fields={live.onAirSnapshot || onAirGraphic?.draftFields || null}
+                master={master}
+                emptyText="OFF AIR / CLEAR"
+              />
+            </div>
+
+            <div className="live-mini-footer">
+              <span className="live-mini-title" title={onAirTitle || "Tidak ada grafis tayang"}>
+                {onAirTitle || "OFF AIR (STANDBY)"}
+              </span>
+              <span className={`live-mini-status ${live.onAirGraphicId ? "" : "off"}`}>
+                {live.onAirGraphicId ? "LIVE" : "READY"}
+              </span>
+            </div>
+          </aside>
         </div>
 
-        {/* Quick Actions (H, L, T, D) */}
+        {/* Quick Actions (H, L, T, D) - Mengatur Stage Preview (Safety: Tekan SPASI untuk tayang) */}
         <div className="quick-actions-bar">
           <div className="quick-action-btns">
             <button
               type="button"
-              className={`qa-btn ${isSelectedOnAir ? "is-live" : ""}`}
+              className="qa-btn"
               onClick={actionHeadline}
-              title="Tayangkan headline bersih (Hotkey: H)"
+              title="Siapkan headline bersih di preview (Hotkey: H, lalu tekan SPASI)"
             >
               <span className="qa-kbd">H</span>
               <span className="qa-text">HEADLINE BERSIH</span>
@@ -711,7 +727,7 @@ export function SimpleProductionEditor({
               className={`qa-btn ${composition.showLocation ? "active" : ""} ${!miniDraft.location.trim() ? "disabled" : ""}`}
               disabled={!miniDraft.location.trim()}
               onClick={actionToggleLocation}
-              title="Toggle Lokasi (Hotkey: L)"
+              title="Toggle Lokasi di preview (Hotkey: L, lalu tekan SPASI)"
             >
               <span className="qa-kbd">L</span>
               <span className="qa-text">LOKASI</span>
@@ -723,7 +739,7 @@ export function SimpleProductionEditor({
               className={`qa-btn ${composition.showKicker ? "active" : ""} ${!miniDraft.kicker.trim() ? "disabled" : ""}`}
               disabled={!miniDraft.kicker.trim()}
               onClick={actionToggleTopic}
-              title="Toggle Topik / Kicker (Hotkey: T)"
+              title="Toggle Topik di preview (Hotkey: T, lalu tekan SPASI)"
             >
               <span className="qa-kbd">T</span>
               <span className="qa-text">TOPIK</span>
@@ -735,7 +751,7 @@ export function SimpleProductionEditor({
               className={`qa-btn ${composition.showDetail ? "active" : ""} ${!miniDraft.subline.trim() ? "disabled" : ""}`}
               disabled={!miniDraft.subline.trim()}
               onClick={actionToggleDetail}
-              title="Toggle Detail Headline (Hotkey: D)"
+              title="Toggle Detail Headline di preview (Hotkey: D, lalu tekan SPASI)"
             >
               <span className="qa-kbd">D</span>
               <span className="qa-text">DETAIL</span>
@@ -748,13 +764,15 @@ export function SimpleProductionEditor({
         <div className="primary-actions-deck">
           <button
             type="button"
-            className="action-btn btn-take"
+            className={`action-btn btn-take ${isSelectedOnAir ? "btn-commit-update" : ""}`}
             disabled={busy || !selectedCue}
-            onClick={() => executeTake()}
+            onClick={() => executeCommitToAir()}
           >
             <div className="btn-inner">
               <Play size={16} fill="currentColor" />
-              <span className="btn-title">TAKE</span>
+              <span className="btn-title">
+                {isSelectedOnAir ? "UPDATE KE ON AIR" : "TAKE ON AIR"}
+              </span>
             </div>
             <kbd className="btn-key">SPACE / ENTER</kbd>
           </button>

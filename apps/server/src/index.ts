@@ -46,7 +46,7 @@ app.post("/api/mock/connection",(req,res)=>res.json(setMockConnection(Boolean(re
 app.post("/api/live/prepare",(req,res)=>{try{return res.json(prepare(req.body.graphicId));}catch(e:any){return res.status(404).json({error:e.message});}});
 app.post("/api/live/take",asyncRoute(async(req:any,res:any)=>res.json(await take(req.body?.graphicId,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID(),{presentation:req.body?.presentation}))));
 app.post("/api/live/variant",asyncRoute(async(req:any,res:any)=>{const{graphicId,action}=req.body||{};if(!graphicId||!action)return res.status(400).json({error:"graphicId dan action wajib diisi"});return res.json(await takeVariantLive(graphicId,action,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()));}));
-app.post("/api/live/update",asyncRoute(async(req:any,res:any)=>res.json(await updateLive(req.body?.graphicId,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()))));
+app.post("/api/live/update",asyncRoute(async(req:any,res:any)=>res.json(await updateLive(req.body?.graphicId,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID(),{syncComposition:Boolean(req.body?.syncComposition)}))));
 app.post("/api/live/clear",asyncRoute(async(req:any,res:any)=>res.json(await clearLive(req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()))));
 app.post("/api/live/clear-all",asyncRoute(async(req:any,res:any)=>res.json(await clearAllLive(req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()))));
 app.post("/api/live/stage",asyncRoute(async(req:any,res:any) => {

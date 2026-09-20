@@ -102,7 +102,7 @@ export function deleteItem(id: string) {
   const changed = db.prepare("DELETE FROM rundown_items WHERE id=?").run(id).changes > 0; touch(row.rundown_id); return changed;
 }
 export function createGraphic(itemId: string, input: any) {
-  const id = randomUUID();
+  const id = input.id || randomUUID();
   db.prepare("INSERT INTO graphic_items VALUES (?, ?, ?, ?, ?, ?, NULL)").run(id, itemId, input.templateType, input.sortOrder, input.status, JSON.stringify(input.draftFields));
   return getGraphic(id)!;
 }
@@ -183,12 +183,7 @@ export function saveHeadlineDefaults(patch: Partial<HeadlineDefaults>): Headline
 
 export function seedIfEmpty() {
   if ((db.prepare("SELECT COUNT(*) count FROM rundowns").get() as any).count) return;
-  const rd = createRundown({ id: "NEWS-001", programName: "NEWS LIVE", title: "Rundown Utama — Pagi", items: [
-    { id:"NEWS-01", slug:"OPENING", title:"Pembukaan", format:"READER", estimatedDurationSeconds:30, sortOrder:1, graphics:[] },
-    { id:"NEWS-02", slug:"HEADLINE-01", title:"Tenggelamnya KM Virgo Transport 8", format:"VO", estimatedDurationSeconds:90, sortOrder:2, graphics:[{ id:"CG-201", templateType:"HEADLINE", sortOrder:1, status:"READY", draftFields:{ kicker:"TENGGELAMNYA KM VIRGO TRANSPORT 8", headline:"KELUARGA BINGUNG DATA MANIFES TAK SAMA", subline:"Salah Satu Keluarga Korban Tak Menemukan Data Ayahnya di Data Penumpang", location:"Surabaya, Jawa Timur", ticker:"SHERLY TJOANDA CURHAT KENA PHP ATR/BPN PIMPINAN NUSRON WAHID", brand:"CNNINDONESIA.COM" }}]},
-    { id:"NEWS-03", slug:"LIVE-01", title:"Laporan Langsung dari Jakarta Timur", format:"LIVE", estimatedDurationSeconds:180, sortOrder:3, graphics:[{ id:"CG-301", templateType:"REPORTER", sortOrder:1, status:"READY", draftFields:{ kicker:"LIVE", name:"SANDI ARDIANSYAH", role:"REPORTER", location:"JAKARTA TIMUR", ticker:"LAPORAN LANGSUNG DARI LOKASI BANJIR", brand:"CNNINDONESIA.COM" }},{ id:"CG-302", templateType:"LOCATION", sortOrder:2, status:"READY", draftFields:{ location:"JAKARTA TIMUR" }}]},
-    { id:"NEWS-04", slug:"BREAKING", title:"Perkembangan Cuaca Ekstrem", format:"READER", estimatedDurationSeconds:120, sortOrder:4, graphics:[{ id:"CG-401", templateType:"BREAKING", sortOrder:1, status:"DRAFT", draftFields:{ kicker:"BREAKING NEWS", headline:"PERINGATAN DINI CUACA EKSTREM DI JABODETABEK", subline:"BMKG Imbau Warga Waspada Hujan Lebat Disertai Angin Kencang", location:"BMKG Pusat", ticker:"INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI", brand:"CNNINDONESIA.COM" }}]}
-  ]});
+  const rd = createRundown({ id: "NEWS-001", programName: "NEWS LIVE", title: "Rundown Siaran", items: [] });
   const defaults: VmixMapping[] = [
     { templateType:"HEADLINE", inputGuid:"mock-headline-guid", inputTitle:"NewsCG Headline", fieldMap:{headline:"Headline.Text",kicker:"Kicker.Text"}},
     { templateType:"REPORTER", inputGuid:"mock-reporter-guid", inputTitle:"NewsCG Reporter", fieldMap:{name:"Name.Text",role:"Role.Text",location:"Location.Text"}},
@@ -196,25 +191,6 @@ export function seedIfEmpty() {
     { templateType:"BREAKING", inputGuid:"mock-breaking-guid", inputTitle:"NewsCG Breaking", fieldMap:{headline:"Headline.Text",kicker:"Kicker.Text"}}
   ];
   saveSettings({ mappings: defaults });
-  logAction("SYSTEM", "confirmed", `Data demo ${rd.id} dibuat`);
+  logAction("SYSTEM", "confirmed", `Rundown baru ${rd.id} dibuat (bersih)`);
 }
 
-// Pastikan item demo CG-201 diperbarui sesuai referensi TV siaran
-try {
-  const cg201 = db.prepare("SELECT * FROM graphic_items WHERE id = 'CG-201'").get() as any;
-  if (cg201) {
-    const fields = (json(cg201.draft_fields) || {}) as Record<string, string>;
-    if (!fields.subline || fields.kicker === "TOPIK UTAMA") {
-      db.prepare("UPDATE graphic_items SET draft_fields = ? WHERE id = 'CG-201'").run(
-        JSON.stringify({
-          kicker: "TENGGELAMNYA KM VIRGO TRANSPORT 8",
-          headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA",
-          subline: "Salah Satu Keluarga Korban Tak Menemukan Data Ayahnya di Data Penumpang",
-          location: "Surabaya, Jawa Timur",
-          ticker: "SHERLY TJOANDA CURHAT KENA PHP ATR/BPN PIMPINAN NUSRON WAHID",
-          brand: "CNNINDONESIA.COM"
-        })
-      );
-    }
-  }
-} catch {}
