@@ -37,29 +37,28 @@ export function BroadcastGraphic({
   const effectiveFields = fields || {};
   const hasContent = !isLocationOnly && Boolean(type && fields && (fields.headline || fields.name || fields.location || fields.text));
 
-  // Location tag di pojok kiri atas (hanya tampil jika isLocationOnly ATAU jika showLocation diaktifkan "true")
-  const showLocationTag =
-    isLocationOnly ||
-    (effectiveFields.showLocation === "true" &&
-      Boolean(effectiveFields.location && effectiveFields.location.trim().length > 0));
+  // Location tag di pojok kiri atas (otomatis tampil dinamis jika field lokasi diisi)
+  const hasLocation = Boolean(effectiveFields.location && effectiveFields.location.trim().length > 0);
+  const showLocationTag = isLocationOnly ? hasLocation : (hasLocation && effectiveFields.showLocation !== "false");
 
   const locationLayer = useLayerPresence(showLocationTag && !isExiting);
   const [lastLocation, setLastLocation] = useState(effectiveFields.location || "");
   useEffect(() => { if (effectiveFields.location) setLastLocation(effectiveFields.location); }, [effectiveFields.location]);
 
-  // Content mode: "headline" (default), "paragraph" (Gambar 3), atau "presenter" (Gambar 4)
+  // Content mode: "headline" (default), "paragraph", atau "presenter"
   const contentMode = effectiveFields.contentMode || (isReporter ? "presenter" : "headline");
 
-  // Kicker Tab: Tampil hanya jika tidak dimatikan dan mode adalah headline yang memiliki kicker
+  // Kicker Tab: Tampil hanya jika sub topik diisi oleh pengguna (dinamis tanpa paksaan default)
+  const hasKicker = Boolean(effectiveFields.kicker && effectiveFields.kicker.trim().length > 0);
   const shouldShowKicker =
     effectiveFields.showKicker !== "false" &&
     contentMode === "headline" &&
-    Boolean(effectiveFields.kicker && effectiveFields.kicker.trim().length > 0);
+    hasKicker;
 
   const kickerLayer = useLayerPresence(shouldShowKicker && !isExiting);
   const [lastKicker, setLastKicker] = useState(effectiveFields.kicker || "");
   useEffect(() => { if (effectiveFields.kicker) setLastKicker(effectiveFields.kicker); }, [effectiveFields.kicker]);
-  const kickerText = effectiveFields.kicker || (isBreaking ? "BREAKING NEWS" : "TOPIK UTAMA");
+  const kickerText = effectiveFields.kicker || (isBreaking ? "BREAKING NEWS" : "");
 
   const headlineText = (isReporter || contentMode === "presenter")
     ? effectiveFields.name || effectiveFields.headline || "NAMA PEMBAWA BERITA"
@@ -69,10 +68,11 @@ export function BroadcastGraphic({
     ? (effectiveFields.role || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
 
-  // Mode layout: "single" (Gede Semua) atau "sub" (Dengan Sub Detail)
+  // Mode layout: jika subline tidak diisi, otomatis menjadi judul tunggal bersih (single-line full)
+  const hasSubline = Boolean(sublineText && sublineText.trim().length > 0);
   const isSingleLayout =
     effectiveFields.layoutStyle === "single" ||
-    (!sublineText && effectiveFields.layoutStyle !== "sub");
+    (!hasSubline && effectiveFields.layoutStyle !== "sub");
 
   const brandText = effectiveFields.brand || master.brandText || "CNNINDONESIA.COM";
   const tickerText =

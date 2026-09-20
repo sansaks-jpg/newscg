@@ -55,7 +55,7 @@ export type OverlayEvent =
 export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
   HEADLINE: z.object({
     headline: z.string().trim().min(1).max(120),
-    kicker: z.string().trim().max(60).optional().default("TOPIK UTAMA"),
+    kicker: z.string().trim().max(60).optional().default(""),
     subline: z.string().trim().max(160).optional().default(""),
     location: z.string().trim().max(60).optional().default(""),
     ticker: z.string().trim().max(160).optional().default(""),
@@ -65,7 +65,7 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     contentMode: z.enum(contentModes).optional().default("headline"),
     socialHandle: z.string().trim().max(80).optional().default(""),
     showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("false")
+    showLocation: z.string().optional().default("true")
   }),
   REPORTER: z.object({
     name: z.string().trim().min(1).max(60),

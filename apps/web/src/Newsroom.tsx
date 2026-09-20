@@ -502,28 +502,29 @@ function StoryEditor({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function add(type: TemplateType, variant = "") {
+  function add(type: TemplateType) {
     const base = graphics.find((g) => g.templateType === "HEADLINE")?.draftFields;
     setGraphics((gs) => [
       ...gs,
       {
         templateType: type,
-        status: "DRAFT",
+        status: "READY",
         sortOrder: gs.length,
         draftFields:
           type === "REPORTER"
-            ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub" }
+            ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub", showLocation: "false", visualTemplate: "cnn" }
             : type === "LOCATION"
-            ? { location: base?.location || "" }
+            ? { location: base?.location || "", contentMode: "location", layoutStyle: "single", showLocation: "true", visualTemplate: "cnn" }
             : {
                 headline: base?.headline || title,
-                location: base?.location || "",
-                subline: "",
                 kicker: "",
+                subline: "",
+                location: base?.location || "",
                 contentMode: "headline",
-                layoutStyle: variant === "detail" ? "sub" : "single",
-                showLocation: variant === "location" ? "true" : "false",
-                showKicker: "false"
+                layoutStyle: "sub",
+                showLocation: "true",
+                showKicker: "false",
+                visualTemplate: "cnn"
               }
       }
     ]);
@@ -709,28 +710,22 @@ function StoryEditor({
               </div>
 
               <div className="add-cg-buttons">
+                <button type="button" onClick={() => add("HEADLINE")}>
+                  + Tambah Headline
+                </button>
+                <button type="button" onClick={() => add("REPORTER")}>
+                  + Tambah Narasumber
+                </button>
+                <button type="button" onClick={() => add("LOCATION")}>
+                  + Tambah Lokasi Saja
+                </button>
                 <button
                   type="button"
                   className="btn-preset-tiered"
                   onClick={addTieredFlow}
                   title="Otomatis buat 3 varian bertingkat: 1. Headline Bersih, 2. + Lokasi, 3. + Banyak Info"
                 >
-                  ✨ Alur Standar (Bersih → +Lokasi → +Banyak Info)
-                </button>
-                <button type="button" onClick={() => add("HEADLINE")}>
-                  + Headline
-                </button>
-                <button type="button" onClick={() => add("HEADLINE", "location")}>
-                  + Headline & Lokasi
-                </button>
-                <button type="button" onClick={() => add("HEADLINE", "detail")}>
-                  + Headline & Detail
-                </button>
-                <button type="button" onClick={() => add("REPORTER")}>
-                  + Nama / Narasumber
-                </button>
-                <button type="button" onClick={() => add("LOCATION")}>
-                  + Lokasi Saja
+                  ✨ Buat 3 Alur Bertingkat
                 </button>
               </div>
             </div>
@@ -820,55 +815,42 @@ function StoryEditor({
                     ) : (
                       <div className="cue-fields-grid">
                         <label className="field-full">
-                          <span>Headline Berita</span>
+                          <span>Headline Utama (Wajib) <strong style={{ color: "#ef4444" }}>*</strong></span>
                           <input
                             required
                             maxLength={120}
                             value={g.draftFields.headline || ""}
                             onChange={(e) => field(index, "headline", e.target.value)}
-                            placeholder="Teks judul headline utama..."
+                            placeholder="Judul headline utama yang wajib diisi..."
                           />
                         </label>
                         <label>
-                          <span>Keterangan Tambahan (Subline)</span>
+                          <span>Sub Topik di Atas / Kicker (Opsional)</span>
+                          <input
+                            maxLength={60}
+                            value={g.draftFields.kicker || ""}
+                            onChange={(e) => field(index, "kicker", e.target.value)}
+                            placeholder="Contoh: BREAKING NEWS (kosongkan jika tidak ada)"
+                          />
+                        </label>
+                        <label>
+                          <span>Detail Headline / Keterangan (Opsional)</span>
                           <input
                             maxLength={140}
                             value={g.draftFields.subline || ""}
                             onChange={(e) => field(index, "subline", e.target.value)}
-                            placeholder="Penjelasan ringkas atau poin berita..."
+                            placeholder="Keterangan tambahan (kosongkan jika tidak ada)"
                           />
                         </label>
-                        <label>
-                          <span>Lokasi (Opsional)</span>
+                        <label className="field-full">
+                          <span>Lokasi Liputan (Opsional)</span>
                           <input
                             maxLength={50}
                             value={g.draftFields.location || ""}
                             onChange={(e) => field(index, "location", e.target.value)}
-                            placeholder="Contoh: SURABAYA"
+                            placeholder="Contoh: JAKARTA PUSAT (kosongkan jika tidak ada)"
                           />
                         </label>
-                        <div className="cue-checkboxes-row">
-                          <label className="check-label">
-                            <input
-                              type="checkbox"
-                              checked={g.draftFields.showLocation === "true"}
-                              onChange={(e) =>
-                                field(index, "showLocation", String(e.target.checked))
-                              }
-                            />
-                            <span>Tampilkan badge lokasi</span>
-                          </label>
-                          <label className="check-label">
-                            <input
-                              type="checkbox"
-                              checked={g.draftFields.layoutStyle !== "single"}
-                              onChange={(e) =>
-                                field(index, "layoutStyle", e.target.checked ? "sub" : "single")
-                              }
-                            />
-                            <span>Tampilkan baris keterangan tambahan</span>
-                          </label>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -1032,7 +1014,9 @@ export function Production({
     const defaultCue = i.graphics.find((g) => g.templateType === "HEADLINE") || i.graphics[0];
     if (defaultCue) {
       setCueId(defaultCue.id);
+      setQuickDraft(defaultCue.draftFields);
     }
+    setShowQuickEdit(false);
   }
 
   async function command(action: string, graphic?: GraphicItem): Promise<boolean> {
@@ -1133,29 +1117,39 @@ export function Production({
   const saveQuickDraft = () => saveRevision(false);
   const saveAndUpdateLive = () => saveRevision(true);
 
-  async function selectVariant(variant: "clean" | "location" | "detail") {
+  function selectCue(g: GraphicItem) {
+    if (quickDirty) {
+      toast("Simpan atau batalkan revisi sebelum memilih materi lain.");
+      return;
+    }
+    setCueId(g.id);
+    setQuickDraft(g.draftFields);
+    setShowQuickEdit(false);
+    const label = g.draftFields.headline || g.draftFields.name || g.draftFields.location || graphicLabel(g);
+    setCommandFeedback({
+      text: `Materi "${label}" dimuat ke PREVIEW. Tekan TAKE untuk menayangkan.`,
+      error: false
+    });
+  }
+
+  function selectVariant(variant: "clean" | "location" | "detail") {
     if (!item || busy || editBusy) return;
     if (quickDirty) { toast("Simpan atau batalkan revisi sebelum memilih variasi."); return; }
     const headlines = item.graphics.filter((graphic) => graphic.templateType === "HEADLINE" || graphic.templateType === "BREAKING");
-    const specific = headlines.find((graphic) => {
-      const f = graphic.draftFields;
-      if (variant === "detail") return Boolean(f.subline && f.layoutStyle !== "single");
-      const single = !f.subline || f.layoutStyle === "single";
-      return single && (variant === "location" ? f.showLocation === "true" : f.showLocation !== "true");
-    });
-    if (specific) {
-      setCueId(specific.id); setQuickDraft(specific.draftFields); setShowQuickEdit(false);
-      setCommandFeedback({ text: "Materi dimuat ke PREVIEW. Tekan TAKE untuk menayangkan.", error: false });
+    if (!headlines.length) {
+      toast("Belum ada headline pada berita ini.");
       return;
     }
-    const source = headlines[0];
-    if (!source) { toast("Belum ada headline. Tambahkan materi di Persiapan terlebih dahulu."); return; }
-    const fields: Record<string, string> = { ...source.draftFields, layoutStyle: variant === "detail" ? "sub" : "single" };
-    if (variant === "clean") fields.showLocation = "false";
-    if (variant === "location") fields.showLocation = "true";
-    pendingRevision.current = { id: source.id, fields };
-    setCueId(source.id); setQuickDraft(fields); setShowQuickEdit(true);
-    setCommandFeedback({ text: "Periksa variasi dan isi teks yang diperlukan, lalu Simpan ke Preview.", error: false });
+    const specific = headlines.find((graphic) => {
+      const f = graphic.draftFields;
+      if (variant === "detail") return Boolean(f.subline);
+      if (variant === "location") return Boolean(f.location);
+      return !f.subline && !f.location;
+    });
+    const target = specific || headlines[0];
+    if (target) {
+      selectCue(target);
+    }
   }
 
   function stageToggle(kind: "location" | "detail") {
@@ -1213,17 +1207,16 @@ export function Production({
     if (kind === "cg") {
       const reporter = item?.graphics.find((g) => g.templateType === "REPORTER");
       if (reporter) {
-        setCueId(reporter.id);
-        setCommandFeedback({ text: "Nama dimuat ke PREVIEW. Tekan TAKE untuk menayangkan.", error: false });
+        selectCue(reporter);
       } else {
-        void addNewReporterCue();
+        addNewReporterCue();
       }
     } else if (kind === "headline") {
-      void selectVariant("clean");
+      selectVariant("clean");
     } else if (kind === "location") {
-      void selectVariant("location");
+      selectVariant("location");
     } else if (kind === "detail") {
-      void selectVariant("detail");
+      selectVariant("detail");
     }
   }
 
@@ -1307,53 +1300,6 @@ export function Production({
   const headlineCue =
     item?.graphics.find((g) => g.templateType === "HEADLINE" || g.templateType === "BREAKING") ||
     item?.graphics[0];
-  const headlineText = headlineCue?.draftFields.headline || item?.title || "Judul Berita";
-  const locationText =
-    headlineCue?.draftFields.location ||
-    item?.graphics.find((g) => g.draftFields?.location)?.draftFields.location ||
-    "";
-  const sublineText =
-    headlineCue?.draftFields.subline ||
-    item?.graphics.find((g) => g.draftFields?.subline)?.draftFields.subline ||
-    "";
-
-  const isCurrentOnAirHeadline = Boolean(
-    onAir && item?.graphics.some((graphic) => graphic.id === onAir.id) && (onAir.templateType === "HEADLINE" || onAir.templateType === "BREAKING")
-  );
-  const isCleanOnAir =
-    isCurrentOnAirHeadline &&
-    live.onAirSnapshot?.showLocation !== "true" &&
-    (live.onAirSnapshot?.layoutStyle === "single" || !live.onAirSnapshot?.subline);
-  const isLocationOnAir =
-    isCurrentOnAirHeadline &&
-    live.onAirSnapshot?.showLocation === "true" &&
-    (live.onAirSnapshot?.layoutStyle === "single" || !live.onAirSnapshot?.subline);
-  const isDetailOnAir =
-    isCurrentOnAirHeadline &&
-    live.onAirSnapshot?.layoutStyle !== "single" &&
-    Boolean(live.onAirSnapshot?.subline);
-
-  const isCurrentStandbyHeadline = Boolean(cue && (cue.templateType === "HEADLINE" || cue.templateType === "BREAKING"));
-  const isCleanStandby =
-    isCurrentStandbyHeadline &&
-    cue?.draftFields.showLocation !== "true" &&
-    (cue?.draftFields.layoutStyle === "single" || !cue?.draftFields.subline);
-  const isLocationStandby =
-    isCurrentStandbyHeadline &&
-    cue?.draftFields.showLocation === "true" &&
-    (cue?.draftFields.layoutStyle === "single" || !cue?.draftFields.subline);
-  const isDetailStandby =
-    isCurrentStandbyHeadline &&
-    cue?.draftFields.layoutStyle !== "single" &&
-    Boolean(cue?.draftFields.subline);
-
-  const stagedFields = showQuickEdit ? quickDraft : cue?.draftFields;
-  const isLocationActiveNow = stagedFields?.showLocation === "true";
-  const isDetailActiveNow = stagedFields?.layoutStyle !== "single" && Boolean(stagedFields?.subline);
-
-  const additionalCues = (item?.graphics || []).filter(
-    (g) => g.templateType === "REPORTER" || (g.templateType !== "HEADLINE" && g.id !== headlineCue?.id)
-  );
 
   return (
     <div className="vmix-production-shell">
@@ -1832,6 +1778,15 @@ export function Production({
                       />
                     </label>
                     <label className="field-full">
+                      <span>SUB TOPIK DI ATAS / KICKER (OPSIONAL)</span>
+                      <input
+                        value={quickDraft.kicker || ""}
+                        maxLength={60}
+                        placeholder="Contoh: BREAKING NEWS (kosongkan jika tidak ada)"
+                        onChange={(e) => setQuickDraft((d) => ({ ...d, kicker: e.target.value }))}
+                      />
+                    </label>
+                    <label className="field-full">
                       <span>KETERANGAN / SUBLINE</span>
                       <input
                         value={quickDraft.subline || ""}
@@ -1930,162 +1885,25 @@ export function Production({
           <div className="vmix-input-tiles-grid">
             {item ? (
               <>
-                {/* 1. VARIAN: HEADLINE BERSIH */}
-                <div
-                  className={`vmix-input-tile variant-clean ${
-                    isCleanOnAir ? "onair-active" : isCleanStandby ? "standby-active" : ""
-                  }`}
-                  onClick={() => selectVariant("clean")}
-                >
-                  <div className="tile-top-bar">
-                    <span className="tile-input-num">01 · HEADLINE</span>
-                    <div className="tile-status-pill">
-                      {isCleanOnAir ? (
-                        <span className="pill-onair">ON AIR</span>
-                      ) : isCleanStandby ? (
-                        <span className="pill-standby">PREVIEW</span>
-                      ) : (
-                        <span className="pill-ready">SIAP</span>
-                      )}
-                      <kbd className="tile-kbd">4</kbd>
-                    </div>
-                  </div>
-
-                  <div className="tile-content-area">
-                    <div className="tile-template-tag">HEADLINE BERSIH</div>
-                    <div className="tile-text-preview headline-main">{headlineText}</div>
-                    <div className="tile-sub-hint">Format Bersih (Single Line)</div>
-                  </div>
-
-                  <div className="tile-bottom-bar">
-                    <button
-                      className="tile-btn-preview"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectVariant("clean");
-                      }}
-                      title="Muat Headline Bersih ke Preview (Hotkey: 4)"
-                    >
-                      <span>PREVIEW</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. VARIAN: HEADLINE + LOKASI */}
-                <div
-                  className={`vmix-input-tile variant-location ${
-                    isLocationOnAir ? "onair-active" : isLocationStandby ? "standby-active" : ""
-                  }`}
-                  onClick={() => selectVariant("location")}
-                >
-                  <div className="tile-top-bar">
-                    <span className="tile-input-num">02 · LOKASI</span>
-                    <div className="tile-status-pill">
-                      {isLocationOnAir ? (
-                        <span className="pill-onair">ON AIR</span>
-                      ) : isLocationStandby ? (
-                        <span className="pill-standby">PREVIEW</span>
-                      ) : locationText ? (
-                        <span className="pill-ready">SIAP</span>
-                      ) : (
-                        <span className="pill-draft">KOSONG</span>
-                      )}
-                      <kbd className="tile-kbd">5</kbd>
-                    </div>
-                  </div>
-
-                  <div className="tile-content-area">
-                    <div className="tile-template-tag">HEADLINE + LOKASI</div>
-                    <div className="tile-text-preview headline-main">{headlineText}</div>
-                    <div className="tile-location-chip">
-                      <MapPin size={10} />
-                      <span>{locationText || "Belum diisi lokasi"}</span>
-                    </div>
-                  </div>
-
-                  <div className="tile-bottom-bar">
-                    <button
-                      className="tile-btn-preview"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectVariant("location");
-                      }}
-                      title="Muat Headline + Lokasi ke Preview (Hotkey: 5)"
-                    >
-                      <span>PREVIEW</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. VARIAN: HEADLINE + DETAIL */}
-                <div
-                  className={`vmix-input-tile variant-detail ${
-                    isDetailOnAir ? "onair-active" : isDetailStandby ? "standby-active" : ""
-                  }`}
-                  onClick={() => selectVariant("detail")}
-                >
-                  <div className="tile-top-bar">
-                    <span className="tile-input-num">03 · DETAIL</span>
-                    <div className="tile-status-pill">
-                      {isDetailOnAir ? (
-                        <span className="pill-onair">ON AIR</span>
-                      ) : isDetailStandby ? (
-                        <span className="pill-standby">PREVIEW</span>
-                      ) : sublineText ? (
-                        <span className="pill-ready">SIAP</span>
-                      ) : (
-                        <span className="pill-draft">KOSONG</span>
-                      )}
-                      <kbd className="tile-kbd">6</kbd>
-                    </div>
-                  </div>
-
-                  <div className="tile-content-area">
-                    <div className="tile-template-tag">HEADLINE + SUBLINE</div>
-                    <div className="tile-text-preview headline-main">{headlineText}</div>
-                    <div className="tile-subline-snippet">
-                      {sublineText || "Belum ada keterangan subline"}
-                    </div>
-                  </div>
-
-                  <div className="tile-bottom-bar">
-                    <button
-                      className="tile-btn-preview"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectVariant("detail");
-                      }}
-                      title="Muat Headline + Detail ke Preview (Hotkey: 6)"
-                    >
-                      <span>PREVIEW</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 4. CUE TAMBAHAN (REPORTER / NARASUMBER) */}
-                {additionalCues.map((g, n) => {
+                {item.graphics.map((g, n) => {
                   const isCueSelected = cue?.id === g.id;
                   const isCueOnAir = g.id === live.onAirGraphicId;
+                  const f = g.draftFields;
+                  const isHeadline = g.templateType === "HEADLINE" || g.templateType === "BREAKING";
+                  const isReporter = g.templateType === "REPORTER";
+                  const isLocationOnly = g.templateType === "LOCATION";
 
                   return (
                     <div
                       key={g.id}
-                      className={`vmix-input-tile variant-reporter ${
-                        isCueSelected ? "standby-active" : ""
-                      } ${isCueOnAir ? "onair-active" : ""}`}
-                      onClick={() => {
-                        if (quickDirty) {
-                          toast("Simpan atau batalkan revisi dahulu.");
-                          return;
-                        }
-                        setCueId(g.id);
-                      }}
+                      className={`vmix-input-tile ${
+                        isHeadline ? "variant-clean" : isReporter ? "variant-reporter" : "variant-location"
+                      } ${isCueSelected ? "standby-active" : ""} ${isCueOnAir ? "onair-active" : ""}`}
+                      onClick={() => selectCue(g)}
                     >
                       <div className="tile-top-bar">
                         <span className="tile-input-num">
-                          {g.templateType === "REPORTER"
-                            ? `0${n + 4} · NARASUMBER`
-                            : `0${n + 4} · ${g.templateType}`}
+                          {String(n + 1).padStart(2, "0")} · {g.templateType}
                         </span>
                         <div className="tile-status-pill">
                           {isCueOnAir ? (
@@ -2097,21 +1915,57 @@ export function Production({
                           ) : (
                             <span className="pill-draft">DRAFT</span>
                           )}
-                          {g.templateType === "REPORTER" && n === 0 && <kbd className="tile-kbd">3</kbd>}
+                          {n < 9 && <kbd className="tile-kbd">{n + 1}</kbd>}
                         </div>
                       </div>
 
                       <div className="tile-content-area">
-                        <div className="tile-template-tag">{graphicLabel(g)}</div>
-                        <div className="tile-text-preview reporter-name">
-                          {g.templateType === "REPORTER"
-                            ? g.draftFields.name || "Nama Pembicara"
-                            : g.draftFields.headline || g.draftFields.location || "—"}
+                        <div className="tile-template-tag">
+                          {isReporter ? "NARASUMBER" : isLocationOnly ? "LOKASI SAJA" : "HEADLINE"}
                         </div>
-                        {g.templateType === "REPORTER" && (
-                          <div className="tile-subline-snippet">
-                            {g.draftFields.role || g.draftFields.socialHandle || "Jabatan/Keterangan"}
-                          </div>
+
+                        {isHeadline && (
+                          <>
+                            {f.kicker && (
+                              <div className="tile-kicker-badge" style={{ fontSize: "0.68rem", color: "#f59e0b", fontWeight: 700, textTransform: "uppercase", marginBottom: "2px" }}>
+                                {f.kicker}
+                              </div>
+                            )}
+                            <div className="tile-text-preview headline-main">
+                              {f.headline || item.title}
+                            </div>
+                            {f.location && (
+                              <div className="tile-location-chip" style={{ marginTop: "4px" }}>
+                                <MapPin size={10} />
+                                <span>{f.location}</span>
+                              </div>
+                            )}
+                            {f.subline && (
+                              <div className="tile-subline-snippet" style={{ marginTop: "4px" }}>
+                                {f.subline}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {isReporter && (
+                          <>
+                            <div className="tile-text-preview reporter-name">
+                              {f.name || "Nama Pembicara"}
+                            </div>
+                            <div className="tile-subline-snippet">
+                              {f.role || f.socialHandle || "Jabatan / Instansi"}
+                            </div>
+                          </>
+                        )}
+
+                        {isLocationOnly && (
+                          <>
+                            <div className="tile-text-preview headline-main">
+                              {f.location || "Nama Lokasi"}
+                            </div>
+                            <div className="tile-sub-hint">Visual Lokasi Tunggal</div>
+                          </>
                         )}
                       </div>
 
@@ -2120,11 +1974,7 @@ export function Production({
                           className="tile-btn-preview"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (quickDirty) {
-                              toast("Simpan atau batalkan revisi dahulu.");
-                              return;
-                            }
-                            setCueId(g.id);
+                            selectCue(g);
                           }}
                           title="Muat ke Preview"
                         >
@@ -2135,7 +1985,22 @@ export function Production({
                   );
                 })}
 
-                {/* 5. TOMBOL CEPAT TAMBAH NARASUMBER */}
+                {item.graphics.length === 0 && (
+                  <div className="empty-cues-tile-notice" style={{ gridColumn: "1 / -1", padding: "28px 16px", textAlign: "center", background: "#111827", borderRadius: "8px", border: "1px dashed #374151" }}>
+                    <p style={{ color: "#9ca3af", marginBottom: "12px", fontSize: "0.85rem" }}>
+                      Belum ada materi grafis pada berita ini.
+                    </p>
+                    <button
+                      className="btn-goto-prep"
+                      onClick={onPrepare}
+                      style={{ padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: 600, fontSize: "0.8rem" }}
+                    >
+                      + Tambah Grafis di Tab Persiapan
+                    </button>
+                  </div>
+                )}
+
+                {/* Tombol Cepat Tambah Narasumber */}
                 <div
                   className="vmix-input-tile btn-tile-add-reporter"
                   role="button"
