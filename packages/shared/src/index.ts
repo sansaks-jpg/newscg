@@ -22,6 +22,7 @@ export type MasterOverlayState = {
   showTicker: boolean;
   brandText: string;
   tickerText: string;
+  tickerSpeed?: number;
   logoType: "text" | "image";
   logoImage: string | null;
   logoText: string;
@@ -36,6 +37,7 @@ export const defaultMasterOverlayState: MasterOverlayState = {
   showTicker: false,
   brandText: "CNNINDONESIA.COM",
   tickerText: "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI",
+  tickerSpeed: 85,
   logoType: "text",
   logoImage: null,
   logoText: "CNN",

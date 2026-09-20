@@ -6,7 +6,7 @@ import { useEffect, useState, type CSSProperties } from "react";
  * Menjamin putaran looping 100% mulus (seamless), bebas race-condition piksel,
  * dan berjalan stabil baik pada layar output 1080p maupun pratinjau monitor kecil.
  */
-export function BroadcastTicker({ text }: { text: string }) {
+export function BroadcastTicker({ text, speed = 85 }: { text: string; speed?: number }) {
   const [displayText, setDisplayText] = useState(text);
   const changing = displayText !== text;
 
@@ -22,9 +22,10 @@ export function BroadcastTicker({ text }: { text: string }) {
   // Pastikan segmen cukup panjang melebihi lebar layar kanvas (minimal 2000px)
   const repeatCount = Math.max(2, Math.ceil(120 / Math.max(1, charLength)));
 
-  // Hitung durasi agar kecepatan linear stabil di kisaran 85 px/detik
+  // Hitung durasi agar kecepatan linear sesuai prop speed (default 85 px/detik)
+  const currentSpeed = Math.max(30, Math.min(250, speed || 85));
   const estimatedSegmentWidth = repeatCount * (charLength * 18 + 80);
-  const durationSec = Math.max(14, Math.min(60, Math.round(estimatedSegmentWidth / 85)));
+  const durationSec = Math.max(6, Math.min(120, Math.round(estimatedSegmentWidth / currentSpeed)));
 
   return (
     <div className={`cg-ticker-content ${changing ? "ticker-changing" : ""}`}>

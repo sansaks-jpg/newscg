@@ -26,7 +26,15 @@ app.put("/api/rundowns/:id/story", (req,res) => {
 app.get("/api/rundowns/:id",(req,res)=>{const r=getRundown(req.params.id);return r?res.json(r):res.status(404).json({error:"Rundown tidak ditemukan"});});
 app.post("/api/rundowns",(req,res)=>{const parsed=rundownInputSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data rundown tidak valid",details:parsed.error.issues});return res.status(201).json(createRundown(parsed.data));});
 app.patch("/api/rundowns/:id",(req,res)=>{const r=updateRundown(req.params.id,req.body);return r?res.json(r):res.status(404).json({error:"Rundown tidak ditemukan"});});
-app.delete("/api/rundowns/:id",(req,res)=>res.status(deleteRundown(req.params.id)?204:404).end());
+app.delete("/api/rundowns/:id", (req, res) => {
+  const live = getLiveState();
+  const r = getRundown(req.params.id);
+  if (!r) return res.status(404).json({ error: "Rundown tidak ditemukan" });
+  if (r.items.some(i => i.graphics.some(g => g.id === live.onAirGraphicId))) {
+    return res.status(409).json({ error: "Grafis dalam rundown ini sedang ON AIR. CLEAR siaran terlebih dahulu." });
+  }
+  return res.status(deleteRundown(req.params.id) ? 204 : 404).end();
+});
 app.post("/api/rundowns/:id/items",(req,res)=>{const parsed=rundownItemInputSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data berita tidak valid",details:parsed.error.issues});return res.status(201).json(createItem(req.params.id,parsed.data));});
 app.patch("/api/items/:id",(req,res)=>{const r=updateItem(req.params.id,req.body);return r?res.json(r):res.status(404).json({error:"Berita tidak ditemukan"});});
 app.delete("/api/items/:id",(req,res)=>{const live=getLiveState();const rundown=getRundowns().find(r=>r.items.some(i=>i.id===req.params.id));const item=rundown?.items.find(i=>i.id===req.params.id);if(item?.graphics.some(g=>g.id===live.onAirGraphicId))return res.status(409).json({error:"Berita terkait ON AIR. CLEAR terlebih dahulu."});return res.status(deleteItem(req.params.id)?204:404).end();});

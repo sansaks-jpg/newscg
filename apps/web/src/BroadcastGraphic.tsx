@@ -200,7 +200,7 @@ export function BroadcastGraphic({
             <div className="cg-ticker-badge" title="Nama Berita / Kategori Ticker">
               <AutoSquishText text={brandText} style={{ width: "max-content", maxWidth: "100%" }} />
             </div>
-            <BroadcastTicker text={tickerText} />
+            <BroadcastTicker text={tickerText} speed={master.tickerSpeed} />
             <div className="cg-ticker-clock">
               <BroadcastClock
                 timezone={master.timezone}

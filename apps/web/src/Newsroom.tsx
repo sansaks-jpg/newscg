@@ -109,6 +109,29 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
     }
   }
 
+  async function deleteCurrentRundown() {
+    if (!rundown || pending) return;
+    const confirmed = window.confirm(
+      `Hapus rundown "${rundown.programName} · ${rundown.title}" beserta seluruh berita di dalamnya?\n\nTindakan ini permanen dan tidak dapat dibatalkan.`
+    );
+    if (!confirmed) return;
+
+    setPending(true);
+    try {
+      await mutate(`/api/rundowns/${rundown.id}`, "DELETE");
+      await reload();
+      const remaining = rundowns.filter((r) => r.id !== rundown.id);
+      if (remaining[0]) {
+        onRundown(remaining[0].id);
+      }
+      toast(`Rundown "${rundown.title}" berhasil dihapus`);
+    } catch (e: any) {
+      toast(e.message || "Gagal menghapus rundown");
+    } finally {
+      setPending(false);
+    }
+  }
+
   const items = rundown?.items || [];
   const filteredItems = items.filter(
     (i) =>
@@ -178,6 +201,32 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             <Plus size={13} />
             <span>Rundown Baru</span>
           </button>
+
+          {rundown && (
+            <button
+              className="btn-prep-danger"
+              disabled={pending}
+              onClick={deleteCurrentRundown}
+              title="Hapus rundown saat ini beserta seluruh berita di dalamnya"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                background: "rgba(225, 29, 72, 0.12)",
+                border: "1px solid rgba(225, 29, 72, 0.35)",
+                color: "#ff8891",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease"
+              }}
+            >
+              <Trash2 size={13} />
+              <span>Hapus Rundown</span>
+            </button>
+          )}
 
           <button
             className="btn-prep-primary"

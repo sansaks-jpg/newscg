@@ -1636,7 +1636,70 @@ function SettingsView({
             </label>
           </div>
 
-          {/* Subgrup 4: Zona Waktu Siaran */}
+          {/* Subgrup 4: Kecepatan Running Ticker */}
+          <div className="form-grid" style={{ marginBottom: 14 }}>
+            <label className="wide">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span>Kecepatan Running Ticker: <b style={{ color: "#38bdf8" }}>{masterForm.tickerSpeed || 85} px/detik</b></span>
+                <div className="tab-pill-group" style={{ display: "flex", gap: 4 }}>
+                  <button
+                    type="button"
+                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 55 ? "active" : ""}`}
+                    onClick={() => {
+                      const u = { ...masterForm, tickerSpeed: 55 };
+                      setMasterForm(u);
+                      onUpdateMaster(u);
+                    }}
+                  >
+                    Lambat (55)
+                  </button>
+                  <button
+                    type="button"
+                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 85 ? "active" : ""}`}
+                    onClick={() => {
+                      const u = { ...masterForm, tickerSpeed: 85 };
+                      setMasterForm(u);
+                      onUpdateMaster(u);
+                    }}
+                  >
+                    Standar (85)
+                  </button>
+                  <button
+                    type="button"
+                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 130 ? "active" : ""}`}
+                    onClick={() => {
+                      const u = { ...masterForm, tickerSpeed: 130 };
+                      setMasterForm(u);
+                      onUpdateMaster(u);
+                    }}
+                  >
+                    Cepat (130)
+                  </button>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={40}
+                max={200}
+                step={5}
+                value={masterForm.tickerSpeed || 85}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  const u = { ...masterForm, tickerSpeed: val };
+                  setMasterForm(u);
+                  onUpdateMaster(u);
+                }}
+                style={{ width: "100%", cursor: "pointer", accentColor: "#e11d48" }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: 10, marginTop: 2 }}>
+                <span>40 px/s (Sangat Santai)</span>
+                <span>85 px/s (Standar Siaran TV)</span>
+                <span>200 px/s (Sangat Cepat)</span>
+              </div>
+            </label>
+          </div>
+
+          {/* Subgrup 5: Zona Waktu Siaran */}
           <div className="form-grid" style={{ marginBottom: 14 }}>
             <label>
               <span>Zona Waktu Siaran</span>
