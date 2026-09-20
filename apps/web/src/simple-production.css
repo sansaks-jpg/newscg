@@ -377,6 +377,21 @@
   color: #34d399;
 }
 
+.master-btn.staged-pending {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+}
+
+.staged-pill {
+  font-size: 8px;
+  font-weight: 900;
+  background: #f59e0b;
+  color: #000;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
 .master-btn .btn-kbd {
   font-size: 9px;
   font-weight: 800;
