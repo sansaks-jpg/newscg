@@ -1,0 +1,18 @@
+{
+  "name": "newscg",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n SERVER,WEB -c red,cyan \"npm run dev -w @newscg/server\" \"npm run dev -w @newscg/web\"",
+    "build": "npm run build -w @newscg/shared && npm run build -w @newscg/server && npm run build -w @newscg/web",
+    "start": "npm run start -w @newscg/server",
+    "test": "npm run test -w @newscg/server",
+    "typecheck": "npm run typecheck -w @newscg/shared && npm run typecheck -w @newscg/server && npm run typecheck -w @newscg/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": { "node": ">=20" }
+}

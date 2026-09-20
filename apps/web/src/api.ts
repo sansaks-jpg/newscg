@@ -1,0 +1,3 @@
+const headers={"Content-Type":"application/json"};
+export async function api<T>(path:string,options:RequestInit={}):Promise<T>{const response=await fetch(path,{...options,headers:{...headers,...options.headers}});if(!response.ok){const body=await response.json().catch(()=>({error:`HTTP ${response.status}`}));throw new Error(body.error||`HTTP ${response.status}`);}if(response.status===204)return undefined as T;return response.json();}
+export const mutate=<T>(path:string,method:string,body?:unknown,idempotent=false)=>api<T>(path,{method,body:body===undefined?undefined:JSON.stringify(body),headers:idempotent?{"Idempotency-Key":crypto.randomUUID()}:undefined});

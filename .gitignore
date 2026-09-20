@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Production builds & TS artifacts
+dist/
+*.tsbuildinfo
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
+
+# SQLite databases and journal files
+*.db
+*.db-shm
+*.db-wal
+data/
+apps/server/data/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# System and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Runtime
+.sites-runtime/
