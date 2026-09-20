@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { liveShortcut, takeThenAdvance } from "../../web/src/productionFlow";
-import { fieldSchemas, headlineDefaultsSchema } from "@newscg/shared";
+import { fieldSchemas, headlineDefaultsSchema, validateGraphicPatch } from "@newscg/shared";
 
 describe("operator live workflow", () => {
   it("keeps the selected cue when TAKE is rejected or unavailable", async () => {
@@ -78,5 +78,39 @@ describe("operator live workflow", () => {
       expect(result.headline).toBe("JUDUL TETAP");
       expect(result.subline).toBe("Detail tetap");
     }
+  });
+
+  it("rejects invalid PATCH with empty headline or overlong fields", () => {
+    const currentGraphic: any = {
+      id: "G-1",
+      itemId: "I-1",
+      templateType: "HEADLINE",
+      sortOrder: 0,
+      status: "READY",
+      draftFields: {
+        headline: "JUDUL LAMA",
+        subline: "Keterangan",
+        location: "Jakarta"
+      }
+    };
+
+    const validPatch = validateGraphicPatch(currentGraphic, {
+      draftFields: { headline: "JUDUL BARU" }
+    });
+    expect(validPatch.success).toBe(true);
+    if (validPatch.success) {
+      expect(validPatch.data.headline).toBe("JUDUL BARU");
+      expect(validPatch.data.location).toBe("Jakarta");
+    }
+
+    const invalidEmpty = validateGraphicPatch(currentGraphic, {
+      draftFields: { headline: "" }
+    });
+    expect(invalidEmpty.success).toBe(false);
+
+    const invalidTooLong = validateGraphicPatch(currentGraphic, {
+      draftFields: { headline: "A".repeat(121) }
+    });
+    expect(invalidTooLong.success).toBe(false);
   });
 });

@@ -22,6 +22,7 @@ const idempotency = new Map<string, Promise<any>>();
 let queue: Promise<unknown> = Promise.resolve();
 
 const subscribers = new Set<(event: OverlayEvent) => void>();
+let currentRevision = 1;
 
 export function addOverlaySubscriber(handler: (event: OverlayEvent) => void) {
   subscribers.add(handler);
@@ -33,7 +34,8 @@ export function addOverlaySubscriber(handler: (event: OverlayEvent) => void) {
     onAir: Boolean(current?.graphicId),
     graphic,
     fields: (current?.snapshot as Record<string, string> | null) || null,
-    master
+    master,
+    revision: currentRevision
   });
   return () => {
     subscribers.delete(handler);
@@ -41,9 +43,11 @@ export function addOverlaySubscriber(handler: (event: OverlayEvent) => void) {
 }
 
 export function broadcastOverlayEvent(event: OverlayEvent) {
+  currentRevision++;
+  const eventWithRevision: OverlayEvent = { ...event, revision: currentRevision };
   for (const sub of subscribers) {
     try {
-      sub(event);
+      sub(eventWithRevision);
     } catch (e) {
       console.error("Gagal mengirim event overlay", e);
     }
@@ -276,6 +280,9 @@ export function takeVariantLive(
     const settings = getSettingsInternal();
 
     try {
+      if (settings.outputMode === "vmix-gt") {
+        throw new Error("Perintah varian komposisi langsung belum didukung pada mode vMix GT Title");
+      }
       if (!graphic || !current || current.graphicId !== graphicId) {
         throw new Error("Perubahan varian diblokir: grafis ini tidak sedang ON AIR");
       }
@@ -383,15 +390,16 @@ export function clearLive(idempotencyKey: string) {
   });
 }
 
-export function clearAllLive(idempotencyKey: string) {
+export function clearAllLive(idempotencyKey: string, options?: { immediate?: boolean }) {
   return enqueue(idempotencyKey, async () => {
     const requestId = randomUUID();
     if (getSettingsInternal().outputMode === "vmix-gt") throw new Error("Layar kosong dan preset master tersedia untuk output browser. Gunakan CLEAR untuk GT Title.");
     saveMasterOverlay({ showLogo: false, showTicker: false, showLiveBadge: false });
     saveOnAir(null, null, 1, null, "confirmed");
     live = { ...live, commandStatus: "confirmed", onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: new Date().toISOString() };
-    broadcastOverlayEvent({ type: "CLEAR_ALL" });
-    logAction("CLEAR_ALL", "confirmed", "Seluruh layer grafis (Blackout) dibersihkan", null, requestId);
+    const immediate = options?.immediate !== false;
+    broadcastOverlayEvent(immediate ? { type: "CLEAR_ALL_IMMEDIATE" } : { type: "CLEAR_ALL_ANIMATED" });
+    logAction("CLEAR_ALL", "confirmed", `Seluruh layer grafis (Blackout) dibersihkan (${immediate ? "Instan" : "Animasi"})`, null, requestId);
     return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: null, timestamp: new Date().toISOString(), error: null, state: publicState() };
   });
 }

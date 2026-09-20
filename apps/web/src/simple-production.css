@@ -129,10 +129,10 @@
 }
 
 .badge-onair.pulse {
-  animation: pulse-red 1.2s infinite ease-in-out;
+  animation: editor-status-pulse 1.2s infinite ease-in-out;
 }
 
-@keyframes pulse-red {
+@keyframes editor-status-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
@@ -282,7 +282,7 @@
 
 .dot-led.red { background: #ef4444; }
 .dot-led.green { background: #10b981; }
-.dot-led.pulse { animation: pulse-red 1.2s infinite ease-in-out; }
+.dot-led.pulse { animation: editor-status-pulse 1.2s infinite ease-in-out; }
 
 .on-air-text-box {
   display: flex;

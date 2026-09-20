@@ -69,16 +69,21 @@ export function SimpleProductionEditor({
 }: Props) {
   const items = rundown?.items || [];
 
+  const rundownId = rundown?.id || "default";
+  const storyKey = `simple-cued-story-${rundownId}`;
+  const cueKey = `simple-cued-cue-${rundownId}`;
+
   // Pilihan berita aktif di sidebar (null jika dibersihkan via ESC)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(() => {
-    return sessionStorage.getItem("simple-cued-story") || items[0]?.id || null;
+    const saved = sessionStorage.getItem(`simple-cued-story-${rundownId}`);
+    return (saved && items.some((i) => i.id === saved)) ? saved : items[0]?.id || null;
   });
 
   const selectedItem = selectedItemId ? (items.find((i) => i.id === selectedItemId) || null) : null;
 
   // Cue terpilih dalam berita tersebut
   const [selectedCueId, setSelectedCueId] = useState<string | null>(() => {
-    return sessionStorage.getItem("simple-cued-cue") || null;
+    return sessionStorage.getItem(`simple-cued-cue-${rundownId}`) || null;
   });
 
   const selectedCue: GraphicItem | null = selectedItem
@@ -89,22 +94,31 @@ export function SimpleProductionEditor({
     : null;
 
   useEffect(() => {
+    if (!rundown?.id) return;
+    const saved = sessionStorage.getItem(`simple-cued-story-${rundown.id}`);
+    const valid = (saved && items.some((i) => i.id === saved)) ? saved : items[0]?.id || null;
+    setSelectedItemId(valid);
+    const savedCue = sessionStorage.getItem(`simple-cued-cue-${rundown.id}`);
+    setSelectedCueId(savedCue || null);
+  }, [rundown?.id]);
+
+  useEffect(() => {
     if (selectedItem?.id) {
-      sessionStorage.setItem("simple-cued-story", selectedItem.id);
+      sessionStorage.setItem(storyKey, selectedItem.id);
     } else {
-      sessionStorage.removeItem("simple-cued-story");
+      sessionStorage.removeItem(storyKey);
     }
-  }, [selectedItem?.id]);
+  }, [selectedItem?.id, storyKey]);
 
   useEffect(() => {
     if (selectedCue?.id) {
-      sessionStorage.setItem("simple-cued-cue", selectedCue.id);
+      sessionStorage.setItem(cueKey, selectedCue.id);
       setSelectedCueId(selectedCue.id);
     } else {
-      sessionStorage.removeItem("simple-cued-cue");
+      sessionStorage.removeItem(cueKey);
       setSelectedCueId(null);
     }
-  }, [selectedCue?.id]);
+  }, [selectedCue?.id, cueKey]);
 
   // Status On-Air berita
   const onAirGraphicId = live.onAirGraphicId;
@@ -164,11 +178,17 @@ export function SimpleProductionEditor({
       return;
     }
     const f = selectedCue.draftFields || {};
+    const headline = selectedCue.templateType === "REPORTER"
+      ? f.name || f.headline || ""
+      : f.headline || f.name || selectedItem?.title || "";
+    const subline = selectedCue.templateType === "REPORTER"
+      ? f.role || f.subline || ""
+      : f.subline || f.role || "";
     setMiniDraft({
-      headline: f.headline || f.name || selectedItem?.title || "",
+      headline,
       location: f.location || "",
       kicker: f.kicker || "",
-      subline: f.subline || f.role || ""
+      subline
     });
 
     setComposition({
@@ -181,22 +201,38 @@ export function SimpleProductionEditor({
 
   // Fungsi penyimpanan autosave dengan debounce
   const flushSaveDraft = useCallback(
-    async (draftToSave: MiniDraft, compToSave: PreviewComposition): Promise<boolean> => {
-      if (!selectedCue) return false;
+    async (
+      draftToSave: MiniDraft,
+      compToSave: PreviewComposition,
+      targetCue: GraphicItem | null = selectedCue
+    ): Promise<boolean> => {
+      if (!targetCue) return false;
       setSaveStatus("saving");
       try {
         const patchFields: Record<string, string> = {
-          ...selectedCue.draftFields,
-          headline: draftToSave.headline.trim(),
+          ...(targetCue.draftFields || {}),
           location: draftToSave.location.trim(),
-          kicker: draftToSave.kicker.trim(),
-          subline: draftToSave.subline.trim(),
           showLocation: compToSave.showLocation ? "true" : "false",
           showKicker: compToSave.showKicker ? "true" : "false",
           showDetail: compToSave.showDetail ? "true" : "false",
           layoutStyle: compToSave.showDetail ? "sub" : "single"
         };
-        await mutate(`/api/graphics/${selectedCue.id}`, "PATCH", {
+
+        if (targetCue.templateType === "REPORTER") {
+          patchFields.name = draftToSave.headline.trim();
+          patchFields.role = draftToSave.subline.trim() || "REPORTER";
+          patchFields.headline = draftToSave.headline.trim();
+          patchFields.subline = draftToSave.subline.trim();
+        } else if (targetCue.templateType === "LOCATION") {
+          patchFields.location = draftToSave.location.trim() || draftToSave.headline.trim();
+          patchFields.headline = patchFields.location;
+        } else {
+          patchFields.headline = draftToSave.headline.trim();
+          patchFields.subline = draftToSave.subline.trim();
+          patchFields.kicker = draftToSave.kicker.trim();
+        }
+
+        await mutate(`/api/graphics/${targetCue.id}`, "PATCH", {
           draftFields: patchFields,
           status: "READY"
         });
@@ -226,6 +262,13 @@ export function SimpleProductionEditor({
   const navigateStory = useCallback(
     (direction: -1 | 1) => {
       if (!items.length) return;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+        if (selectedCue) {
+          void flushSaveDraft(miniDraft, composition, selectedCue);
+        }
+      }
       const currentIndex = items.findIndex((i) => i.id === selectedItem?.id);
       if (currentIndex === -1) {
         const targetIndex = direction === 1 ? 0 : items.length - 1;
@@ -264,7 +307,24 @@ export function SimpleProductionEditor({
         }
       }
     },
-    [items, selectedItem]
+    [items, selectedItem, selectedCue, miniDraft, composition, flushSaveDraft]
+  );
+
+  // Perintah Live Terpusat: Memastikan commandStatus terkonfirmasi
+  const sendLiveCommand = useCallback(
+    async (path: string, body: Record<string, unknown> = {}) => {
+      const result = await mutate<{
+        commandStatus: string;
+        error: string | null;
+        state: LiveState;
+      }>(path, "POST", body, true);
+
+      if (result.commandStatus !== "confirmed") {
+        throw new Error(result.error || `Perintah belum terkonfirmasi (status: ${result.commandStatus})`);
+      }
+      return result;
+    },
+    []
   );
 
   // Perintah Live Utama: COMMIT TO AIR (TAKE / UPDATE via SPASI)
@@ -275,9 +335,14 @@ export function SimpleProductionEditor({
 
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
       if (selectedCue) {
-        await flushSaveDraft(miniDraft, composition);
+        const saved = await flushSaveDraft(miniDraft, composition);
+        if (!saved) {
+          toast("TAKE dibatalkan: draft gagal disimpan");
+          return;
+        }
       }
       setBusy(true);
       try {
@@ -295,12 +360,10 @@ export function SimpleProductionEditor({
         if (selectedCue) {
           if (isSelectedOnAir) {
             // Grafis ini sedang ON AIR: perbarui teks dan sinkronkan varian komposisi (L, T, D)
-            await mutate(
-              "/api/live/update",
-              "POST",
-              { graphicId: selectedCue.id, syncComposition: true },
-              true
-            );
+            await sendLiveCommand("/api/live/update", {
+              graphicId: selectedCue.id,
+              syncComposition: true
+            });
             await reload();
             toast("ON AIR DIPERBARUI — Perubahan preview ditayangkan");
           } else {
@@ -309,7 +372,7 @@ export function SimpleProductionEditor({
             if (options?.presentation === "clean") {
               body.presentation = "clean";
             }
-            await mutate("/api/live/take", "POST", body, true);
+            await sendLiveCommand("/api/live/take", body);
             await reload();
             toast("TAKE terkonfirmasi — Grafis tayang ON AIR");
           }
@@ -334,7 +397,8 @@ export function SimpleProductionEditor({
       onUpdateMaster,
       isSelectedOnAir,
       reload,
-      toast
+      toast,
+      sendLiveCommand
     ]
   );
 
@@ -345,8 +409,13 @@ export function SimpleProductionEditor({
     if (!selectedCue || !isSelectedOnAir || busy) return;
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
-    await flushSaveDraft(miniDraft, composition);
+    const saved = await flushSaveDraft(miniDraft, composition);
+    if (!saved) {
+      toast("UPDATE dibatalkan: draft gagal disimpan");
+      return;
+    }
     setBusy(true);
     try {
       if (isMasterChanged) {
@@ -357,12 +426,10 @@ export function SimpleProductionEditor({
         });
         isUserStagingMasterRef.current = false;
       }
-      await mutate(
-        "/api/live/update",
-        "POST",
-        { graphicId: selectedCue.id, syncComposition: true },
-        true
-      );
+      await sendLiveCommand("/api/live/update", {
+        graphicId: selectedCue.id,
+        syncComposition: true
+      });
       await reload();
       toast("UPDATE LIVE terkonfirmasi — Teks siaran diperbarui");
     } catch (e: any) {
@@ -370,7 +437,7 @@ export function SimpleProductionEditor({
     } finally {
       setBusy(false);
     }
-  }, [selectedCue, isSelectedOnAir, busy, miniDraft, composition, flushSaveDraft, isMasterChanged, onUpdateMaster, stagedMaster, reload, toast]);
+  }, [selectedCue, isSelectedOnAir, busy, miniDraft, composition, flushSaveDraft, isMasterChanged, onUpdateMaster, stagedMaster, reload, toast, sendLiveCommand]);
 
   // Perintah Live & Preview: CLEAR CG & UNSELECT BERITA (Esc / C)
   const executeClear = useCallback(async () => {
@@ -378,6 +445,7 @@ export function SimpleProductionEditor({
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
 
     // 1. Unselect dan kosongkan preview berita (tidak memilih apapun di preview)
@@ -385,14 +453,14 @@ export function SimpleProductionEditor({
     setSelectedCueId(null);
     setMiniDraft({ headline: "", location: "", kicker: "", subline: "" });
     setComposition({ showLocation: false, showKicker: false, showDetail: false });
-    sessionStorage.removeItem("simple-cued-story");
-    sessionStorage.removeItem("simple-cued-cue");
+    sessionStorage.removeItem(storyKey);
+    sessionStorage.removeItem(cueKey);
 
     // 2. Hapus visual di siaran langsung secara langsung jika ada yang tayang ON AIR
     if (live.onAirGraphicId) {
       setBusy(true);
       try {
-        await mutate("/api/live/clear", "POST", {}, true);
+        await sendLiveCommand("/api/live/clear", {});
         await reload();
         toast("CLEAR — Visual siaran dinonaktifkan & preview dikosongkan");
       } catch (e: any) {
@@ -403,14 +471,14 @@ export function SimpleProductionEditor({
     } else {
       toast("CLEAR — Preview dikosongkan (tidak memilih berita)");
     }
-  }, [busy, live.onAirGraphicId, reload, toast]);
+  }, [busy, live.onAirGraphicId, reload, toast, storyKey, cueKey, sendLiveCommand]);
 
-  // Perintah Live: ALL CLEAR
+  // Perintah Live: ALL CLEAR (Blackout Darurat)
   const executeClearAll = useCallback(async () => {
     if (busy) return;
     setBusy(true);
     try {
-      await mutate("/api/live/clear-all", "POST", {}, true);
+      await sendLiveCommand("/api/live/clear-all", { immediate: true });
       await reload();
       toast("ALL CLEAR terkonfirmasi — Seluruh layer dikosongkan");
     } catch (e: any) {
@@ -418,7 +486,7 @@ export function SimpleProductionEditor({
     } finally {
       setBusy(false);
     }
-  }, [busy, reload, toast]);
+  }, [busy, reload, toast, sendLiveCommand]);
 
   // Aksi Master 1: Toggle Logo di Preview (Safety: Tekan SPASI untuk kirim ke ON AIR)
   const toggleMasterLogo = useCallback(() => {
@@ -601,6 +669,8 @@ export function SimpleProductionEditor({
     ? {
         ...(selectedCue.draftFields || {}),
         headline: miniDraft.headline,
+        name: selectedCue.templateType === "REPORTER" ? miniDraft.headline : (selectedCue.draftFields?.name || miniDraft.headline),
+        role: selectedCue.templateType === "REPORTER" ? miniDraft.subline : (selectedCue.draftFields?.role || miniDraft.subline),
         location: miniDraft.location,
         kicker: miniDraft.kicker,
         subline: miniDraft.subline,
@@ -611,14 +681,16 @@ export function SimpleProductionEditor({
       }
     : null;
 
-  // Label On-Air sekarang
-  const onAirGraphic = items
-    .flatMap((i) => i.graphics)
-    .find((g) => g.id === live.onAirGraphicId);
+  // Label On-Air sekarang (pencarian di seluruh rundown yang tersedia agar tidak hilang saat berganti rundown)
+  const allGraphics = rundowns && rundowns.length > 0
+    ? rundowns.flatMap((r) => r.items.flatMap((i) => i.graphics))
+    : items.flatMap((i) => i.graphics);
+  const onAirGraphic = allGraphics.find((g) => g.id === live.onAirGraphicId);
   const onAirTitle = onAirGraphic
     ? live.onAirSnapshot?.headline ||
       live.onAirSnapshot?.name ||
       onAirGraphic.draftFields.headline ||
+      onAirGraphic.draftFields.name ||
       "Grafis On Air"
     : null;
 
@@ -968,11 +1040,25 @@ export function SimpleProductionEditor({
 
           <div className="mini-editor-grid">
             <div className="mini-input-group span-2">
-              <label>Headline Utama</label>
+              <label>
+                {selectedCue?.templateType === "REPORTER"
+                  ? "Nama Pembawa Berita / Reporter"
+                  : selectedCue?.templateType === "LOCATION"
+                  ? "Teks Lokasi"
+                  : "Headline Utama"}
+              </label>
               <input
                 type="text"
-                placeholder={selectedCue ? "Masukkan judul berita utama..." : "Pilih berita dari daftar untuk mengedit..."}
-                maxLength={120}
+                placeholder={
+                  selectedCue?.templateType === "REPORTER"
+                    ? "Masukkan nama reporter..."
+                    : selectedCue?.templateType === "LOCATION"
+                    ? "Masukkan nama lokasi siaran..."
+                    : selectedCue
+                    ? "Masukkan judul berita utama..."
+                    : "Pilih berita dari daftar untuk mengedit..."
+                }
+                maxLength={selectedCue?.templateType === "REPORTER" ? 60 : 120}
                 disabled={!selectedCue}
                 value={miniDraft.headline}
                 onChange={(e) => handleMiniDraftChange("headline", e.target.value)}
@@ -997,19 +1083,29 @@ export function SimpleProductionEditor({
                 type="text"
                 placeholder={selectedCue ? "Contoh: BREAKING NEWS" : "-"}
                 maxLength={60}
-                disabled={!selectedCue}
+                disabled={!selectedCue || selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "LOCATION"}
                 value={miniDraft.kicker}
                 onChange={(e) => handleMiniDraftChange("kicker", e.target.value)}
               />
             </div>
 
             <div className="mini-input-group span-2">
-              <label>Detail / Subline Keterangan</label>
+              <label>
+                {selectedCue?.templateType === "REPORTER"
+                  ? "Jabatan / Role"
+                  : "Detail / Subline Keterangan"}
+              </label>
               <input
                 type="text"
-                placeholder={selectedCue ? "Penjelasan ringkas poin berita..." : "-"}
-                maxLength={160}
-                disabled={!selectedCue}
+                placeholder={
+                  selectedCue?.templateType === "REPORTER"
+                    ? "Contoh: REPORTER, PRESENTER..."
+                    : selectedCue
+                    ? "Penjelasan ringkas poin berita..."
+                    : "-"
+                }
+                maxLength={selectedCue?.templateType === "REPORTER" ? 60 : 160}
+                disabled={!selectedCue || selectedCue?.templateType === "LOCATION"}
                 value={miniDraft.subline}
                 onChange={(e) => handleMiniDraftChange("subline", e.target.value)}
               />

@@ -47,12 +47,14 @@ export const defaultMasterOverlayState: MasterOverlayState = {
 };
 
 export type OverlayEvent =
-  | { type: "SYNC"; onAir: boolean; graphic: GraphicItem | null; fields: Record<string, string> | null; master: MasterOverlayState }
-  | { type: "TAKE"; graphic: GraphicItem; fields: Record<string, string>; master: MasterOverlayState }
-  | { type: "UPDATE"; graphicId: string; fields: Record<string, string>; master: MasterOverlayState }
-  | { type: "CLEAR"; master: MasterOverlayState }
-  | { type: "MASTER_UPDATE"; master: MasterOverlayState }
-  | { type: "CLEAR_ALL" };
+  | { type: "SYNC"; onAir: boolean; graphic: GraphicItem | null; fields: Record<string, string> | null; master: MasterOverlayState; revision?: number }
+  | { type: "TAKE"; graphic: GraphicItem; fields: Record<string, string>; master: MasterOverlayState; revision?: number }
+  | { type: "UPDATE"; graphicId: string; fields: Record<string, string>; master: MasterOverlayState; revision?: number }
+  | { type: "CLEAR"; master: MasterOverlayState; revision?: number }
+  | { type: "MASTER_UPDATE"; master: MasterOverlayState; revision?: number }
+  | { type: "CLEAR_ALL"; immediate?: boolean; revision?: number }
+  | { type: "CLEAR_ALL_IMMEDIATE"; revision?: number }
+  | { type: "CLEAR_ALL_ANIMATED"; revision?: number };
 
 export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
   HEADLINE: z.object({
@@ -115,6 +117,22 @@ export const graphicPatchSchema = z.object({
   status: z.enum(["DRAFT", "READY"]).optional(),
   draftFields: z.record(z.string(), z.string()).optional()
 });
+
+export function validateGraphicPatch(
+  current: GraphicItem,
+  patch: z.infer<typeof graphicPatchSchema>
+): { success: true; data: Record<string, string> } | { success: false; error: z.ZodError } {
+  const targetTemplateType = (patch.templateType || current.templateType) as TemplateType;
+  const schema = fieldSchemas[targetTemplateType];
+  const mergedFields = patch.draftFields
+    ? { ...current.draftFields, ...patch.draftFields }
+    : current.draftFields;
+  const result = schema.safeParse(mergedFields);
+  if (result.success) {
+    return { success: true, data: result.data as Record<string, string> };
+  }
+  return { success: false, error: result.error };
+}
 
 export const rundownItemInputSchema = z.object({
   slug: z.string().trim().min(1).max(30),

@@ -125,16 +125,20 @@ Server produksi terpadu akan melayani dashboard dan overlay di `http://localhost
 
 ## ⌨️ Pintasan Keyboard (Hotkeys Operator)
 
-| Tombol | Aksi |
-|---|---|
-| `Space` / `T` | **TAKE** (Kirim grafis terpilih ke siaran live) |
-| `Enter` | **TAKE & NEXT** (Tayangkan grafis dan pilih grafis berikutnya) |
-| `U` | **UPDATE LIVE** (Perbarui teks grafis live tanpa transisi keluar) |
-| `Escape` / `C` | **CLEAR** (Tarik grafis keluar dari siaran live dengan animasi transisi) |
-| `0` | **CLEAR ALL** (Bersihkan seluruh grafis termasuk master overlay) |
-| `1` | **STAGE LOGO** (Aktifkan logo & live bug) |
-| `2` | **STAGE FULL** (Aktifkan seluruh master layer: logo, live bug, ticker) |
-| `ArrowUp` / `ArrowDown` | Navigasi antar baris grafis / rundown |
+| Tombol | Aksi | Keterangan |
+|---|---|---|
+| `Space` / `Enter` | **TAKE / COMMIT** | Menayangkan grafis terpilih ke siaran live (atau perbarui live jika grafis yang sama sedang tayang) |
+| `U` | **UPDATE LIVE** | Memperbarui teks/data pada grafis yang sedang tayang tanpa animasi ulang |
+| `Escape` / `C` | **CLEAR CG** | Menarik grafis lower third keluar dari siaran live dengan animasi transisi keluar |
+| `0` | **CLEAR ALL (BLACKOUT)** | Membersihkan seketika seluruh grafis di layar termasuk logo dan ticker |
+| `1` | **TOGGLE LOGO** | Menampilkan atau menyembunyikan Logo siaran |
+| `2` | **TOGGLE TICKER & LIVE** | Menampilkan atau menyembunyikan Ticker bawah dan badge LIVE |
+| `H` | **MODE HEADLINE** | Mengatur template ke mode Headline Bersih |
+| `L` | **TOGGLE LOKASI** | Menampilkan atau menyembunyikan elemen lokasi pada grafis |
+| `T` | **TOGGLE TOPIK** | Menampilkan atau menyembunyikan kicker / topik di atas headline |
+| `D` | **TOGGLE DETAIL** | Menampilkan atau menyembunyikan baris detail / sub-judul |
+| `ArrowUp` | **PREVIOUS STORY** | Berpindah ke berita sebelumnya pada rundown |
+| `ArrowDown` | **NEXT STORY** | Berpindah ke berita berikutnya pada rundown |
 
 ---
 

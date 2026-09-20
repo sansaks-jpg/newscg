@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GraphicItem, MasterOverlayState, OverlayEvent } from "@newscg/shared";
 import { defaultMasterOverlayState } from "@newscg/shared";
 import { BroadcastGraphic } from "./BroadcastGraphic";
@@ -11,6 +11,9 @@ export default function OverlayWindow() {
   const [exitAll, setExitAll] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [scale, setScale] = useState(1);
+
+  const activeGraphicRef = useRef<GraphicItem | null>(null);
+  const revisionRef = useRef<number>(0);
 
   // Lock to exact 1920x1080 canvas and 16:9 ratio without distortion
   useEffect(() => {
@@ -38,65 +41,124 @@ export default function OverlayWindow() {
     updateScale();
     window.addEventListener("resize", updateScale);
 
-    let clearingAll = false;
     let exitTimer: ReturnType<typeof setTimeout> | undefined;
-    const cancelExit = () => { clearTimeout(exitTimer); clearingAll = false; setExitAll(false); };
+    let transitionTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const clearTimers = () => {
+      if (exitTimer) {
+        clearTimeout(exitTimer);
+        exitTimer = undefined;
+      }
+      if (transitionTimer) {
+        clearTimeout(transitionTimer);
+        transitionTimer = undefined;
+      }
+    };
+
     const es = new EventSource("/api/live/stream");
 
     es.onmessage = (event) => {
       try {
         const payload: OverlayEvent = JSON.parse(event.data);
+        if (payload.revision !== undefined) {
+          if (payload.revision < revisionRef.current) {
+            // Abaikan event lama yang datang out-of-order
+            return;
+          }
+          revisionRef.current = payload.revision;
+        }
+
         if (payload.type === "SYNC") {
-          cancelExit();
+          clearTimers();
           if (payload.master) setMaster(payload.master);
           if (payload.onAir && payload.graphic && payload.fields) {
+            const isSame = activeGraphicRef.current?.id === payload.graphic.id;
             setIsExiting(false);
+            setExitAll(false);
+            activeGraphicRef.current = payload.graphic;
             setActiveGraphic(payload.graphic);
             setFields(payload.fields);
-            setAnimKey((k) => k + 1);
+            if (!isSame) {
+              setAnimKey((k) => k + 1);
+            }
           } else {
+            activeGraphicRef.current = null;
             setActiveGraphic(null);
             setFields(null);
             setIsExiting(false);
+            setExitAll(false);
           }
         } else if (payload.type === "TAKE") {
-          cancelExit();
+          clearTimers();
           if (payload.master) setMaster(payload.master);
-          setIsExiting(false);
-          setActiveGraphic(payload.graphic);
-          setFields(payload.fields);
-          setAnimKey((k) => k + 1);
+
+          const currentOnAir = activeGraphicRef.current;
+          const isDifferent = currentOnAir && currentOnAir.id !== payload.graphic.id;
+
+          if (isDifferent) {
+            // Pergantian headline beruntun: transisi OUT pada konten lama lalu IN pada konten baru
+            setIsExiting(true);
+            transitionTimer = setTimeout(() => {
+              activeGraphicRef.current = payload.graphic;
+              setActiveGraphic(payload.graphic);
+              setFields(payload.fields);
+              setIsExiting(false);
+              setAnimKey((k) => k + 1);
+              transitionTimer = undefined;
+            }, 320);
+          } else {
+            activeGraphicRef.current = payload.graphic;
+            setActiveGraphic(payload.graphic);
+            setFields(payload.fields);
+            setIsExiting(false);
+            setAnimKey((k) => k + 1);
+          }
         } else if (payload.type === "UPDATE") {
           if (payload.master) setMaster(payload.master);
           setFields({ ...payload.fields });
         } else if (payload.type === "CLEAR") {
-          cancelExit();
+          clearTimers();
           if (payload.master) setMaster(payload.master);
           setIsExiting(true);
           exitTimer = setTimeout(() => {
+            activeGraphicRef.current = null;
             setActiveGraphic(null);
             setFields(null);
             setIsExiting(false);
-          }, 560);
+            exitTimer = undefined;
+          }, 500);
         } else if (payload.type === "MASTER_UPDATE") {
-          if (clearingAll) {
-            cancelExit(); setActiveGraphic(null); setFields(null); setIsExiting(false);
-          }
-          setExitAll(false);
-          setMaster(payload.master);
-        } else if (payload.type === "CLEAR_ALL") {
-          cancelExit();
-          clearingAll = true;
-          setExitAll(true);
-          setIsExiting(true);
-          exitTimer = setTimeout(() => {
+          if (payload.master) setMaster(payload.master);
+        } else if (
+          payload.type === "CLEAR_ALL" ||
+          payload.type === "CLEAR_ALL_IMMEDIATE" ||
+          payload.type === "CLEAR_ALL_ANIMATED"
+        ) {
+          clearTimers();
+          const isImmediate =
+            payload.type === "CLEAR_ALL_IMMEDIATE" ||
+            (payload.type === "CLEAR_ALL" && payload.immediate !== false);
+
+          if (isImmediate) {
+            activeGraphicRef.current = null;
             setActiveGraphic(null);
             setFields(null);
             setMaster((m) => ({ ...m, showLogo: false, showTicker: false, showLiveBadge: false }));
-            clearingAll = false;
-            setExitAll(false);
             setIsExiting(false);
-          }, 560);
+            setExitAll(false);
+          } else {
+            setExitAll(true);
+            setIsExiting(true);
+            exitTimer = setTimeout(() => {
+              activeGraphicRef.current = null;
+              setActiveGraphic(null);
+              setFields(null);
+              setMaster((m) => ({ ...m, showLogo: false, showTicker: false, showLiveBadge: false }));
+              setExitAll(false);
+              setIsExiting(false);
+              exitTimer = undefined;
+            }, 500);
+          }
         }
       } catch (err) {
         console.error("Gagal memproses event overlay:", err);
@@ -104,7 +166,7 @@ export default function OverlayWindow() {
     };
 
     return () => {
-      clearTimeout(exitTimer);
+      clearTimers();
       es.close();
       window.removeEventListener("resize", updateScale);
       document.body.classList.remove("overlay-mode");

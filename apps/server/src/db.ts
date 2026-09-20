@@ -108,7 +108,8 @@ export function createGraphic(itemId: string, input: any) {
 }
 export function updateGraphic(id: string, patch: any) {
   const current = getGraphic(id); if (!current) return null;
-  db.prepare("UPDATE graphic_items SET template_type=?,sort_order=?,status=?,draft_fields=? WHERE id=?").run(patch.templateType ?? current.templateType, patch.sortOrder ?? current.sortOrder, patch.status ?? current.status, JSON.stringify(patch.draftFields ?? current.draftFields), id);
+  const mergedFields = patch.draftFields !== undefined ? { ...current.draftFields, ...patch.draftFields } : current.draftFields;
+  db.prepare("UPDATE graphic_items SET template_type=?,sort_order=?,status=?,draft_fields=? WHERE id=?").run(patch.templateType ?? current.templateType, patch.sortOrder ?? current.sortOrder, patch.status ?? current.status, JSON.stringify(mergedFields), id);
   return getGraphic(id);
 }
 export function deleteGraphic(id: string) { return db.prepare("DELETE FROM graphic_items WHERE id=?").run(id).changes > 0; }

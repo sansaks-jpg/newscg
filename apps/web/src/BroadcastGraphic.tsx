@@ -75,7 +75,7 @@ export function BroadcastGraphic({
     : effectiveFields.headline || effectiveFields.text || "";
 
   const sublineText = isReporter
-    ? (effectiveFields.role || effectiveFields.socialHandle || "")
+    ? (effectiveFields.role || effectiveFields.subline || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
 
   // Mode layout: jika subline tidak diisi, otomatis menjadi judul tunggal bersih (single-line full)
@@ -102,10 +102,10 @@ export function BroadcastGraphic({
 
   const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText;
 
-  const brandText = master.brandText || effectiveFields.brand || "CNNINDONESIA.COM";
+  const brandText = effectiveFields.brand?.trim() || master.brandText?.trim() || "CNNINDONESIA.COM";
   const tickerText =
-    master.tickerText ||
-    effectiveFields.ticker ||
+    effectiveFields.ticker?.trim() ||
+    master.tickerText?.trim() ||
     "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI";
 
   return (

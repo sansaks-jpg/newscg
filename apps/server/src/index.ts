@@ -7,7 +7,7 @@ import cors from "cors";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { graphicInputSchema, graphicPatchSchema, headlineDefaultsSchema, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
+import { graphicInputSchema, graphicPatchSchema, headlineDefaultsSchema, rundownInputSchema, rundownItemInputSchema, validateGraphicPatch } from "@newscg/shared";
 import { createGraphic, createItem, createRundown, deleteGraphic, deleteItem, deleteRundown, getActions, getGraphic, getHeadlineDefaults, getMasterOverlay, getRundown, getRundowns, getSettings, saveHeadlineDefaults, saveSettings, seedIfEmpty, updateGraphic, updateItem, updateRundown } from "./db.js";
 import { addOverlaySubscriber, checkConnection, clearAllLive, clearLive, getLiveState, listInputs, prepare, setMockConnection, take, takeVariantLive, updateLive, updateMasterState } from "./live.js";
 
@@ -39,7 +39,7 @@ app.post("/api/rundowns/:id/items",(req,res)=>{const parsed=rundownItemInputSche
 app.patch("/api/items/:id",(req,res)=>{const r=updateItem(req.params.id,req.body);return r?res.json(r):res.status(404).json({error:"Berita tidak ditemukan"});});
 app.delete("/api/items/:id",(req,res)=>{const live=getLiveState();const rundown=getRundowns().find(r=>r.items.some(i=>i.id===req.params.id));const item=rundown?.items.find(i=>i.id===req.params.id);if(item?.graphics.some(g=>g.id===live.onAirGraphicId))return res.status(409).json({error:"Berita terkait ON AIR. CLEAR terlebih dahulu."});return res.status(deleteItem(req.params.id)?204:404).end();});
 app.post("/api/items/:id/graphics",(req,res)=>{const parsed=graphicInputSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data grafis tidak valid",details:parsed.error.issues});return res.status(201).json(createGraphic(req.params.id,parsed.data));});
-app.patch("/api/graphics/:id",(req,res)=>{const current=getGraphic(req.params.id);if(!current)return res.status(404).json({error:"Grafis tidak ditemukan"});const parsed=graphicPatchSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data grafis tidak valid",details:parsed.error.issues});return res.json(updateGraphic(req.params.id,parsed.data));});
+app.patch("/api/graphics/:id",(req,res)=>{const current=getGraphic(req.params.id);if(!current)return res.status(404).json({error:"Grafis tidak ditemukan"});const parsed=graphicPatchSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data grafis tidak valid",details:parsed.error.issues});const validated=validateGraphicPatch(current,parsed.data);if(!validated.success)return res.status(400).json({error:"Validasi field grafis gagal",details:validated.error.issues});return res.json(updateGraphic(req.params.id,{...parsed.data,draftFields:validated.data}));});
 app.delete("/api/graphics/:id",(req,res)=>{if(getLiveState().onAirGraphicId===req.params.id)return res.status(409).json({error:"Grafis sedang ON AIR. CLEAR terlebih dahulu."});return res.status(deleteGraphic(req.params.id)?204:404).end();});
 app.get("/api/rundowns/:id/export",(req,res)=>{const r=getRundown(req.params.id);if(!r)return res.status(404).json({error:"Rundown tidak ditemukan"});res.setHeader("Content-Disposition",`attachment; filename=\"${r.id}.json\"`);return res.json({schemaVersion:1,exportedAt:new Date().toISOString(),rundown:r});});
 app.post("/api/rundowns/import",(req,res)=>{const payload=req.body.rundown||req.body;const parsed=rundownInputSchema.safeParse(payload);if(!parsed.success)return res.status(400).json({error:"Berkas impor tidak valid",details:parsed.error.issues});return res.status(201).json(createRundown(parsed.data));});
@@ -56,7 +56,7 @@ app.post("/api/live/take",asyncRoute(async(req:any,res:any)=>res.json(await take
 app.post("/api/live/variant",asyncRoute(async(req:any,res:any)=>{const{graphicId,action}=req.body||{};if(!graphicId||!action)return res.status(400).json({error:"graphicId dan action wajib diisi"});return res.json(await takeVariantLive(graphicId,action,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()));}));
 app.post("/api/live/update",asyncRoute(async(req:any,res:any)=>res.json(await updateLive(req.body?.graphicId,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID(),{syncComposition:Boolean(req.body?.syncComposition)}))));
 app.post("/api/live/clear",asyncRoute(async(req:any,res:any)=>res.json(await clearLive(req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()))));
-app.post("/api/live/clear-all",asyncRoute(async(req:any,res:any)=>res.json(await clearAllLive(req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()))));
+app.post("/api/live/clear-all",asyncRoute(async(req:any,res:any)=>res.json(await clearAllLive(req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID(),{immediate:req.body?.immediate!==undefined?Boolean(req.body?.immediate):true}))));
 app.post("/api/live/stage",asyncRoute(async(req:any,res:any) => {
   if (!["empty","logo","full"].includes(req.body.mode)) return res.status(400).json({error:"Preset tidak valid"});
   return res.json(await setStage(req.body.mode,req.get("Idempotency-Key") || crypto.randomUUID()));

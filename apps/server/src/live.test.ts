@@ -138,7 +138,7 @@ describe("Web Overlay (Singular.live style) controller", () => {
     unsubscribe();
   });
 
-  it("mengirim event CLEAR_ALL dan membersihkan seluruh layer", async () => {
+  it("mengirim event CLEAR_ALL_IMMEDIATE dan membersihkan seluruh layer", async () => {
     const events: OverlayEvent[] = [];
     const unsubscribe = liveModule.addOverlaySubscriber((ev) => events.push(ev));
 
@@ -147,8 +147,22 @@ describe("Web Overlay (Singular.live style) controller", () => {
     expect(result.commandStatus).toBe("confirmed");
     expect(liveModule.getLiveState().onAirGraphicId).toBeNull();
 
-    const clearAllEvent = events.find((e) => e.type === "CLEAR_ALL");
+    const clearAllEvent = events.find((e) => e.type === "CLEAR_ALL_IMMEDIATE");
     expect(clearAllEvent).toBeDefined();
+
+    unsubscribe();
+  });
+
+  it("mengirim event CLEAR_ALL_ANIMATED jika immediate false", async () => {
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber((ev) => events.push(ev));
+
+    await liveModule.take("CG-201", "take-before-clear-animated");
+    const result = await liveModule.clearAllLive("clear-all-animated-test", { immediate: false });
+    expect(result.commandStatus).toBe("confirmed");
+
+    const clearAllAnimEvent = events.find((e) => e.type === "CLEAR_ALL_ANIMATED");
+    expect(clearAllAnimEvent).toBeDefined();
 
     unsubscribe();
   });
@@ -157,6 +171,12 @@ describe("Web Overlay (Singular.live style) controller", () => {
 describe("vMix GT Title API safety", () => {
   beforeEach(() => {
     dbModule.saveSettings({ outputMode: "vmix-gt" });
+  });
+
+  it("menolak perintah varian komposisi pada mode vmix-gt", async () => {
+    const res = await liveModule.takeVariantLive("CG-201", "toggle-location", "gt-variant-test");
+    expect(res.commandStatus).toBe("failed");
+    expect(res.error).toContain("belum didukung pada mode vMix GT Title");
   });
 
   it("prepare menjaga draft tetap terisolasi dari input vMix", () => {
