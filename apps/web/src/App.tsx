@@ -57,7 +57,8 @@ import OverlayWindow from "./OverlayWindow";
 import { Preparation, Production } from "./Newsroom";
 import { AutoSquishText } from "./AutoSquishText";
 import { BroadcastTemplateInfo } from "./VisualTemplatePicker";
-import { BroadcastPreviewBox } from "./BroadcastGraphic";
+import { BroadcastPreviewBox, BroadcastClock } from "./BroadcastGraphic";
+import { BroadcastTicker } from "./BroadcastTicker";
 
 type View = "live" | "rundown" | "graphics" | "settings";
 const templateMeta: Record<TemplateType, { label: string; icon: any; accent: string }> = {
@@ -418,378 +419,6 @@ function StateBadge({ state }: { state: string }) {
       )}{" "}
       {state}
     </span>
-  );
-}
-
-function LiveControl({
-  rundown,
-  graphics,
-  selected,
-  onAir,
-  live,
-  master,
-  busy,
-  onChoose,
-  onCueStep,
-  onSave,
-  onCommand,
-  onTakeAndNext,
-  onUpdateMaster,
-  onOpenSetupModal,
-  actions
-}: {
-  rundown?: Rundown;
-  graphics: any[];
-  selected: any;
-  onAir: any;
-  live: LiveState;
-  master: MasterOverlayState;
-  busy: string;
-  onChoose: (id: string) => void;
-  onCueStep: (dir: number) => void;
-  onSave: (id: string, p: Partial<GraphicItem>) => void;
-  onCommand: (c: any) => void;
-  onTakeAndNext: () => void;
-  onUpdateMaster: (p: Partial<MasterOverlayState>) => void;
-  onOpenSetupModal: () => void;
-  actions: any[];
-}) {
-  const [search, setSearch] = useState("");
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filteredItems = useMemo(() => {
-    if (!rundown?.items) return [];
-    if (!normalizedSearch) return rundown.items;
-    return rundown.items.filter((item) => {
-      const matchSlug = item.slug.toLowerCase().includes(normalizedSearch);
-      const matchTitle = item.title.toLowerCase().includes(normalizedSearch);
-      const matchGraphics = item.graphics.some((g) =>
-        Object.values(g.draftFields).some(
-          (v) => typeof v === "string" && v.toLowerCase().includes(normalizedSearch)
-        )
-      );
-      return matchSlug || matchTitle || matchGraphics;
-    });
-  }, [rundown?.items, normalizedSearch]);
-
-  const currentIndex = graphics.findIndex((g) => g.id === selected?.id);
-  const totalGraphics = graphics.length;
-
-  return (
-    <div className="live-layout">
-      {/* 1. Rundown Sidebar with Quick Filter */}
-      <aside className="rundown-panel">
-        <div className="panel-title">
-          <div>
-            <small>ANTREAN RUNDOWN</small>
-            <b>
-              {rundown?.items.length || 0} BERITA · {totalGraphics} CG
-            </b>
-          </div>
-          <span className="rundown-pos-chip" title="Posisi CG Terpilih">
-            {currentIndex >= 0 ? `${currentIndex + 1}/${totalGraphics}` : "—"}
-          </span>
-        </div>
-
-        {/* Quick Search / Filter Input */}
-        <div className="rundown-search-box">
-          <Search size={13} className="search-icon" />
-          <input
-            type="text"
-            className="rundown-search-input"
-            placeholder="Cari berita / slug / teks…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="search-clear-btn" onClick={() => setSearch("")} title="Bersihkan">
-              <X size={12} />
-            </button>
-          )}
-        </div>
-
-        <div className="rundown-list">
-          {filteredItems.length === 0 ? (
-            <div className="rundown-empty-search">
-              <span>Tidak ada berita yang cocok</span>
-              <button onClick={() => setSearch("")}>Reset pencarian</button>
-            </div>
-          ) : (
-            filteredItems.map((item, index) => (
-              <div className="story-group" key={item.id}>
-                <div className="story-head">
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <small>
-                      {item.slug} · {item.format}
-                    </small>
-                    <b>{item.title}</b>
-                  </div>
-                  <em>{item.graphics.length}</em>
-                </div>
-                {item.graphics.map((g) => {
-                  const meta = templateMeta[g.templateType];
-                  const Icon = meta.icon;
-                  const isOn = g.id === live.onAirGraphicId;
-                  const isSelected = g.id === selected?.id;
-                  const preview =
-                    g.draftFields.headline ||
-                    g.draftFields.name ||
-                    g.draftFields.location ||
-                    Object.values(g.draftFields).filter(Boolean)[0] ||
-                    "Belum diisi";
-
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => onChoose(g.id)}
-                      className={`graphic-row ${isSelected ? "selected" : ""} ${isOn ? "on-air" : ""}`}
-                    >
-                      <span className="graphic-icon" style={{ "--accent": meta.accent } as any}>
-                        <Icon size={14} />
-                      </span>
-                      <span className="graphic-meta-text">
-                        <b>{meta.label}</b>
-                        <small>{preview}</small>
-                      </span>
-                      {isOn ? (
-                        <span className="tag-onair pulse">ON AIR</span>
-                      ) : isSelected ? (
-                        <span className="tag-standby">STANDBY</span>
-                      ) : (
-                        <ChevronRight size={14} className="row-chevron" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
-
-      {/* 2. Main Live Control Workspace */}
-      <section className="control-workspace">
-        {/* Streamlined Master Bar: Minimalist & Clean */}
-        <div className="master-bar">
-          <div className="master-bar-group">
-            <span className="master-label">PRESET:</span>
-            <button
-              className={`toggle-btn ${master.showLogo && !master.showTicker ? "active" : ""}`}
-              onClick={() => onUpdateMaster({ showLogo: true, showTicker: false, showLiveBadge: false })}
-              title="Preset 1: Hanya Logo Bug di pojok kanan bawah"
-            >
-              Logo Saja
-            </button>
-            <button
-              className={`toggle-btn ${master.showLogo && master.showTicker ? "active" : ""}`}
-              onClick={() => onUpdateMaster({ showLogo: true, showTicker: true, showLiveBadge: true })}
-              title="Preset 2: Ticker bar + Logo box + Live badge + Jam WIB"
-            >
-              Ticker + Live
-            </button>
-          </div>
-
-          <div className="master-bar-group">
-            <span className="master-label">MASTER LAYER:</span>
-            <button
-              className={`toggle-btn ${master.showLogo ? "active" : ""}`}
-              onClick={() => onUpdateMaster({ showLogo: !master.showLogo })}
-              title="Aktifkan/Matikan Logo Box Kanan"
-            >
-              {master.showLogo ? "✓ LOGO" : "LOGO OFF"}
-            </button>
-            <button
-              className={`toggle-btn ${master.showLiveBadge ? "live-active" : ""}`}
-              onClick={() => onUpdateMaster({ showLiveBadge: !master.showLiveBadge })}
-              title="Aktifkan/Matikan Badge LIVE di Atas Logo"
-            >
-              {master.showLiveBadge ? "● LIVE" : "LIVE OFF"}
-            </button>
-            <button
-              className={`toggle-btn ${master.showTicker ? "active" : ""}`}
-              onClick={() => onUpdateMaster({ showTicker: !master.showTicker })}
-              title="Aktifkan/Matikan Bar Ticker Bawah"
-            >
-              {master.showTicker ? "✓ TICKER" : "TICKER OFF"}
-            </button>
-          </div>
-
-          <div className="master-bar-spacer" />
-
-          <div className="master-bar-group" style={{ borderRight: 0, paddingRight: 0 }}>
-            <button
-              className="setup-trigger-btn"
-              onClick={onOpenSetupModal}
-              title="Atur Brand Teks, Zona Waktu, dan Upload Logo Siaran"
-            >
-              <SlidersHorizontal size={13} />
-              <span>Pengaturan Siaran</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Dual Monitors: Program (ON AIR) vs Preview (STANDBY) */}
-        <div className="monitors">
-          <MonitorCard
-            label="PROGRAM (ON AIR)"
-            state={onAir ? "ON AIR" : live.commandStatus === "pending" ? "PENDING" : "STANDBY"}
-            graphic={onAir}
-            fields={live.onAirSnapshot}
-            master={master}
-            live
-          />
-          <MonitorCard
-            label="PREVIEW (STANDBY)"
-            state={selected?.status || "EMPTY"}
-            graphic={selected}
-            fields={selected?.draftFields}
-            master={master}
-          />
-        </div>
-
-        {/* Lower Workspace: Editor & Broadcast Playout Deck */}
-        <div className="control-lower">
-          <GraphicForm graphic={selected} onSave={onSave} />
-          <div className="command-console">
-            <div className="command-head">
-              <div>
-                <small>BROADCAST CONTROLLER</small>
-                <b>
-                  {selected
-                    ? `${selected.item.slug} / ${templateMeta[selected.templateType as TemplateType]?.label}`
-                    : "PILIH GRAFIS DARI RUNDOWN"}
-                </b>
-              </div>
-              <StateBadge
-                state={
-                  live.commandStatus === "pending"
-                    ? "PENDING"
-                    : live.error
-                    ? "ERROR"
-                    : selected?.status || "EMPTY"
-                }
-              />
-            </div>
-
-            {/* Playout Main Triggers */}
-            <div className="playout-primary-grid">
-              <button
-                className="take-btn"
-                disabled={!selected || !!busy}
-                onClick={() => onCommand("take")}
-                title="Tayangkan grafis standby ke siaran (Hotkeys: SPACE atau T)"
-              >
-                <div className="take-btn-icon">
-                  {busy === "take" ? <LoaderCircle className="spin" size={22} /> : <MonitorPlay size={22} />}
-                </div>
-                <div className="take-btn-label">
-                  <b>TAKE (IN)</b>
-                  <small>Tayangkan ke Siaran</small>
-                </div>
-                <kbd className="take-kbd">SPACE / T</kbd>
-              </button>
-
-              <button
-                className="take-next-btn"
-                disabled={!selected || !!busy}
-                onClick={onTakeAndNext}
-                title="Tayangkan grafis standby dan otomatis pilih CG berikutnya di rundown (Hotkey: ENTER)"
-              >
-                <SkipForward size={17} />
-                <div className="take-next-label">
-                  <b>TAKE & NEXT</b>
-                  <small>Tayangkan & Cue Lanjut</small>
-                </div>
-                <kbd>ENTER</kbd>
-              </button>
-            </div>
-
-            {/* Cue Stepper Navigation */}
-            <div className="cue-stepper-row">
-              <button
-                className="cue-step-btn"
-                onClick={() => onCueStep(-1)}
-                disabled={currentIndex <= 0}
-                title="Pilih grafis sebelumnya di rundown (Hotkey: Panah Atas ↑)"
-              >
-                <ArrowUp size={13} />
-                <span>CUE PREV (↑)</span>
-              </button>
-              <button
-                className="cue-step-btn"
-                onClick={() => onCueStep(1)}
-                disabled={currentIndex < 0 || currentIndex >= totalGraphics - 1}
-                title="Pilih grafis berikutnya di rundown (Hotkey: Panah Bawah ↓)"
-              >
-                <span>CUE NEXT (↓)</span>
-                <ArrowDown size={13} />
-              </button>
-            </div>
-
-            {/* Secondary Actions: UPDATE & CLEAR */}
-            <div className="secondary-actions">
-              <button
-                className={`update-live-btn ${selected?.id === live.onAirGraphicId ? "on-air-match" : ""}`}
-                disabled={!selected || selected.id !== live.onAirGraphicId || !!busy}
-                onClick={() => onCommand("update")}
-                title="Perbarui teks siaran langsung tanpa animasi keluar (Hotkey: U)"
-              >
-                <RefreshCw size={15} />
-                <span>UPDATE LIVE</span>
-                <kbd>U</kbd>
-              </button>
-              <button
-                className="clear-btn"
-                disabled={!live.onAirGraphicId || !!busy}
-                onClick={() => onCommand("clear")}
-                title="Hilangkan lower third berita dengan animasi out; Logo & Ticker tetap tayang (Hotkey: C)"
-              >
-                <X size={15} />
-                <span>CLEAR CG</span>
-                <kbd>C</kbd>
-              </button>
-            </div>
-
-            {/* Guarded Emergency Blackout */}
-            <div className="emergency-section">
-              <button
-                className="blackout-btn"
-                disabled={!!busy}
-                onClick={() => onCommand("clear-all")}
-                title="Bersihkan seluruh layer siaran dari layar (Layar Hitam Total)"
-              >
-                <Trash2 size={12} />
-                <span>BLACK OUT / BERSIH TOTAL</span>
-              </button>
-            </div>
-
-            {live.error && (
-              <div className="error-callout">
-                <AlertTriangle size={15} />
-                <span>
-                  <b>Perintah gagal</b>
-                  {live.error}
-                </span>
-              </div>
-            )}
-
-            <div className="last-action">
-              <Activity size={13} />
-              <span>{actions[0]?.message || "Siap beroperasi"}</span>
-              <time>
-                {actions[0]?.created_at
-                  ? new Date(actions[0].created_at).toLocaleTimeString("id-ID", {
-                      hour: "2-digit",
-                      minute: "2-digit"
-                    })
-                  : "—"}
-              </time>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
   );
 }
 
@@ -1253,14 +882,14 @@ function BroadcastSetupModal({
           <div className="modal-tab-content">
             <div className="setup-field-group">
               <label>
-                <span className="master-label">Teks Brand / Saluran (Kanan Bawah)</span>
+                <span className="master-label">Nama Berita di Ticker (Badge Merah — Fit Huruf)</span>
                 <input
                   className="master-input full"
                   value={master.brandText || ""}
                   placeholder="CNNINDONESIA.COM"
                   onChange={(e) => onUpdate({ brandText: e.target.value })}
                 />
-                <small className="field-hint">Ditampilkan pada baris ticker bawah</small>
+                <small className="field-hint">Warna merah pada layar siaran otomatis fit membungkus teks tanpa space kosong.</small>
               </label>
 
               <label style={{ marginTop: 10 }}>
@@ -1289,15 +918,42 @@ function BroadcastSetupModal({
               </label>
 
               <label style={{ marginTop: 10 }}>
-                <span className="master-label">Default Running Ticker Berita</span>
+                <span className="master-label">Isi Running Ticker Berita Default</span>
                 <input
                   className="master-input full"
                   value={master.tickerText || ""}
                   placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"
                   onChange={(e) => onUpdate({ tickerText: e.target.value })}
                 />
-                <small className="field-hint">Digunakan saat grafis tidak mengisi teks ticker khusus</small>
+                <small className="field-hint">Animasi teks berjalan mulus 60fps berputar tanpa henti (seamless loop).</small>
               </label>
+
+              {/* Pratinjau Interaktif Ticker */}
+              <div style={{ marginTop: 14 }}>
+                <span className="master-label" style={{ display: "block", marginBottom: 6, color: "#38bdf8" }}>
+                  PRATINJAU LANGSUNG TICKER (BADGE FIT & ANIMASI):
+                </span>
+                <div
+                  className="cg-ticker-bar cnn-template"
+                  style={{
+                    position: "relative",
+                    height: 44,
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "stretch",
+                    border: "1px solid #334155"
+                  }}
+                >
+                  <div className="cg-ticker-badge" style={{ height: "100%", fontSize: 18 }}>
+                    <span>{master.brandText || "CNNINDONESIA.COM"}</span>
+                  </div>
+                  <BroadcastTicker text={master.tickerText || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"} />
+                  <div className="cg-ticker-clock" style={{ height: "100%", fontSize: 20 }}>
+                    <BroadcastClock timezone={master.timezone} customLabel={master.customTimezoneLabel} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1688,14 +1344,41 @@ function SettingsView({
   const [form, setForm] = useState<any>(value);
   const [inputs, setInputs] = useState<VmixInput[]>([]);
   const [testing, setTesting] = useState(false);
+  const [masterForm, setMasterForm] = useState<MasterOverlayState>(master);
+  const masterLogoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setForm(value), [value]);
+  useEffect(() => setMasterForm(master), [master]);
 
   async function save() {
     await mutate("/api/settings", "PATCH", form);
+    await onUpdateMaster(masterForm);
     await onSaved();
-    toast("Pengaturan tersimpan");
+    toast("Semua pengaturan berhasil disimpan");
   }
+
+  async function saveMaster() {
+    await onUpdateMaster(masterForm);
+    toast("Pengaturan default siaran berhasil disimpan");
+  }
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast("Ukuran file gambar melebihi batas 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const updated = { ...masterForm, logoType: "image" as const, logoImage: dataUrl };
+      setMasterForm(updated);
+      onUpdateMaster(updated);
+      toast("Gambar logo berhasil diunggah");
+    };
+    reader.readAsDataURL(file);
+  };
 
   async function test() {
     setTesting(true);
@@ -1730,11 +1413,292 @@ function SettingsView({
         action={
           <button className="primary-small" onClick={save}>
             <Save size={16} />
-            Simpan
+            Simpan Semua
           </button>
         }
       />
       <div className="settings-grid">
+        {/* 1. KARTU PENGATURAN DEFAULT SIARAN (LOGO, NAMA BERITA TICKER, & ISI TICKER) */}
+        <div className="settings-card broadcast-defaults-card">
+          <h3>
+            <SlidersHorizontal size={17} />
+            Pengaturan Default Siaran & Ticker
+          </h3>
+          <p>
+            Konfigurasi master bawaan yang berlaku otomatis di layar siaran. Nilai ini menjadi acuan default dan tetap dapat di-override secara manual per grafis saat produksi jika diperlukan.
+          </p>
+
+          {/* Subgrup 1: Logo Siaran Default */}
+          <div
+            className="settings-subgroup"
+            style={{
+              marginBottom: 16,
+              padding: "12px",
+              background: "#0c1018",
+              borderRadius: 6,
+              border: "1px solid #1c2638"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <strong style={{ fontSize: 12, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 6 }}>
+                <ImageIcon size={15} /> Logo Siaran Default
+              </strong>
+              <div className="tab-pill-group" style={{ display: "flex", gap: 4 }}>
+                <button
+                  type="button"
+                  className={`mini-pill-btn ${masterForm.logoType === "text" ? "active" : ""}`}
+                  onClick={() => {
+                    const u = { ...masterForm, logoType: "text" as const };
+                    setMasterForm(u);
+                    onUpdateMaster(u);
+                  }}
+                >
+                  Teks Logo
+                </button>
+                <button
+                  type="button"
+                  className={`mini-pill-btn ${masterForm.logoType === "image" ? "active" : ""}`}
+                  onClick={() => {
+                    const u = { ...masterForm, logoType: "image" as const };
+                    setMasterForm(u);
+                    onUpdateMaster(u);
+                  }}
+                >
+                  Upload Gambar
+                </button>
+              </div>
+            </div>
+
+            {masterForm.logoType === "image" ? (
+              <div>
+                <input
+                  ref={masterLogoInputRef}
+                  type="file"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  style={{ display: "none" }}
+                  onChange={handleLogoUpload}
+                />
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <div
+                    style={{
+                      width: 140,
+                      height: 80,
+                      background: "#06090e",
+                      border: "1px dashed #2d3b4e",
+                      borderRadius: 4,
+                      display: "grid",
+                      placeItems: "center",
+                      overflow: "hidden",
+                      flexShrink: 0
+                    }}
+                  >
+                    {masterForm.logoImage ? (
+                      <img
+                        src={masterForm.logoImage}
+                        alt="Logo Preview"
+                        style={{ maxWidth: "90%", maxHeight: "90%", objectFit: "contain" }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 10, color: "#64748b", textAlign: "center", padding: 6 }}>
+                        Belum ada gambar
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="primary-small"
+                        onClick={() => masterLogoInputRef.current?.click()}
+                      >
+                        <Upload size={13} /> {masterForm.logoImage ? "Ganti File Gambar" : "Pilih File Gambar Logo"}
+                      </button>
+                      {masterForm.logoImage && (
+                        <button
+                          type="button"
+                          className="btn-text-danger"
+                          style={{
+                            background: "transparent",
+                            border: "1px solid #5a242c",
+                            color: "#ff8891",
+                            borderRadius: 4,
+                            padding: "5px 10px",
+                            fontSize: 11,
+                            cursor: "pointer"
+                          }}
+                          onClick={() => {
+                            const u = { ...masterForm, logoImage: null, logoType: "text" as const };
+                            setMasterForm(u);
+                            onUpdateMaster(u);
+                            toast("Logo gambar dihapus (kembali ke teks bawaan)");
+                          }}
+                        >
+                          <Trash2 size={12} /> Hapus
+                        </button>
+                      )}
+                    </div>
+                    <small style={{ display: "block", marginTop: 6, color: "#94a3b8", fontSize: 10, lineHeight: 1.4 }}>
+                      Format rekomendasi: <b>PNG Transparan</b> atau <b>SVG</b>. Kotak logo siaran berukuran rasio 155 × 98 px.
+                    </small>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <label>
+                  <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", fontWeight: 700 }}>
+                    Teks Logo Utama
+                  </span>
+                  <input
+                    style={{
+                      marginTop: 4,
+                      width: "100%",
+                      background: "#06090e",
+                      color: "white",
+                      border: "1px solid #2d3748",
+                      borderRadius: 4,
+                      padding: "7px 9px",
+                      fontSize: 11
+                    }}
+                    value={masterForm.logoText || "CNN"}
+                    onChange={(e) => setMasterForm({ ...masterForm, logoText: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", fontWeight: 700 }}>
+                    Teks Sub-Logo
+                  </span>
+                  <input
+                    style={{
+                      marginTop: 4,
+                      width: "100%",
+                      background: "#06090e",
+                      color: "white",
+                      border: "1px solid #2d3748",
+                      borderRadius: 4,
+                      padding: "7px 9px",
+                      fontSize: 11
+                    }}
+                    value={masterForm.logoSub || "Indonesia"}
+                    onChange={(e) => setMasterForm({ ...masterForm, logoSub: e.target.value })}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Subgrup 2: Nama Berita di Ticker (Badge Merah Fit) */}
+          <div className="form-grid" style={{ marginBottom: 12 }}>
+            <label className="wide">
+              <span>Nama Berita di Ticker (Badge Merah — Fit Otomatis Sesuai Huruf)</span>
+              <input
+                value={masterForm.brandText || ""}
+                placeholder="CNNINDONESIA.COM"
+                onChange={(e) => setMasterForm({ ...masterForm, brandText: e.target.value })}
+              />
+              <small style={{ color: "#94a3b8", fontSize: 10, marginTop: 4, display: "block" }}>
+                Label merah di sebelah kiri running text. Lebar warna merah otomatis pas (fit-content) membungkus huruf tanpa ruang kosong berlebih.
+              </small>
+            </label>
+          </div>
+
+          {/* Subgrup 3: Isi Ticker Berita Default */}
+          <div className="form-grid" style={{ marginBottom: 12 }}>
+            <label className="wide">
+              <span>Isi Running Ticker Berita Default (Animasi Berjalan Kontinu)</span>
+              <input
+                value={masterForm.tickerText || ""}
+                placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"
+                onChange={(e) => setMasterForm({ ...masterForm, tickerText: e.target.value })}
+              />
+              <small style={{ color: "#94a3b8", fontSize: 10, marginTop: 4, display: "block" }}>
+                Animasi running text berputar mulus 60fps tanpa jeda (looping seamless kontinu).
+              </small>
+            </label>
+          </div>
+
+          {/* Subgrup 4: Zona Waktu Siaran */}
+          <div className="form-grid" style={{ marginBottom: 14 }}>
+            <label>
+              <span>Zona Waktu Siaran</span>
+              <select
+                value={masterForm.timezone}
+                onChange={(e) => setMasterForm({ ...masterForm, timezone: e.target.value as TimezoneMode })}
+              >
+                <option value="WIB">WIB (Waktu Indonesia Barat, UTC+7)</option>
+                <option value="WITA">WITA (Waktu Indonesia Tengah, UTC+8)</option>
+                <option value="WIT">WIT (Waktu Indonesia Timur, UTC+9)</option>
+                <option value="CUSTOM">Custom Label Suffix</option>
+              </select>
+            </label>
+            {masterForm.timezone === "CUSTOM" && (
+              <label>
+                <span>Label Kustom Zona Waktu</span>
+                <input
+                  placeholder="Label Jam"
+                  value={masterForm.customTimezoneLabel || ""}
+                  onChange={(e) => setMasterForm({ ...masterForm, customTimezoneLabel: e.target.value })}
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Subgrup 5: Pratinjau Interaktif Ticker Langsung */}
+          <div style={{ marginTop: 12, marginBottom: 14 }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#38bdf8",
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+                display: "block",
+                marginBottom: 6
+              }}
+            >
+              ⚡ PRATINJAU LANGSUNG TICKER (BADGE FIT & ANIMASI BERPUTAR):
+            </span>
+            <div
+              className="cg-ticker-bar cnn-template"
+              style={{
+                position: "relative",
+                height: 46,
+                borderRadius: 6,
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "stretch",
+                border: "1px solid #334155"
+              }}
+            >
+              <div className="cg-ticker-badge" style={{ height: "100%", fontSize: 18 }}>
+                <span>{masterForm.brandText || "CNNINDONESIA.COM"}</span>
+              </div>
+              <BroadcastTicker text={masterForm.tickerText || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"} />
+              <div className="cg-ticker-clock" style={{ height: "100%", fontSize: 20 }}>
+                <BroadcastClock timezone={masterForm.timezone} customLabel={masterForm.customTimezoneLabel} />
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              borderTop: "1px solid #1e293b",
+              paddingTop: 12
+            }}
+          >
+            <button className="primary-small" onClick={saveMaster}>
+              <Save size={13} /> Simpan Pengaturan Default Siaran
+            </button>
+            <span style={{ fontSize: 10, color: "#64748b" }}>
+              Perubahan langsung tersimpan ke database & terkirim ke overlay siaran.
+            </span>
+          </div>
+        </div>
+
+        {/* 2. KARTU OUTPUT & INTEGRASI SWITCHER */}
         <div className="settings-card">
           <h3>
             <Globe />
@@ -1810,34 +1774,6 @@ function SettingsView({
               </span>
             </div>
           )}
-
-          {/* Master Overlay Configuration Section */}
-          <h3 style={{ marginTop: 22 }}>
-            <SlidersHorizontal size={17} />
-            Master Layer & Identitas Brand
-          </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "#8a96a8", flex: 1 }}>Konfigurasi Siaran & Identitas:</span>
-              <button className="primary-small" onClick={onOpenSetupModal}>
-                <SlidersHorizontal size={13} />
-                Buka Pengaturan Siaran & Logo
-              </button>
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "#8a96a8", flex: 1 }}>Zona Waktu Siaran:</span>
-              <select
-                className="master-select"
-                value={master.timezone}
-                onChange={(e) => onUpdateMaster({ timezone: e.target.value as TimezoneMode })}
-              >
-                <option value="WIB">WIB (Waktu Indonesia Barat, UTC+7)</option>
-                <option value="WITA">WITA (Waktu Indonesia Tengah, UTC+8)</option>
-                <option value="WIT">WIT (Waktu Indonesia Timur, UTC+9)</option>
-                <option value="CUSTOM">Kustom Suffix</option>
-              </select>
-            </div>
-          </div>
         </div>
 
         {form.outputMode === "vmix-gt" ? (

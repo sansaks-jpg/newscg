@@ -199,7 +199,9 @@ export function BroadcastGraphic({
         {/* 3. Baris Ticker Bawah (Badge Merah + Running Ticker + Jam Realtime) */}
         {tickerLayer.present && (
           <div className={`cg-ticker-bar ${tickerLayer.exiting ? "cg-ticker-out" : "cg-ticker-in"}`}>
-            <div className="cg-ticker-badge"><AutoSquishText text={brandText} /></div>
+            <div className="cg-ticker-badge" title="Nama Berita / Kategori Ticker">
+              <AutoSquishText text={brandText} style={{ width: "max-content", maxWidth: "100%" }} />
+            </div>
             <BroadcastTicker text={tickerText} />
             <div className="cg-ticker-clock">
               <BroadcastClock

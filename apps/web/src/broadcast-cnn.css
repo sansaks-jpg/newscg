@@ -54,17 +54,51 @@
 .cnn-template.no-ticker .cg-persistent-master { bottom: 62px; }
 .cnn-template .cg-logo-box.standalone.no-ticker { border-radius: 16px 0 0 0; }
 .cnn-template .cg-cnn-logo { font-family: Arial, sans-serif; font-style: normal; font-size: 76px; letter-spacing: -5px; font-weight: 900; line-height: .95; }
+.cnn-template .cg-logo-box.standalone.no-ticker { border-radius: 16px 0 0 0; }
+.cnn-template .cg-cnn-logo { font-family: Arial, sans-serif; font-style: normal; font-size: 76px; letter-spacing: -5px; font-weight: 900; line-height: .95; }
 .cnn-template .cg-cnn-sub { font-size: 38px; line-height: 1; font-weight: 400; letter-spacing: -1px; margin-top: 4px; }
 .cnn-template .cg-brand-cnn { width: 184px; height: 86px; object-fit: contain; }
 .cnn-template .cg-custom-logo-img { max-width: 196px; max-height: 126px; }
 .cnn-template .cg-standalone-live-badge { width: var(--cg-logo-width); height: 64px; justify-content: center; padding: 0; margin: 0; border-radius: 0; box-shadow: none; background: linear-gradient(#f21212,#c00); font: 500 46px/1 Arial,sans-serif; letter-spacing: 5px; animation: cnn-text-in 300ms both; }
 .cnn-template .live-dot { display: none; }
 .cnn-template .cg-ticker-bar { height: 56px; margin-top: 6px; border-radius: 0 0 14px 14px; background: linear-gradient(#303030,#060606); opacity: 1; animation: cnn-text-in 320ms both; }
-.cnn-template .cg-ticker-badge { width: 310px; padding: 0 18px; justify-content: center; background: linear-gradient(#f00,#c00); font: 400 28px/1 Arial,sans-serif; letter-spacing: 0; }
-.cnn-template .cg-ticker-content { padding: 0 12px; }
-.cnn-template .cg-ticker-text { font: 400 34px/1.1 "Arial Narrow",Arial,sans-serif; }
-.cnn-template .cg-ticker-clock { width: var(--cg-logo-width); padding: 0 12px; justify-content: center; background: linear-gradient(#606060,#383838); font: 700 36px/1 Arial,sans-serif; font-variant-numeric: tabular-nums; }
-.cnn-template .cg-ticker-bar { position: absolute; bottom: 0; left: 0; right: 0; margin-top: 0; }
+.cnn-template .cg-ticker-badge {
+  width: max-content;
+  max-width: 520px;
+  min-width: 0;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(#f00, #c00);
+  font: 700 28px/1 "Arial Narrow", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  z-index: 2;
+}
+.cnn-template .cg-ticker-content { padding: 0; }
+.cnn-template .cg-ticker-text { font: 400 34px/1.1 "Arial Narrow", Arial, sans-serif; }
+.cnn-template .cg-ticker-clock {
+  width: var(--cg-logo-width);
+  padding: 0 12px;
+  justify-content: center;
+  background: linear-gradient(#606060, #383838);
+  font: 700 36px/1 Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  z-index: 2;
+}
+.cnn-template .cg-ticker-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin-top: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
 .cnn-template .cg-content-layer.cg-exit { animation: none !important; }
 .cnn-template .cg-exit .cg-main-box { animation: cnn-panel-out 360ms 140ms cubic-bezier(.7,0,.84,0) both; }
 .cnn-template .cg-exit .cg-kicker-tab { animation: cnn-panel-out 280ms 70ms ease-in both; }
@@ -80,15 +114,51 @@
   .cnn-template, .cnn-template *, .cg-all-exit * { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
 
-/* Independent broadcast layers: no scaleX on logos or text during transitions. */
-.cg-ticker-content { position: relative; display: block; align-content: center; padding: 0; }
-.cnn-template .cg-ticker-content { padding: 0; }
-.cg-ticker-track { display: flex; width: max-content; align-items: center; will-change: transform;
-  animation: cg-ticker-travel var(--ticker-duration) linear infinite; }
-.cg-ticker-copy { display: inline-flex; align-items: center; flex: 0 0 auto; padding: 0 96px 0 12px; }
-.cg-ticker-text { display: inline-block; }
-.cg-ticker-content { opacity: 1; transition: opacity 180ms ease; }
-.cg-ticker-content.ticker-changing { opacity: 0; }
+/* Independent broadcast layers: ticker marquee engine */
+.cg-ticker-content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0;
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+.cg-ticker-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  will-change: transform;
+  animation: cg-ticker-loop var(--ticker-duration, 24s) linear infinite !important;
+}
+.cg-ticker-segment {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cg-ticker-copy {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 18px;
+}
+.cg-ticker-text {
+  display: inline-block;
+  white-space: nowrap;
+  color: #ffffff;
+}
+.cg-ticker-bullet {
+  color: #ef4444;
+  font-size: 15px;
+  margin-left: 20px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.cg-ticker-content.ticker-changing {
+  opacity: 0;
+}
 .cg-ticker-bar.cg-ticker-in { animation: cg-bar-in 480ms cubic-bezier(.16,1,.3,1) both; }
 .cg-ticker-bar.cg-ticker-out { animation: cg-bar-out 480ms cubic-bezier(.65,0,.8,.2) both; }
 .cg-logo-box.standalone.cg-layer-in,
@@ -99,12 +169,18 @@
 .cg-all-exit .cg-standalone-live-badge { animation: cg-brand-out 420ms both; }
 .cg-all-exit .cg-ticker-bar { animation: cg-bar-out 480ms both; }
 .cg-all-exit .cg-persistent-master { animation: none; }
-@keyframes cg-ticker-travel { from { transform: translate3d(0,0,0); } to { transform: translate3d(calc(-1 * var(--ticker-distance)),0,0); } }
+@keyframes cg-ticker-loop {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
 @keyframes cg-bar-in { from { clip-path: inset(0 100% 0 0); transform: translateY(8px); } to { clip-path: inset(0); transform: translateY(0); } }
 @keyframes cg-bar-out { from { clip-path: inset(0); transform: translateY(0); } to { clip-path: inset(0 0 0 100%); transform: translateY(8px); } }
 @keyframes cg-brand-in { from { clip-path: inset(100% 0 0); transform: translateY(12px); opacity: 0; } to { clip-path: inset(0); transform: translateY(0); opacity: 1; } }
 @keyframes cg-brand-out { from { clip-path: inset(0); transform: translateY(0); opacity: 1; } to { clip-path: inset(100% 0 0); transform: translateY(12px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .cg-ticker-bar, .cg-logo-box.standalone, .cg-standalone-live-badge { animation-duration: 1ms !important; }
-  .cg-ticker-track { animation: none !important; transform: none; }
 }

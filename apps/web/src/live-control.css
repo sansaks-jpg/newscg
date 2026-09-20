@@ -1,113 +1,100 @@
-/* Operator workspace: preview is green, transmission is red, revision is amber. */
-.vmix-production-shell { padding: 12px 16px; gap: 12px; overflow-y: auto; }
-.live-workflow-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 36px; flex-shrink: 0; }
-.live-workflow-bar > div { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9dacc1; }
-.live-workflow-bar b { color: #d3deed; font-weight: 500; }
-.workflow-step { width: 24px; height: 24px; display: grid; place-items: center; background: #132b24; color: #62d7a2; border: 1px solid #2b5b47; border-radius: 50%; font-size: 11px; font-weight: 700; }
-.workflow-step.live { background: #351821; color: #ff8d9b; border-color: #62313d; }
-.live-workflow-bar button { padding: 7px 12px; border: 1px solid #34445b; border-radius: 5px; background: #131b28; color: #a3b2c6; font-size: 11px; cursor: pointer; }
-.live-workflow-bar button.keys-enabled { color: #99dbbb; border-color: #345744; }
-.vmix-multiview-deck { grid-template-columns: minmax(0,1fr) 244px minmax(0,1fr); gap: 12px; height: 460px; min-height: 460px; max-height: none; flex-shrink: 0; }
-.vmix-monitor-card { border-radius: 8px; box-shadow: none; }
-.monitor-header { height: 38px; min-height: 38px; padding: 0 12px; }
-.monitor-title { font-size: 12px; letter-spacing: 1px; }
-.monitor-tag { font-size: 9px; }
-.monitor-res { font-size: 9px; color: #899bb4; }
-.monitor-footer { height: 40px; min-height: 40px; gap: 8px; padding: 0 12px; }
-.monitor-cue-name { font-size: 11px; color: #d1dce9; }
-.monitor-type-badge { font-size: 8px; flex-shrink: 0; }
-.vmix-transition-console { padding: 12px; border-radius: 8px; gap: 8px; overflow-y: auto; background: #121925; }
-.console-target { display: grid; gap: 5px; }
-.console-target small, .master-live-label { font-size: 9px; letter-spacing: .7px; color: #9aabc3; }
-.console-target strong { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.console-target span { color: #7ecbaa; font-size: 10px; }
-.transition-primary-group { gap: 7px; }
-.btn-vmix-take { min-height: 76px; background: #db243b; box-shadow: none; }
-.btn-vmix-take:hover:not(:disabled) { background: #ee314a; box-shadow: none; }
-.btn-vmix-take-next, .btn-vmix-update, .btn-vmix-clear { min-height: 33px; font-size: 10px; padding: 6px 10px; }
-.btn-vmix-update.on-air-sync { background: #3d301b; border-color: #806134; color: #ffe0a0; }
-.cue-step-nav-btn { min-height: 30px; font-size: 9px; }
-.console-feedback { margin: 0; color: #aabbd0; font-size: 10px; line-height: 1.5; min-height: 30px; }
-.console-feedback.error { color: #ffb2b9; }
-.master-live-label { display: block; margin-bottom: 6px; }
-.master-toggle-btn { min-height: 28px; font-size: 10px; }
-.btn-vmix-blackout { min-height: 28px; margin-top: 8px; font-size: 9px; }
-.vmix-bottom-deck { flex: 1 0 310px; height: auto; min-height: 310px; grid-template-columns: 300px minmax(0,1fr); gap: 12px; }
-.vmix-rundown-panel, .vmix-inputs-panel { border-radius: 8px; }
-.deck-panel-header { padding: 10px 12px; }
-.panel-title-row b { font-size: 11px; }
-.panel-search-bar input { font-size: 12px; min-height: 28px; }
-.rundown-timer-strip { min-height: 42px; }
-.rundown-row-card { min-height: 62px; padding: 10px; }
-.row-title { font-size: 12px; line-height: 1.35; }
-.row-meta { margin-top: 5px; }
-.row-dur { font-size: 11px; }
-.row-num { font-size: 11px; }
-.inputs-panel-header { height: auto; min-height: 66px; padding: 12px; flex-wrap: wrap; flex-shrink: 0; }
-.story-title-label { max-width: 640px; font-size: 14px; margin-top: 4px; }
-.story-slug-label { font-size: 9px; color: #8ea2be; }
-.header-quick-actions { flex-wrap: wrap; gap: 6px; }
-.header-quick-actions button { min-height: 30px; font-size: 10px; }
-.preview-action-hint { padding: 9px 12px; font-size: 11px; color: #96a8c1; border-bottom: 1px solid #253145; flex-shrink: 0; }
-.preview-action-hint span { color: #70d5a4; font-weight: 700; margin-right: 8px; }
-.vmix-input-tiles-grid { padding: 12px; gap: 10px; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); }
-.vmix-input-tile { min-height: 145px; padding: 10px; border-radius: 6px; box-shadow: none; }
-.tile-template-tag { font-size: 10px; }
-.tile-text-preview, .tile-text-preview.headline-main { font-size: 13px; line-height: 1.45; }
-.tile-sub-hint, .tile-subline-snippet, .tile-location-chip { font-size: 11px; color: #a6b7cd; }
-.tile-btn-preview { min-height: 30px; font-size: 10px; width: 100%; }
-.tile-input-num, .tile-status-pill span { font-size: 9px; }
-.vmix-direct-hotkeys-bar { padding: 8px 12px; min-height: 42px; }
-.quick-key-btn { min-height: 28px; font-size: 10px; }
-.vmix-status-footer { min-height: 25px; font-size: 10px; flex-shrink: 0; }
-.vmix-quick-edit-box { padding: 12px; max-height: 420px; flex-shrink: 0; gap: 10px; }
-.quick-edit-title-bar { font-size: 10px; color: #f4c67a; }
-.quick-edit-fields span, .quick-location-field > span { font-size: 11px; color: #b9c8dc; }
-.quick-edit-fields input, .quick-location-field input { font-size: 13px; padding: 9px; color: #fff; background: #0b111c; border: 1px solid #35445d; border-radius: 4px; }
-.quick-location-field { display: grid; gap: 6px; }
-.quick-edit-action-bar { gap: 8px; flex-wrap: wrap; }
-.quick-edit-action-bar button { font-size: 11px; min-height: 34px; padding: 8px 12px; }
-.btn-update-live-inline { background: #815b1f; color: #fff1cc; }
-.live-reporter-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px; background: #142031; flex-shrink: 0; }
-.live-reporter-form h3 { grid-column: 1/-1; font-size: 13px; margin: 0; }
-.live-reporter-form label { display: grid; gap: 6px; font-size: 11px; color: #b7c8df; }
-.live-reporter-form input { padding: 9px; background: #0a1321; color: white; border: 1px solid #3b4e69; border-radius: 4px; }
-.live-reporter-form > div { grid-column: 1/-1; display: flex; gap: 8px; }
-.live-reporter-form button { background: #254663; color: white; border: 1px solid #426886; border-radius: 4px; padding: 8px 12px; font-size: 11px; }
-.vmix-production-shell button:focus-visible, .vmix-input-tile:focus-visible { outline: 2px solid #9cc7ff; outline-offset: 3px; }
-.vmix-production-shell button:disabled { opacity: .4; cursor: not-allowed; }
-.preview-16-9-viewport { border: 0; border-radius: 0; }
-html:has(.template-demo), body:has(.template-demo), #root:has(.template-demo) { min-width: 0; overflow: auto !important; max-height: none; height: auto; }
-@media (max-width: 1350px) {
-  .vmix-production-shell { padding: 8px; gap: 8px; }
-  .vmix-multiview-deck { grid-template-columns: minmax(0,1fr) 216px minmax(0,1fr); gap: 8px; }
-  .vmix-bottom-deck { grid-template-columns: 260px minmax(0,1fr); }
-  .monitor-res { display: none; }
-}
-@media (max-width: 850px) {
-  .template-demo { padding: 20px 16px; }
-  .template-demo header { align-items: start; gap: 16px; }
-  .template-demo h1 { font-size: 20px; }
-  .template-demo-controls { grid-template-columns: 1fr; }
+/* =========================================================
+   NewsCG - Modern Broadcast Control Panel (Live Control Refinements)
+   Designed for Professional Newsroom Operators (Singular.live style)
+   ========================================================= */
+
+/* 1. Custom Smooth Scrollbars for Dark Studio */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-.transition-primary-group { display: grid; grid-template-columns: 1fr 1fr; }
-.btn-vmix-take, .btn-vmix-take-next { grid-column: 1/-1; }
-.btn-vmix-update, .btn-vmix-clear { padding: 6px; gap: 4px; font-size: 9px; }
-.btn-vmix-update kbd, .btn-vmix-clear kbd { display: none; }
-.vmix-inputs-panel:has(.vmix-quick-edit-box), .vmix-inputs-panel:has(.live-reporter-form) { overflow-y: auto; }
-.vmix-inputs-panel:has(.vmix-quick-edit-box) .vmix-input-tiles-grid { display: none; }
-@media (max-height: 850px) {
-  .vmix-production-shell { padding: 8px; gap: 8px; }
-  .vmix-multiview-deck { height: 340px; min-height: 340px; }
-  .vmix-bottom-deck { flex-basis: 260px; min-height: 260px; }
-  .vmix-transition-console { padding: 8px; gap: 5px; }
-  .console-target { gap: 2px; }
-  .console-target strong { font-size: 11px; }
-  .btn-vmix-take { min-height: 58px; }
-  .transition-primary-group { gap: 5px; }
-  .console-feedback { min-height: 15px; font-size: 9px; }
-  .master-toggle-btn { min-height: 24px; }
-  .btn-vmix-blackout { min-height: 24px; margin-top: 4px; }
-  .master-live-label { margin-bottom: 3px; }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b transparent;
+}
+
+/* 2. Tactile Button Click Interactions */
+.btn-vmix-take:active:not(:disabled),
+.btn-vmix-take-next:active:not(:disabled),
+.btn-vmix-update:active:not(:disabled),
+.btn-vmix-clear:active:not(:disabled),
+.btn-vmix-blackout:active:not(:disabled),
+.master-toggle-btn:active:not(:disabled),
+.tile-btn-preview:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* 3. Accessibility & Keyboard Focus Rings */
+.vmix-production-shell button:focus-visible,
+.vmix-input-tile:focus-visible,
+.topbar-tab-btn:focus-visible,
+.unified-topbar input:focus-visible,
+.unified-topbar select:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+/* 4. Responsive Viewport Balancing */
+@media (max-width: 1400px) {
+  .vmix-multiview-deck {
+    grid-template-columns: minmax(0, 1fr) 210px minmax(0, 1fr);
+  }
+  .vmix-bottom-deck {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .vmix-input-tiles-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .vmix-multiview-deck {
+    grid-template-columns: minmax(0, 1fr) 190px minmax(0, 1fr);
+  }
+  .vmix-bottom-deck {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+  .btn-take-inner .take-text {
+    font-size: 14px;
+  }
+}
+
+/* 5. Template Preview Demo Route */
+html:has(.template-demo),
+body:has(.template-demo),
+#root:has(.template-demo) {
+  min-width: 0;
+  overflow: auto !important;
+  max-height: none;
+  height: auto;
+}
+
+@media (max-width: 850px) {
+  .template-demo {
+    padding: 20px 16px;
+  }
+  .template-demo header {
+    align-items: start;
+    gap: 16px;
+  }
+  .template-demo h1 {
+    font-size: 20px;
+  }
+  .template-demo-controls {
+    grid-template-columns: 1fr;
+  }
 }

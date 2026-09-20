@@ -1357,14 +1357,8 @@ export function Production({
 
   return (
     <div className="vmix-production-shell">
-      <div className="live-workflow-bar">
-        <div><span className="workflow-step">1</span><b>Pilih materi</b><span>→</span><span className="workflow-step">2</span><b>Cek PREVIEW</b><span>→</span><span className="workflow-step live">3</span><b>TAKE ke PROGRAM</b></div>
-        <button className={shortcutsEnabled ? "keys-enabled" : ""} aria-pressed={shortcutsEnabled} onClick={() => setShortcutsEnabled((value) => !value)}>
-          Keyboard {shortcutsEnabled ? "aktif" : "nonaktif"}
-        </button>
-      </div>
       {/* =========================================================
-          BAGIAN ATAS: MULTIVIEWER & TRANSITION CONSOLE (vMix Switcher)
+          BAGIAN ATAS: MULTIVIEWER & TRANSITION CONSOLE (Studio Switcher)
           ========================================================= */}
       <section className="vmix-multiview-deck">
         {/* 1. MONITOR PREVIEW (STANDBY) */}
@@ -1375,7 +1369,7 @@ export function Production({
               <b className="monitor-title">PREVIEW</b>
               <span className="monitor-tag standby">STANDBY</span>
             </div>
-            <span className="monitor-res">1920x1080 · STANDBY</span>
+            <span className="monitor-res">1080p · STANDBY</span>
           </header>
 
           <div className="monitor-screen-area">
@@ -1399,121 +1393,142 @@ export function Production({
           </footer>
         </div>
 
-        {/* 2. SWITCHER TRANSITION CONSOLE (vMix Center Bar) */}
+        {/* 2. SWITCHER TRANSITION CONSOLE (Center Hardware Console) */}
         <aside className="vmix-transition-console">
-          <div className="console-target"><small>AKAN DITAYANGKAN</small><strong>{cue?.draftFields.headline || cue?.draftFields.name || cue?.draftFields.location || "Pilih materi"}</strong><span>{cue?.status === "READY" ? "Siap TAKE" : "Belum siap"} · CNN Putih</span></div>
+          <div className="console-target">
+            <div className="console-target-header">
+              <span className="target-label-tag">STANDBY CUE</span>
+              <div className="console-stepper-mini">
+                <button
+                  className="cue-mini-btn"
+                  onClick={() => stepCue(-1)}
+                  title="Pilih Cue Sebelumnya (↑)"
+                >
+                  <ArrowUp size={11} />
+                </button>
+                <button
+                  className="cue-mini-btn"
+                  onClick={() => stepCue(1)}
+                  title="Pilih Cue Berikutnya (↓)"
+                >
+                  <ArrowDown size={11} />
+                </button>
+              </div>
+            </div>
+            <strong className="target-title">
+              {cue?.draftFields.headline || cue?.draftFields.name || cue?.draftFields.location || "Pilih materi"}
+            </strong>
+            <div className="target-status-line">
+              <span className={`target-pill ${cue?.status === "READY" ? "ready" : "draft"}`}>
+                {cue?.status === "READY" ? "SIAP TAKE" : "DRAFT"}
+              </span>
+              <small className="target-hint">{cue ? graphicLabel(cue) : "Belum dipilih"}</small>
+            </div>
+          </div>
+
           {/* Main Transition Buttons */}
           <div className="transition-primary-group">
             <button
               className="btn-vmix-take"
               disabled={busy || editBusy || quickDirty || !cue || cue.status !== "READY"}
               onClick={() => cue && command("take", cue)}
-              title="Tayangkan materi standby ke layar siaran (Hotkey: SPACE atau T)"
+              title="Tayangkan materi standby ke siaran (Hotkey: SPACE / T)"
             >
-              <div className="btn-take-top">
+              <div className="btn-take-inner">
                 {busy ? <LoaderCircle className="spin" size={20} /> : <MonitorPlay size={20} />}
-                <b>TAKE</b>
+                <span className="take-text">TAKE</span>
               </div>
-              <small>TAYANGKAN KE LIVE</small>
-              <kbd>SPACE / T</kbd>
+              <kbd className="take-kbd">SPACE</kbd>
             </button>
 
-            <button
-              className="btn-vmix-take-next"
-              disabled={busy || editBusy || quickDirty || !cue || cue.status !== "READY"}
-              onClick={takeAndNext}
-              title="Tayangkan dan langsung pilih cue berikutnya (Hotkey: ENTER)"
-            >
-              <SkipForward size={14} />
-              <span>TAKE & NEXT</span>
-              <kbd>ENTER</kbd>
-            </button>
+            <div className="transition-secondary-grid">
+              <button
+                className="btn-vmix-take-next"
+                disabled={busy || editBusy || quickDirty || !cue || cue.status !== "READY"}
+                onClick={takeAndNext}
+                title="Tayangkan dan langsung pilih cue berikutnya (Hotkey: ENTER)"
+              >
+                <SkipForward size={13} />
+                <span>TAKE & NEXT</span>
+                <kbd>ENTER</kbd>
+              </button>
 
-            <button
-              className={`btn-vmix-update ${
-                cue && cue.id === live.onAirGraphicId ? "on-air-sync" : ""
-              }`}
-              disabled={busy || editBusy || quickDirty || !cue || cue.status !== "READY" || cue.id !== live.onAirGraphicId}
-              onClick={() => cue && command("update", cue)}
-              title="Perbarui teks siaran langsung tanpa animasi keluar (Hotkey: U)"
-            >
-              <RefreshCw size={13} />
-              <span>UPDATE LIVE</span>
-              <kbd>U</kbd>
-            </button>
+              <button
+                className={`btn-vmix-update ${
+                  cue && cue.id === live.onAirGraphicId ? "on-air-sync" : ""
+                }`}
+                disabled={busy || editBusy || quickDirty || !cue || cue.status !== "READY" || cue.id !== live.onAirGraphicId}
+                onClick={() => cue && command("update", cue)}
+                title="Perbarui teks siaran langsung tanpa animasi keluar (Hotkey: U)"
+              >
+                <RefreshCw size={12} />
+                <span>UPDATE</span>
+                <kbd>U</kbd>
+              </button>
 
-            <button
-              className="btn-vmix-clear"
-              disabled={busy || !live.onAirGraphicId}
-              onClick={() => command("clear")}
-              title="Keluarkan CG Lower Third dengan animasi out (Hotkey: ESC atau C)"
-            >
-              <X size={14} />
-              <span>CLEAR CG</span>
-              <kbd>ESC / C</kbd>
-            </button>
+              <button
+                className="btn-vmix-clear"
+                disabled={busy || !live.onAirGraphicId}
+                onClick={() => command("clear")}
+                title="Keluarkan CG Lower Third dengan animasi out (Hotkey: ESC / C)"
+              >
+                <X size={13} />
+                <span>CLEAR CG</span>
+                <kbd>ESC</kbd>
+              </button>
+
+              <button
+                className="btn-vmix-blackout"
+                disabled={busy}
+                onClick={() => command("clear-all")}
+                title="Kosongkan seluruh layer siaran termasuk Master (Hotkey: 0)"
+              >
+                <Trash2 size={12} />
+                <span>ALL CLEAR</span>
+                <kbd>0</kbd>
+              </button>
+            </div>
           </div>
 
-          {/* Cue Step Controls */}
-          <div className="transition-cue-stepper">
-            <button
-              className="cue-step-nav-btn"
-              onClick={() => stepCue(-1)}
-              title="Pilih Cue Sebelumnya (↑)"
-            >
-              <ArrowUp size={12} />
-              <span>PREV CUE</span>
-            </button>
-            <button
-              className="cue-step-nav-btn"
-              onClick={() => stepCue(1)}
-              title="Pilih Cue Berikutnya (↓)"
-            >
-              <span>NEXT CUE</span>
-              <ArrowDown size={12} />
-            </button>
-          </div>
+          <p className={`console-feedback ${commandFeedback.error ? "error" : ""}`} role="status" aria-live="polite">
+            {quickDirty ? "Revisi belum disimpan. Simpan ke preview sebelum TAKE." : commandFeedback.text}
+          </p>
 
-          <p className={`console-feedback ${commandFeedback.error ? "error" : ""}`} role="status" aria-live="polite">{quickDirty ? "Revisi belum disimpan. Simpan ke preview sebelum TAKE." : commandFeedback.text}</p>
-          {/* Master Layer & Blackout */}
+          {/* Master Layer Switches */}
           <div className="transition-master-group">
-            <small className="master-live-label">LAYER MASTER · LANGSUNG LIVE</small>
+            <span className="master-live-label">LAYER MASTER (LANGSUNG ON AIR)</span>
             <div className="master-toggles">
               <button
-                className={`master-toggle-btn ${master.showLogo ? "active" : ""}`}
-                aria-pressed={master.showLogo} disabled={busy || editBusy}
+                className={`master-toggle-btn toggle-logo ${master.showLogo ? "active" : ""}`}
+                aria-pressed={master.showLogo}
+                disabled={busy || editBusy}
                 onClick={() => toggleMaster("showLogo")}
                 title="Toggle Logo Bug Siaran"
               >
-                {master.showLogo ? "✓ LOGO" : "LOGO"}
+                <span className="toggle-indicator" />
+                <span>LOGO</span>
               </button>
               <button
-                className={`master-toggle-btn ${master.showLiveBadge ? "live-active" : ""}`}
-                aria-pressed={master.showLiveBadge} disabled={busy || editBusy}
+                className={`master-toggle-btn toggle-live ${master.showLiveBadge ? "active" : ""}`}
+                aria-pressed={master.showLiveBadge}
+                disabled={busy || editBusy}
                 onClick={() => toggleMaster("showLiveBadge")}
-                title="Toggle Live Indicator"
+                title="Toggle Indikator LIVE"
               >
-                {master.showLiveBadge ? "● LIVE" : "LIVE"}
+                <span className="toggle-indicator" />
+                <span>LIVE</span>
               </button>
               <button
-                className={`master-toggle-btn ${master.showTicker ? "active" : ""}`}
-                aria-pressed={master.showTicker} disabled={busy || editBusy}
+                className={`master-toggle-btn toggle-ticker ${master.showTicker ? "active" : ""}`}
+                aria-pressed={master.showTicker}
+                disabled={busy || editBusy}
                 onClick={() => toggleMaster("showTicker")}
                 title="Toggle Running Ticker & Jam"
               >
-                {master.showTicker ? "✓ TICKER" : "TICKER"}
+                <span className="toggle-indicator" />
+                <span>TICKER</span>
               </button>
             </div>
-
-            <button
-              className="btn-vmix-blackout"
-              disabled={busy}
-              onClick={() => command("clear-all")}
-              title="Kosongkan seluruh layer grafis dari layar (Hotkey: 0)"
-            >
-              <Trash2 size={12} />
-              <span>BERSIH TOTAL (0)</span>
-            </button>
           </div>
         </aside>
 
@@ -1527,7 +1542,7 @@ export function Production({
                 {live.onAirGraphicId ? "ON AIR" : "CG KOSONG"}
               </span>
             </div>
-            <span className="monitor-res">1920x1080 · PROGRAM</span>
+            <span className="monitor-res">1080p · ON AIR</span>
           </header>
 
           <div className="monitor-screen-area">
@@ -1544,14 +1559,14 @@ export function Production({
       </section>
 
       {/* =========================================================
-          BAGIAN BAWAH: INPUTS & RUNDOWN DECK (vMix Input Tiles)
+          BAGIAN BAWAH: INPUTS & RUNDOWN DECK
           ========================================================= */}
       <section className="vmix-bottom-deck">
         {/* SISI KIRI: RUNDOWN BERITA & TIMER */}
         <aside className="vmix-rundown-panel">
           <header className="deck-panel-header">
             <div className="panel-title-row">
-              <b>RUNDOWN SIARAN</b>
+              <b className="panel-title-text">RUNDOWN</b>
               <span className="rundown-stats-badge">
                 {index >= 0 ? `${index + 1}/${rundown?.items.length || 0}` : "—"}
               </span>
@@ -1560,7 +1575,7 @@ export function Production({
               <Search size={12} />
               <input
                 type="text"
-                placeholder="Cari berita / slug…"
+                placeholder="Filter berita…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -1575,15 +1590,15 @@ export function Production({
           {/* Segment Timer Strip */}
           <div className="rundown-timer-strip">
             <div className="timer-readout">
-              <Clock3 size={12} />
-              <span>
+              <Clock3 size={12} className="timer-icon" />
+              <span className="timer-label">
                 {timer && timer.itemId === item?.id
                   ? timer.endAt
-                    ? "SISA WAKTU"
+                    ? "SISA"
                     : "JEDA"
                   : "ESTIMASI"}
               </span>
-              <strong className={timer && remaining <= 10 ? "urgent" : ""}>
+              <strong className={`timer-digits ${timer && remaining <= 10 ? "urgent" : ""}`}>
                 {duration(
                   timer && timer.itemId === item?.id
                     ? remaining
@@ -1596,7 +1611,7 @@ export function Production({
               {timer && timer.itemId === item?.id ? (
                 <>
                   <button
-                    className="timer-action-btn"
+                    className="timer-action-btn pause"
                     onClick={() =>
                       setTimer((t) =>
                         t
@@ -1691,49 +1706,18 @@ export function Production({
           </div>
         </aside>
 
-        {/* SISI KANAN: GRAPHIC INPUT TILES (ala Input Cards vMix) */}
+        {/* SISI KANAN: GRAPHIC CUES DECK */}
         <main className="vmix-inputs-panel">
           <header className="inputs-panel-header">
             <div className="active-story-info">
               <span className="story-slug-label">
-                {item ? `${item.slug} · FORMAT: ${item.format}` : "MATERI BERITA"}
+                {item ? `${item.slug} · FORMAT ${item.format}` : "MATERI BERITA"}
               </span>
               <h2 className="story-title-label">{item?.title || "Pilih berita dari rundown"}</h2>
             </div>
 
             <div className="header-quick-actions">
-              {/* Tombol Cepat Munculkan Lokasi (Langsung Update Siaran) */}
-              <button
-                className={`quick-live-toggle-btn location-btn ${isLocationActiveNow ? "active-on" : ""}`}
-                disabled={busy || !cue || cue.templateType === "REPORTER" || cue.templateType === "LOCATION"}
-                aria-pressed={isLocationActiveNow}
-                onClick={toggleLiveLocation}
-                title="Siapkan lokasi di PREVIEW (L), lalu tekan UPDATE LIVE atau TAKE"
-              >
-                <span className={`toggle-dot ${isLocationActiveNow ? "dot-live" : ""}`} />
-                <MapPin size={11} />
-                <span>
-                  {isLocationActiveNow
-                    ? `LOKASI: ${locationText || "AKTIF"}`
-                    : locationText
-                    ? `+ LOKASI: ${locationText}`
-                    : "LOKASI (OFF)"}
-                </span>
-              </button>
-
-              {/* Tombol Cepat Munculkan Detail / Banyak Info (Langsung Update Siaran) */}
-              <button
-                className={`quick-live-toggle-btn detail-btn ${isDetailActiveNow ? "active-on" : ""}`}
-                disabled={busy || !cue || cue.templateType === "REPORTER" || cue.templateType === "LOCATION"}
-                aria-pressed={isDetailActiveNow}
-                onClick={toggleLiveDetail}
-                title="Siapkan detail di PREVIEW (D), lalu tekan UPDATE LIVE atau TAKE"
-              >
-                <span className={`toggle-dot ${isDetailActiveNow ? "dot-live" : ""}`} />
-                <Layers size={11} />
-                <span>{isDetailActiveNow ? "DETAIL: AKTIF" : "DETAIL (OFF)"}</span>
-              </button>
-
+              {/* Review Toggle Button */}
               <button
                 className={`review-btn ${
                   item && reviewed.includes(reviewedKey(item)) ? "is-reviewed" : ""
@@ -1750,31 +1734,45 @@ export function Production({
                 title="Tandai berita ini sudah dicek produser"
               >
                 <Check size={12} />
-                <span>
-                  {item && reviewed.includes(reviewedKey(item)) ? "Sudah Dicek" : "Tandai Dicek"}
-                </span>
+                <span>{item && reviewed.includes(reviewedKey(item)) ? "Sudah Dicek" : "Tandai Dicek"}</span>
               </button>
 
+              {/* Quick Edit Toggle Button */}
               <button
                 className={`quick-edit-toggle-btn ${showQuickEdit ? "active" : ""}`}
                 disabled={!cue}
-                onClick={() => { if (quickDirty) { toast("Simpan atau batalkan revisi terlebih dahulu."); return; } setShowQuickEdit(!showQuickEdit); }}
-                title="Buka / Tutup Form Revisi Cepat Teks"
+                onClick={() => {
+                  if (quickDirty) {
+                    toast("Simpan atau batalkan revisi terlebih dahulu.");
+                    return;
+                  }
+                  setShowQuickEdit(!showQuickEdit);
+                }}
+                title="Buka / Tutup Form Revisi Teks"
               >
                 <Edit3 size={12} />
-                <span>{showQuickEdit ? "Tutup Edit Teks" : "Revisi Cepat Teks"}</span>
+                <span>{showQuickEdit ? "Tutup Editor" : "Revisi Teks"}</span>
               </button>
             </div>
           </header>
 
-          <div className="preview-action-hint"><span>PREVIEW</span> Pilih variasi di bawah. Perubahan baru tampil saat TAKE atau UPDATE LIVE.</div>
           {/* Quick Edit Box Inline */}
           {showQuickEdit && cue && (
             <div className="vmix-quick-edit-box">
               <div className="quick-edit-title-bar">
-                <span>REVISI CEPAT TEKS (CUE {cue.templateType})</span>
-                <button aria-label="Batalkan revisi" onClick={() => { pendingRevision.current = null; setQuickDraft(cue.draftFields); setShowQuickEdit(false); }}>
-                  <X size={11} />
+                <span className="quick-edit-title-text">
+                  REVISI TEKS · CUE {cue.templateType}
+                </span>
+                <button
+                  className="quick-edit-close-btn"
+                  aria-label="Batalkan revisi"
+                  onClick={() => {
+                    pendingRevision.current = null;
+                    setQuickDraft(cue.draftFields);
+                    setShowQuickEdit(false);
+                  }}
+                >
+                  <X size={13} />
                 </button>
               </div>
               <BroadcastTemplateInfo />
@@ -1786,6 +1784,7 @@ export function Production({
                       <input
                         value={quickDraft.name || quickDraft.headline || ""}
                         maxLength={60}
+                        placeholder="Contoh: Budi Santoso"
                         onChange={(e) =>
                           setQuickDraft((d) => ({
                             ...d,
@@ -1800,6 +1799,7 @@ export function Production({
                       <input
                         value={quickDraft.role || quickDraft.socialHandle || ""}
                         maxLength={60}
+                        placeholder="Contoh: Pengamat Kebijakan Publik"
                         onChange={(e) =>
                           setQuickDraft((d) => ({
                             ...d,
@@ -1816,6 +1816,7 @@ export function Production({
                     <input
                       value={quickDraft.location || ""}
                       maxLength={50}
+                      placeholder="Contoh: JAKARTA PUSAT"
                       onChange={(e) => setQuickDraft((d) => ({ ...d, location: e.target.value }))}
                     />
                   </label>
@@ -1826,6 +1827,7 @@ export function Production({
                       <input
                         value={quickDraft.headline || ""}
                         maxLength={120}
+                        placeholder="Teks judul berita..."
                         onChange={(e) => setQuickDraft((d) => ({ ...d, headline: e.target.value }))}
                       />
                     </label>
@@ -1834,21 +1836,48 @@ export function Production({
                       <input
                         value={quickDraft.subline || ""}
                         maxLength={140}
+                        placeholder="Teks keterangan pendukung..."
                         onChange={(e) => setQuickDraft((d) => ({ ...d, subline: e.target.value }))}
                       />
                     </label>
                   </>
                 )}
               </div>
-              {cue.templateType !== "REPORTER" && <label className="quick-location-field"><span>Lokasi liputan</span><input maxLength={50} value={quickDraft.location || ""} onChange={(event) => setQuickDraft((draft) => ({ ...draft, location: event.target.value }))} /></label>}
+              {cue.templateType !== "REPORTER" && (
+                <label className="quick-location-field">
+                  <span>Lokasi Liputan</span>
+                  <input
+                    maxLength={50}
+                    placeholder="Contoh: JAKARTA"
+                    value={quickDraft.location || ""}
+                    onChange={(event) =>
+                      setQuickDraft((draft) => ({ ...draft, location: event.target.value }))
+                    }
+                  />
+                </label>
+              )}
               <div className="quick-edit-action-bar">
-                <button className="btn-save-draft" disabled={editBusy || busy} onClick={() => { pendingRevision.current = null; setQuickDraft(cue.draftFields); setShowQuickEdit(false); }}>Batalkan revisi</button>
+                <button
+                  className="btn-cancel-draft"
+                  disabled={editBusy || busy}
+                  onClick={() => {
+                    pendingRevision.current = null;
+                    setQuickDraft(cue.draftFields);
+                    setShowQuickEdit(false);
+                  }}
+                >
+                  Batal
+                </button>
                 <button className="btn-save-draft" disabled={editBusy || busy} onClick={saveQuickDraft}>
                   <Save size={12} />
                   <span>Simpan ke Preview</span>
                 </button>
                 {cue.id === live.onAirGraphicId && (
-                  <button className="btn-update-live-inline" disabled={editBusy || busy} onClick={saveAndUpdateLive}>
+                  <button
+                    className="btn-update-live-inline"
+                    disabled={editBusy || busy}
+                    onClick={saveAndUpdateLive}
+                  >
                     <RefreshCw size={12} />
                     <span>Update Langsung ke Siaran</span>
                   </button>
@@ -1857,17 +1886,51 @@ export function Production({
             </div>
           )}
 
-          {reporterForm && <form className="live-reporter-form" onSubmit={(event) => { event.preventDefault(); void saveReporter(); }}>
-            <h3>Siapkan narasumber</h3>
-            <label>Nama<input autoFocus required maxLength={60} value={reporterName} onChange={(event) => setReporterName(event.target.value)} /></label>
-            <label>Jabatan / akun<input maxLength={60} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} /></label>
-            <div><button type="button" onClick={() => setReporterForm(false)}>Batal</button><button type="submit" disabled={editBusy || !reporterName.trim()}>Simpan ke Preview</button></div>
-          </form>}
-          {/* Grid Input Tiles Cue Grafis Berita (vMix Input Cards) */}
+          {reporterForm && (
+            <form
+              className="live-reporter-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveReporter();
+              }}
+            >
+              <h3>+ Siapkan Narasumber / Pembicara</h3>
+              <label>
+                <span>Nama</span>
+                <input
+                  autoFocus
+                  required
+                  maxLength={60}
+                  placeholder="Nama pembicara"
+                  value={reporterName}
+                  onChange={(event) => setReporterName(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Jabatan / Keterangan</span>
+                <input
+                  maxLength={60}
+                  placeholder="Contoh: Direktur Operasional"
+                  value={reporterRole}
+                  onChange={(event) => setReporterRole(event.target.value)}
+                />
+              </label>
+              <div className="form-buttons">
+                <button type="button" onClick={() => setReporterForm(false)}>
+                  Batal
+                </button>
+                <button type="submit" disabled={editBusy || !reporterName.trim()}>
+                  Simpan ke Preview
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Grid Input Tiles Cue Grafis Berita */}
           <div className="vmix-input-tiles-grid">
             {item ? (
               <>
-                {/* 1. VARIAN: HEADLINE BERSIH SAJA */}
+                {/* 1. VARIAN: HEADLINE BERSIH */}
                 <div
                   className={`vmix-input-tile variant-clean ${
                     isCleanOnAir ? "onair-active" : isCleanStandby ? "standby-active" : ""
@@ -1882,15 +1945,16 @@ export function Production({
                       ) : isCleanStandby ? (
                         <span className="pill-standby">PREVIEW</span>
                       ) : (
-                        <span className="pill-ready">SIAP (4)</span>
+                        <span className="pill-ready">SIAP</span>
                       )}
+                      <kbd className="tile-kbd">4</kbd>
                     </div>
                   </div>
 
                   <div className="tile-content-area">
-                    <div className="tile-template-tag">HEADLINE</div>
+                    <div className="tile-template-tag">HEADLINE BERSIH</div>
                     <div className="tile-text-preview headline-main">{headlineText}</div>
-                    <div className="tile-sub-hint">Layout Bersih · Tanpa Lokasi & Subline</div>
+                    <div className="tile-sub-hint">Format Bersih (Single Line)</div>
                   </div>
 
                   <div className="tile-bottom-bar">
@@ -1902,9 +1966,8 @@ export function Production({
                       }}
                       title="Muat Headline Bersih ke Preview (Hotkey: 4)"
                     >
-                      <span>PREVIEW (4)</span>
+                      <span>PREVIEW</span>
                     </button>
-
                   </div>
                 </div>
 
@@ -1923,10 +1986,11 @@ export function Production({
                       ) : isLocationStandby ? (
                         <span className="pill-standby">PREVIEW</span>
                       ) : locationText ? (
-                        <span className="pill-ready">SIAP (5)</span>
+                        <span className="pill-ready">SIAP</span>
                       ) : (
-                        <span className="pill-draft">ISI LOKASI</span>
+                        <span className="pill-draft">KOSONG</span>
                       )}
+                      <kbd className="tile-kbd">5</kbd>
                     </div>
                   </div>
 
@@ -1934,8 +1998,8 @@ export function Production({
                     <div className="tile-template-tag">HEADLINE + LOKASI</div>
                     <div className="tile-text-preview headline-main">{headlineText}</div>
                     <div className="tile-location-chip">
-                      <MapPin size={9} />
-                      <span>{locationText || "Belum di-set (Klik untuk isi)"}</span>
+                      <MapPin size={10} />
+                      <span>{locationText || "Belum diisi lokasi"}</span>
                     </div>
                   </div>
 
@@ -1948,13 +2012,12 @@ export function Production({
                       }}
                       title="Muat Headline + Lokasi ke Preview (Hotkey: 5)"
                     >
-                      <span>PREVIEW (5)</span>
+                      <span>PREVIEW</span>
                     </button>
-
                   </div>
                 </div>
 
-                {/* 3. VARIAN: HEADLINE BANYAK INFO / LENGKAP */}
+                {/* 3. VARIAN: HEADLINE + DETAIL */}
                 <div
                   className={`vmix-input-tile variant-detail ${
                     isDetailOnAir ? "onair-active" : isDetailStandby ? "standby-active" : ""
@@ -1969,18 +2032,19 @@ export function Production({
                       ) : isDetailStandby ? (
                         <span className="pill-standby">PREVIEW</span>
                       ) : sublineText ? (
-                        <span className="pill-ready">SIAP (6)</span>
+                        <span className="pill-ready">SIAP</span>
                       ) : (
-                        <span className="pill-draft">ISI DETAIL</span>
+                        <span className="pill-draft">KOSONG</span>
                       )}
+                      <kbd className="tile-kbd">6</kbd>
                     </div>
                   </div>
 
                   <div className="tile-content-area">
-                    <div className="tile-template-tag">HEADLINE + DETAIL</div>
+                    <div className="tile-template-tag">HEADLINE + SUBLINE</div>
                     <div className="tile-text-preview headline-main">{headlineText}</div>
                     <div className="tile-subline-snippet">
-                      {sublineText || "Belum ada detail keterangan (Klik untuk isi)"}
+                      {sublineText || "Belum ada keterangan subline"}
                     </div>
                   </div>
 
@@ -1993,13 +2057,12 @@ export function Production({
                       }}
                       title="Muat Headline + Detail ke Preview (Hotkey: 6)"
                     >
-                      <span>PREVIEW (6)</span>
+                      <span>PREVIEW</span>
                     </button>
-
                   </div>
                 </div>
 
-                {/* 4. CUE TAMBAHAN (REPORTER / NARASUMBER & CUE SPESIFIK LAINNYA) */}
+                {/* 4. CUE TAMBAHAN (REPORTER / NARASUMBER) */}
                 {additionalCues.map((g, n) => {
                   const isCueSelected = cue?.id === g.id;
                   const isCueOnAir = g.id === live.onAirGraphicId;
@@ -2010,13 +2073,19 @@ export function Production({
                       className={`vmix-input-tile variant-reporter ${
                         isCueSelected ? "standby-active" : ""
                       } ${isCueOnAir ? "onair-active" : ""}`}
-                      onClick={() => { if (quickDirty) { toast("Simpan atau batalkan revisi dahulu."); return; } setCueId(g.id); }}
+                      onClick={() => {
+                        if (quickDirty) {
+                          toast("Simpan atau batalkan revisi dahulu.");
+                          return;
+                        }
+                        setCueId(g.id);
+                      }}
                     >
                       <div className="tile-top-bar">
                         <span className="tile-input-num">
                           {g.templateType === "REPORTER"
-                            ? `CG NARASUMBER #${n + 1}`
-                            : `CUE #${n + 4}`}
+                            ? `0${n + 4} · NARASUMBER`
+                            : `0${n + 4} · ${g.templateType}`}
                         </span>
                         <div className="tile-status-pill">
                           {isCueOnAir ? (
@@ -2024,22 +2093,26 @@ export function Production({
                           ) : isCueSelected ? (
                             <span className="pill-standby">PREVIEW</span>
                           ) : g.status === "READY" ? (
-                            <span className="pill-ready">READY (3)</span>
+                            <span className="pill-ready">SIAP</span>
                           ) : (
                             <span className="pill-draft">DRAFT</span>
                           )}
+                          {g.templateType === "REPORTER" && n === 0 && <kbd className="tile-kbd">3</kbd>}
                         </div>
                       </div>
 
                       <div className="tile-content-area">
                         <div className="tile-template-tag">{graphicLabel(g)}</div>
-                        <div className="tile-text-preview">
+                        <div className="tile-text-preview reporter-name">
                           {g.templateType === "REPORTER"
-                            ? `${g.draftFields.name || "Nama"} · ${
-                                g.draftFields.role || g.draftFields.socialHandle || "@sosmed"
-                              }`
+                            ? g.draftFields.name || "Nama Pembicara"
                             : g.draftFields.headline || g.draftFields.location || "—"}
                         </div>
+                        {g.templateType === "REPORTER" && (
+                          <div className="tile-subline-snippet">
+                            {g.draftFields.role || g.draftFields.socialHandle || "Jabatan/Keterangan"}
+                          </div>
+                        )}
                       </div>
 
                       <div className="tile-bottom-bar">
@@ -2047,31 +2120,42 @@ export function Production({
                           className="tile-btn-preview"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (quickDirty) { toast("Simpan atau batalkan revisi dahulu."); return; }
+                            if (quickDirty) {
+                              toast("Simpan atau batalkan revisi dahulu.");
+                              return;
+                            }
                             setCueId(g.id);
                           }}
                           title="Muat ke Preview"
                         >
                           <span>PREVIEW</span>
                         </button>
-
                       </div>
                     </div>
                   );
                 })}
 
-                {/* 5. TOMBOL CEPAT TAMBAH NARASUMBER LANGSUNG */}
+                {/* 5. TOMBOL CEPAT TAMBAH NARASUMBER */}
                 <div
                   className="vmix-input-tile btn-tile-add-reporter"
-                  role="button" tabIndex={0}
-                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); addNewReporterCue(); } }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      addNewReporterCue();
+                    }
+                  }}
                   onClick={addNewReporterCue}
-                  title="Tambah Nama Narasumber / Reporter Baru untuk Berita Ini"
+                  title="Tambah Nama Narasumber Baru untuk Berita Ini"
                 >
                   <div className="add-tile-inner">
-                    <UserRound size={16} />
-                    <b>+ Tambah Narasumber</b>
-                    <small>Nama & jabatan pembicara</small>
+                    <div className="add-icon-circle">
+                      <UserRound size={16} />
+                    </div>
+                    <b>+ Narasumber</b>
+                    <small>Nama & Jabatan Pembicara</small>
                   </div>
                 </div>
               </>
@@ -2080,29 +2164,6 @@ export function Production({
                 <span>Pilih salah satu berita dari antrean rundown di sebelah kiri.</span>
               </div>
             )}
-          </div>
-
-          {/* Direct Hotkeys Row (0-6) */}
-          <div className="vmix-direct-hotkeys-bar">
-            <span className="hotkeys-label">MUAT KE PREVIEW:</span>
-            <div className="hotkeys-group">
-              {quickCues.map((q) => {
-                const g = findQuick(q.key);
-                const isQuickOnAir = g && g.id === live.onAirGraphicId;
-                return (
-                  <button
-                    key={q.key}
-                    disabled={busy || !g || g.status !== "READY"}
-                    className={`quick-key-btn ${isQuickOnAir ? "is-live" : ""}`}
-                    onClick={() => quick(q.key)}
-                    title={!g ? "Belum disiapkan" : `${q.label}: ${graphicLabel(g)}`}
-                  >
-                    <kbd>{q.shortcut}</kbd>
-                    <span>{q.label}</span>
-                  </button>
-                );
-              })}
-            </div>
           </div>
         </main>
       </section>
@@ -2118,9 +2179,18 @@ export function Production({
           <span>{busy ? "Mengirim perintah ke siaran…" : `Output: ${programLabel}`}</span>
         </div>
         <div className="footer-status-right">
-          <span>Klien Terhubung: <b>{live.overlayClientsCount}</b></span>
+          <button
+            className={`keyboard-status-btn ${shortcutsEnabled ? "enabled" : ""}`}
+            onClick={() => setShortcutsEnabled((v) => !v)}
+            title="Klik untuk aktifkan/nonaktifkan tombol pintasan keyboard"
+          >
+            <span className="kbd-dot" />
+            <span>Keyboard: {shortcutsEnabled ? "Aktif (SPACE / ENTER / U / ESC)" : "Nonaktif"}</span>
+          </button>
           <span>·</span>
-          <span>Resolusi: <b>1920x1080 (16:9)</b></span>
+          <span>Klien: <b>{live.overlayClientsCount}</b></span>
+          <span>·</span>
+          <span>Resolusi: <b>1080p</b></span>
           <span>·</span>
           <span>Mode: <b>{live.outputMode.toUpperCase()}</b></span>
         </div>
