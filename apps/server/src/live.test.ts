@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import type { OverlayEvent } from "@newscg/shared";
@@ -9,7 +9,6 @@ let dbModule: typeof import("./db.js");
 
 beforeAll(async () => {
   process.env.DATABASE_PATH = testDb;
-  process.env.VMIX_MODE = "mock";
   if (existsSync(testDb)) rmSync(testDb, { force: true });
   dbModule = await import("./db.js");
   dbModule.seedIfEmpty();
@@ -53,15 +52,11 @@ beforeAll(async () => {
   liveModule = await import("./live.js");
 });
 
-beforeEach(() => {
-  liveModule.mockAdapter.connected = true;
-  liveModule.mockAdapter.overlay = { overlayNumber: 1, inputGuid: null };
-  liveModule.mockAdapter.fields.clear();
-});
-
 describe("Web Overlay (Singular.live style) controller", () => {
-  beforeEach(() => {
-    dbModule.saveSettings({ outputMode: "web" });
+  it("prepare menjaga draft tetap terisolasi tanpa mengubah status ON AIR", () => {
+    const prepared = liveModule.prepare("CG-201");
+    expect(prepared.selectedGraphicId).toBe("CG-201");
+    expect(liveModule.getLiveState().onAirGraphicId).toBeNull();
   });
 
   it("mengirim event TAKE ke subscriber SSE dan mengonfirmasi ON AIR", async () => {
@@ -82,6 +77,15 @@ describe("Web Overlay (Singular.live style) controller", () => {
     unsubscribe();
   });
 
+  it("mendeduplikasi klik TAKE dengan idempotency key yang sama", async () => {
+    const [a, b] = await Promise.all([
+      liveModule.take("CG-201", "same-click"),
+      liveModule.take("CG-201", "same-click")
+    ]);
+    expect(a.requestId).toBe(b.requestId);
+    expect(a.commandStatus).toBe("confirmed");
+  });
+
   it("mengirim event UPDATE saat konten ON AIR diperbarui", async () => {
     const events: OverlayEvent[] = [];
     const unsubscribe = liveModule.addOverlaySubscriber((ev) => events.push(ev));
@@ -92,6 +96,20 @@ describe("Web Overlay (Singular.live style) controller", () => {
 
     const updateEvent = events.find((e) => e.type === "UPDATE");
     expect(updateEvent).toBeDefined();
+
+    unsubscribe();
+  });
+
+  it("mendukung varian komposisi headline secara dinamis", async () => {
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber((ev) => events.push(ev));
+
+    await liveModule.take("CG-201", "web-take-variant-test");
+    const variantResult = await liveModule.takeVariantLive("CG-201", "toggle-location", "variant-loc-key");
+    expect(variantResult.commandStatus).toBe("confirmed");
+
+    const variantEvent = events.find((e) => e.type === "UPDATE" && e.fields?.showLocation === "false");
+    expect(variantEvent).toBeDefined();
 
     unsubscribe();
   });
@@ -166,48 +184,12 @@ describe("Web Overlay (Singular.live style) controller", () => {
 
     unsubscribe();
   });
-});
 
-describe("vMix GT Title API safety", () => {
-  beforeEach(() => {
-    dbModule.saveSettings({ outputMode: "vmix-gt" });
-  });
+  it("mendukung mode stage preset (empty, logo, full)", async () => {
+    const fullRes = await liveModule.setStage("full", "stage-full-key");
+    expect(fullRes.commandStatus).toBe("confirmed");
 
-  it("menolak perintah varian komposisi pada mode vmix-gt", async () => {
-    const res = await liveModule.takeVariantLive("CG-201", "toggle-location", "gt-variant-test");
-    expect(res.commandStatus).toBe("failed");
-    expect(res.error).toContain("belum didukung pada mode vMix GT Title");
-  });
-
-  it("prepare menjaga draft tetap terisolasi dari input vMix", () => {
-    liveModule.prepare("CG-201");
-    expect(liveModule.mockAdapter.fields.size).toBe(0);
-    expect(liveModule.mockAdapter.overlay.inputGuid).toBeNull();
-  });
-
-  it("menolak TAKE saat overlay dimiliki input asing", async () => {
-    liveModule.mockAdapter.overlay = { overlayNumber: 1, inputGuid: "foreign-camera-guid" };
-    const result = await liveModule.take("CG-201", "foreign-owner-test");
-    expect(result.commandStatus).toBe("failed");
-    expect(result.error).toContain("bukan milik NewsCG");
-    expect(liveModule.mockAdapter.overlay.inputGuid).toBe("foreign-camera-guid");
-  });
-
-  it("mendeduplikasi klik TAKE dengan idempotency key yang sama", async () => {
-    const [a, b] = await Promise.all([
-      liveModule.take("CG-201", "same-click"),
-      liveModule.take("CG-201", "same-click")
-    ]);
-    expect(a.requestId).toBe(b.requestId);
-    expect(a.commandStatus).toBe("confirmed");
-  });
-
-  it("tidak mereplay TAKE gagal setelah reconnect", async () => {
-    liveModule.setMockConnection(false);
-    const failed = await liveModule.take("CG-301", "offline-click");
-    expect(failed.commandStatus).toBe("failed");
-    liveModule.setMockConnection(true);
-    expect(liveModule.mockAdapter.overlay.inputGuid).toBeNull();
+    const emptyRes = await liveModule.setStage("empty", "stage-empty-key");
+    expect(emptyRes.commandStatus).toBe("confirmed");
   });
 });
-

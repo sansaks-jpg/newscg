@@ -1,18 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import {
-  AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Check,
   Edit3,
-  Layers,
-  LoaderCircle,
   MapPin,
   MonitorPlay,
   Plus,
-  Radio,
-  Save,
   Search,
   SlidersHorizontal,
   Trash2,

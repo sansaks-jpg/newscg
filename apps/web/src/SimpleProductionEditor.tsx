@@ -1,33 +1,24 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   GraphicItem,
   LiveState,
-  LiveVariantAction,
   MasterOverlayState,
   Rundown,
   RundownItem
 } from "@newscg/shared";
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Check,
-  CircleDot,
   FileText,
   Keyboard,
-  Layers,
   LoaderCircle,
-  MapPin,
-  MonitorPlay,
   Play,
   Radio,
   RefreshCw,
-  Sparkles,
   Trash2,
-  Tv,
   X
 } from "lucide-react";
-import { api, mutate } from "./api";
+import { mutate } from "./api";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { liveShortcut } from "./productionFlow";
 import "./simple-production.css";

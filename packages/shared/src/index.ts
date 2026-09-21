@@ -4,8 +4,7 @@ export const templateTypes = ["HEADLINE", "REPORTER", "LOCATION", "BREAKING"] as
 export type TemplateType = (typeof templateTypes)[number];
 export type MaterialStatus = "DRAFT" | "READY";
 export type CommandStatus = "idle" | "queued" | "pending" | "confirmed" | "failed" | "unknown";
-export type ConnectionStatus = "CONNECTED" | "DISCONNECTED" | "AUTH_FAILED" | "MOCK" | "STANDALONE";
-export type OutputMode = "web" | "vmix-gt";
+export type ConnectionStatus = "CONNECTED" | "STANDALONE";
 
 export const timezoneModes = ["WIB", "WITA", "WIT", "CUSTOM"] as const;
 export type TimezoneMode = (typeof timezoneModes)[number];
@@ -69,8 +68,9 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     contentMode: z.enum(contentModes).optional().default("headline"),
     socialHandle: z.string().trim().max(80).optional().default(""),
     showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("true")
-  }),
+    showLocation: z.string().optional().default("true"),
+    showDetail: z.string().optional().default("false")
+  }).passthrough(),
   REPORTER: z.object({
     name: z.string().trim().min(1).max(60),
     role: z.string().trim().max(60).default("REPORTER"),
@@ -82,9 +82,12 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     contentMode: z.enum(contentModes).optional().default("presenter"),
     socialHandle: z.string().trim().max(80).optional().default(""),
     showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("false")
-  }),
-  LOCATION: z.object({ visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")), location: z.string().trim().min(1).max(50) }),
+    showLocation: z.string().optional().default("false"),
+    showDetail: z.string().optional().default("false"),
+    headline: z.string().trim().max(120).optional().default(""),
+    subline: z.string().trim().max(160).optional().default("")
+  }).passthrough(),
+  LOCATION: z.object({ visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")), location: z.string().trim().min(1).max(50) }).passthrough(),
   BREAKING: z.object({
     headline: z.string().trim().min(1).max(120),
     kicker: z.string().trim().max(60).optional().default("BREAKING NEWS"),
@@ -97,8 +100,9 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     contentMode: z.enum(contentModes).optional().default("headline"),
     socialHandle: z.string().trim().max(80).optional().default(""),
     showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("false")
-  })
+    showLocation: z.string().optional().default("false"),
+    showDetail: z.string().optional().default("false")
+  }).passthrough()
 };
 
 export const graphicInputSchema = z.object({
@@ -164,19 +168,20 @@ export type RundownItem = {
   estimatedDurationSeconds: number; sortOrder: number; graphics: GraphicItem[];
 };
 export type Rundown = { id: string; programName: string; title: string; updatedAt: string; items: RundownItem[] };
-export type VmixInput = { guid: string; number: number; title: string; type: string; textFields: string[] };
 export type OverlayState = { overlayNumber: number; inputGuid: string | null };
-export type VmixMapping = { templateType: TemplateType; inputGuid: string; inputTitle: string; fieldMap: Record<string, string> };
-export type AppSettings = {
-  outputMode: OutputMode; mode: "mock" | "http"; vmixHost: string; vmixPort: number; overlayNumber: number;
-  pollingIntervalMs: number; username: string; passwordConfigured: boolean; mappings: VmixMapping[];
-};
+export type AppSettings = Record<string, any>;
 export type LiveState = {
-  connection: ConnectionStatus; commandStatus: CommandStatus; selectedGraphicId: string | null;
-  onAirGraphicId: string | null; actualOverlayInputGuid: string | null; onAirSnapshot: Record<string, string> | null;
-  lastActionAt: string | null; error: string | null; mode: "mock" | "http"; outputMode: OutputMode;
+  connection: ConnectionStatus;
+  commandStatus: CommandStatus;
+  selectedGraphicId: string | null;
+  onAirGraphicId: string | null;
+  actualOverlayInputGuid: string | null;
+  onAirSnapshot: Record<string, string> | null;
+  lastActionAt: string | null;
+  error: string | null;
   overlayClientsCount: number;
-};export type HeadlineVisibility = {
+};
+export type HeadlineVisibility = {
   showLocation: boolean;
   showKicker: boolean;
   showDetail: boolean;

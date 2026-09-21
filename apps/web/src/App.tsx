@@ -1,55 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Activity,
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  CircleDot,
   Clock3,
   Copy,
-  Download,
   ExternalLink,
   FileJson,
-  Gauge,
   Globe,
   Image as ImageIcon,
-  Keyboard,
   LayoutList,
   LoaderCircle,
   MapPin,
   MonitorPlay,
   PencilLine,
-  Plus,
-  Radio,
-  RefreshCw,
   Save,
-  Search,
   Settings,
-  ShieldCheck,
   Signal,
-  SkipForward,
   SlidersHorizontal,
   Trash2,
   Upload,
   UserRound,
-  WifiOff,
   X
 } from "lucide-react";
 import type {
   AppSettings,
-  GraphicItem,
+  HeadlineDefaults,
   LiveState,
   MasterOverlayState,
   Rundown,
-  RundownItem,
   TemplateType,
-  TimezoneMode,
-  VmixInput,
-  HeadlineDefaults
+  TimezoneMode
 } from "@newscg/shared";
 import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
 import { api, mutate } from "./api";
@@ -57,9 +36,7 @@ import TemplatePreview from "./TemplatePreview";
 import OverlayWindow from "./OverlayWindow";
 import { Preparation } from "./Newsroom";
 import { SimpleProductionEditor } from "./SimpleProductionEditor";
-import { AutoSquishText } from "./AutoSquishText";
-import { BroadcastTemplateInfo } from "./VisualTemplatePicker";
-import { BroadcastPreviewBox, BroadcastClock } from "./BroadcastGraphic";
+import { BroadcastClock } from "./BroadcastGraphic";
 import { BroadcastTicker } from "./BroadcastTicker";
 
 type View = "editor" | "rundown" | "settings";
@@ -78,8 +55,6 @@ const blankLive: LiveState = {
   onAirSnapshot: null,
   lastActionAt: null,
   error: null,
-  mode: "mock",
-  outputMode: "web",
   overlayClientsCount: 0
 };
 
@@ -110,7 +85,7 @@ export default function App() {
     const [r, s, l, a, m] = await Promise.all([
       api<Rundown[]>("/api/rundowns"),
       api<AppSettings>("/api/settings"),
-      api<LiveState>("/api/vmix/status"),
+      api<LiveState>("/api/live/state"),
       api<any[]>("/api/actions?limit=12"),
       api<MasterOverlayState>("/api/live/master").catch(() => defaultMasterOverlayState)
     ]);
@@ -126,7 +101,7 @@ export default function App() {
     reload().catch((e) => setToast(e.message));
     const id = setInterval(
       () =>
-        api<LiveState>("/api/vmix/status")
+        api<LiveState>("/api/live/state")
           .then(setLive)
           .catch(() => {}),
       2000
@@ -152,15 +127,9 @@ export default function App() {
   }
 
   const status =
-    live.outputMode === "web"
-      ? live.overlayClientsCount > 0
-        ? { label: `OVERLAY: ${live.overlayClientsCount} AKTIF`, kind: "ok" }
-        : { label: "OVERLAY STANDALONE", kind: "mock" }
-      : live.connection === "MOCK"
-      ? { label: "MODE MOCK", kind: "mock" }
-      : live.connection === "CONNECTED"
-      ? { label: "CONNECTED", kind: "ok" }
-      : { label: live.connection, kind: "bad" };
+    live.overlayClientsCount > 0
+      ? { label: `OVERLAY: ${live.overlayClientsCount} AKTIF`, kind: "ok" }
+      : { label: "OVERLAY STANDALONE", kind: "mock" };
 
   return (
     <div className="app-shell-zero-scroll">
@@ -276,6 +245,7 @@ export default function App() {
           <SettingsView
             value={settings}
             master={master}
+            live={live}
             onUpdateMaster={updateMaster}
             onOpenSetupModal={() => setShowSetupModal(true)}
             onSaved={reload}
@@ -322,24 +292,6 @@ function Clock({ timezone = "WIB", customLabel }: { timezone?: TimezoneMode; cus
       {targetTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
       <small> {label}</small>
     </>
-  );
-}
-
-function StateBadge({ state }: { state: string }) {
-  const key = state.toLowerCase().replaceAll(" ", "-");
-  return (
-    <span className={`state-badge ${key}`}>
-      {state === "ON AIR" ? (
-        <CircleDot size={12} />
-      ) : state === "PENDING" ? (
-        <LoaderCircle size={12} />
-      ) : state === "READY" ? (
-        <Check size={12} />
-      ) : (
-        <AlertTriangle size={12} />
-      )}{" "}
-      {state}
-    </span>
   );
 }
 
@@ -592,206 +544,10 @@ function BroadcastSetupModal({
   );
 }
 
-function RundownEditor({
-  rundown,
-  live,
-  reload,
-  toast
-}: {
-  rundown: Rundown;
-  live: LiveState;
-  reload: () => Promise<void>;
-  toast: (s: string) => void;
-}) {
-  async function add() {
-    const n = rundown.items.length + 1;
-    await mutate(`/api/rundowns/${rundown.id}/items`, "POST", {
-      slug: `NEWS-${String(n).padStart(2, "0")}`,
-      title: "Berita baru",
-      format: "READER",
-      estimatedDurationSeconds: 60,
-      sortOrder: n
-    });
-    await reload();
-  }
-
-  async function move(item: RundownItem, dir: number) {
-    const idx = rundown.items.findIndex((i) => i.id === item.id);
-    const other = rundown.items[idx + dir];
-    if (!other) return;
-    await Promise.all([
-      mutate(`/api/items/${item.id}`, "PATCH", { sortOrder: other.sortOrder }),
-      mutate(`/api/items/${other.id}`, "PATCH", { sortOrder: item.sortOrder })
-    ]);
-    await reload();
-  }
-
-  async function remove(item: RundownItem) {
-    try {
-      await mutate(`/api/items/${item.id}`, "DELETE");
-      await reload();
-    } catch (e: any) {
-      toast(e.message);
-    }
-  }
-
-  async function addGraphic(item: RundownItem) {
-    await mutate(`/api/items/${item.id}/graphics`, "POST", {
-      templateType: "HEADLINE",
-      sortOrder: item.graphics.length + 1,
-      status: "DRAFT",
-      draftFields: {
-        kicker: "TOPIK UTAMA",
-        headline: "HEADLINE BARU",
-        subline: "",
-        layoutStyle: "sub"
-      }
-    });
-    await reload();
-  }
-
-  return (
-    <section className="page">
-      <PageTitle
-        eyebrow="RUNDOWN MANAGER"
-        title={rundown.title}
-        action={
-          <button className="primary-small" onClick={add}>
-            <Plus size={16} />
-            Tambah berita
-          </button>
-        }
-      />
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Slug / Judul</th>
-              <th>Format</th>
-              <th>Durasi</th>
-              <th>Grafis</th>
-              <th>Status</th>
-              <th className="right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rundown.items.map((item, i) => (
-              <tr key={item.id}>
-                <td className="order">{String(i + 1).padStart(2, "0")}</td>
-                <td>
-                  <b>{item.slug}</b>
-                  <span>{item.title}</span>
-                </td>
-                <td>
-                  <span className="format-pill">{item.format}</span>
-                </td>
-                <td>
-                  {Math.floor(item.estimatedDurationSeconds / 60)}:
-                  {String(item.estimatedDurationSeconds % 60).padStart(2, "0")}
-                </td>
-                <td>
-                  <div className="mini-graphics">
-                    {item.graphics.map((g) => (
-                      <i
-                        key={g.id}
-                        title={g.templateType}
-                        style={{ background: templateMeta[g.templateType].accent }}
-                      />
-                    ))}
-                    <button onClick={() => addGraphic(item)}>
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </td>
-                <td>
-                  <StateBadge
-                    state={
-                      item.graphics.length && item.graphics.every((g) => g.status === "READY")
-                        ? "READY"
-                        : "DRAFT"
-                    }
-                  />
-                </td>
-                <td>
-                  <div className="row-actions">
-                    <button disabled={i === 0} onClick={() => move(item, -1)}>
-                      <ArrowUp size={15} />
-                    </button>
-                    <button disabled={i === rundown.items.length - 1} onClick={() => move(item, 1)}>
-                      <ArrowDown size={15} />
-                    </button>
-                    <button
-                      disabled={item.graphics.some((g) => g.id === live.onAirGraphicId)}
-                      onClick={() => remove(item)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <ImportExport rundown={rundown} reload={reload} toast={toast} />
-    </section>
-  );
-}
-
-function ImportExport({
-  rundown,
-  reload,
-  toast
-}: {
-  rundown: Rundown;
-  reload: () => Promise<void>;
-  toast: (s: string) => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  async function importFile(file?: File) {
-    if (!file) return;
-    try {
-      const body = JSON.parse(await file.text());
-      await mutate("/api/rundowns/import", "POST", body);
-      await reload();
-      toast("Rundown berhasil diimpor");
-    } catch (e: any) {
-      toast(e.message);
-    }
-  }
-
-  return (
-    <div className="import-export">
-      <div>
-        <FileJson size={20} />
-        <span>
-          <b>Backup rundown</b>
-          <small>Ekspor atau pulihkan rundown dengan JSON tervalidasi.</small>
-        </span>
-      </div>
-      <button onClick={() => window.open(`/api/rundowns/${rundown.id}/export`, "_blank")}>
-        <Download size={15} />
-        Ekspor JSON
-      </button>
-      <button onClick={() => ref.current?.click()}>
-        <Upload size={15} />
-        Impor JSON
-      </button>
-      <input
-        ref={ref}
-        hidden
-        type="file"
-        accept="application/json"
-        onChange={(e) => importFile(e.target.files?.[0])}
-      />
-    </div>
-  );
-}
-
 function SettingsView({
   value,
   master,
+  live,
   onUpdateMaster,
   onOpenSetupModal,
   onSaved,
@@ -799,14 +555,13 @@ function SettingsView({
 }: {
   value: AppSettings;
   master: MasterOverlayState;
+  live: LiveState;
   onUpdateMaster: (p: Partial<MasterOverlayState>) => void;
   onOpenSetupModal: () => void;
   onSaved: () => Promise<void>;
   toast: (s: string) => void;
 }) {
   const [form, setForm] = useState<any>(value);
-  const [inputs, setInputs] = useState<VmixInput[]>([]);
-  const [testing, setTesting] = useState(false);
   const [masterForm, setMasterForm] = useState<MasterOverlayState>(master);
   const [headlineDefaults, setHeadlineDefaults] = useState<HeadlineDefaults>(defaultHeadlineDefaults);
   const [savingHeadline, setSavingHeadline] = useState(false);
@@ -869,29 +624,6 @@ function SettingsView({
     };
     reader.readAsDataURL(file);
   };
-
-  async function test() {
-    setTesting(true);
-    try {
-      const r = await mutate<any>("/api/vmix/test", "POST", {});
-      toast(r.message);
-      if (r.ok) setInputs(await api("/api/vmix/inputs"));
-    } catch (e: any) {
-      toast(e.message);
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  function updateMapping(type: TemplateType, guid: string) {
-    const input = inputs.find((i) => i.guid === guid);
-    setForm((f: any) => ({
-      ...f,
-      mappings: f.mappings.map((m: any) =>
-        m.templateType === type ? { ...m, inputGuid: guid, inputTitle: input?.title || m.inputTitle } : m
-      )
-    }));
-  }
 
   const outputUrl = `${window.location.origin}/output`;
 
@@ -1300,65 +1032,78 @@ function SettingsView({
           </div>
         </div>
 
-        {/* 2. KARTU OUTPUT & INTEGRASI SWITCHER */}
+        {/* 3. KARTU OUTPUT & INTEGRASI SWITCHER (VMIX / OBS / WIRECAST) */}
         <div className="settings-card">
           <h3>
-            <Globe />
-            Mode Output Grafis
+            <Globe size={17} />
+            Output Layar Siaran (vMix / OBS Browser Input)
           </h3>
-          <div className="form-grid">
-            <label className="wide">
-              <span>Pilihan Arsitektur Output</span>
-              <select
-                value={form.outputMode || "web"}
-                onChange={(e) => setForm({ ...form, outputMode: e.target.value })}
-              >
-                <option value="web">Web Browser Overlay (Singular.live style — Rekomendasi)</option>
-                <option value="vmix-gt">vMix GT Title API (Direct HTTP API vMix)</option>
-              </select>
-            </label>
-          </div>
-          {!form.outputMode || form.outputMode === "web" ? (
+          <p>
+            NewsCG beroperasi dengan arsitektur web overlay transparan (Singular.live style). Tambahkan URL Output sebagai input Web Browser pada switcher siaran Anda (vMix, OBS Studio, Wirecast, Tricaster).
+          </p>
+
+          <div
+            style={{
+              marginTop: 14,
+              background: "#0b1420",
+              border: "1px solid #1a3556",
+              borderRadius: 4,
+              padding: 14
+            }}
+          >
             <div
               style={{
-                marginTop: 14,
-                background: "#0b1420",
-                border: "1px solid #1a3556",
-                borderRadius: 4,
-                padding: 12
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+                paddingBottom: 10,
+                borderBottom: "1px solid #162335"
               }}
             >
-              <h4
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: 12,
-                  color: "#74b3f6",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6
-                }}
-              >
-                <Globe size={15} /> Cara Pakai di vMix (Singular.live style):
-              </h4>
-              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#9cb1c9", lineHeight: 1.6 }}>
-                <li>
-                  Di vMix / OBS, klik <b>Add Input → Web Browser</b>.
-                </li>
-                <li>
-                  Masukkan URL Output:{" "}
-                  <code style={{ background: "#162335", color: "#6cb6ff", padding: "2px 5px", borderRadius: 3 }}>
-                    {outputUrl}
-                  </code>
-                </li>
-                <li>
-                  Atur Resolusi ke <b>1920 x 1080</b>.
-                </li>
-                <li>
-                  Selesai! Animasi grafis akan muncul otomatis secara real-time saat Anda menekan TAKE / CLEAR.
-                </li>
-              </ol>
+              <span style={{ fontSize: 11, color: "#8a96a8" }}>Status Layar Overlay Siaran:</span>
+              <span className={`state-badge ${live.overlayClientsCount > 0 ? "on-air" : "cued"}`}>
+                <b>
+                  {live.overlayClientsCount > 0
+                    ? `${live.overlayClientsCount} Layar Terhubung (Siap Siar)`
+                    : "Standby (Buka di Switcher / Tab)"}
+                </b>
+              </span>
+            </div>
+
+            <h4
+              style={{
+                margin: "0 0 8px",
+                fontSize: 12,
+                color: "#74b3f6",
+                display: "flex",
+                alignItems: "center",
+                gap: 6
+              }}
+            >
+              <Globe size={15} /> Panduan Pemasangan di vMix / OBS Studio:
+            </h4>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#9cb1c9", lineHeight: 1.6 }}>
+              <li>
+                Di vMix / OBS, klik <b>Add Input → Web Browser</b> (atau <b>Browser Source</b> di OBS).
+              </li>
+              <li>
+                Masukkan URL Output berikut:{" "}
+                <code style={{ background: "#162335", color: "#6cb6ff", padding: "2px 6px", borderRadius: 3 }}>
+                  {outputUrl}
+                </code>
+              </li>
+              <li>
+                Atur Resolusi ke <b>1920 × 1080</b> (Full HD) dengan transparansi alpha aktif.
+              </li>
+              <li>
+                Pilih nomor overlay di vMix (misal Overlay 1 atau 2). Animasi grafis, ticker, dan logo siaran akan otomatis sinkron real-time saat Anda menekan TAKE / CLEAR.
+              </li>
+            </ol>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <button
-                style={{ marginTop: 10 }}
+                type="button"
                 className="primary-small"
                 onClick={() => {
                   navigator.clipboard.writeText(outputUrl);
@@ -1367,143 +1112,28 @@ function SettingsView({
               >
                 <Copy size={13} /> Salin URL Output vMix
               </button>
-            </div>
-          ) : (
-            <div className="security-note" style={{ marginTop: 12 }}>
-              <ShieldCheck />
-              <span>
-                <b>Mode vMix GT Title Aktif</b>Aplikasi akan mengirim perintah HTTP API langsung ke vMix host untuk mengisi input GT Title.
-              </span>
-            </div>
-          )}
-        </div>
-
-        {form.outputMode === "vmix-gt" ? (
-          <div className="settings-card">
-            <h3>
-              <Signal />
-              Koneksi vMix HTTP API
-            </h3>
-            <div className="form-grid">
-              <label>
-                <span>Mode adapter</span>
-                <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
-                  <option value="mock">Mock — simulasi lokal</option>
-                  <option value="http">HTTP — perangkat vMix</option>
-                </select>
-              </label>
-              <label>
-                <span>Host / IP privat</span>
-                <input
-                  value={form.vmixHost}
-                  onChange={(e) => setForm({ ...form, vmixHost: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Port</span>
-                <input
-                  type="number"
-                  value={form.vmixPort}
-                  onChange={(e) => setForm({ ...form, vmixPort: Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                <span>Overlay khusus</span>
-                <select
-                  value={form.overlayNumber}
-                  onChange={(e) => setForm({ ...form, overlayNumber: Number(e.target.value) })}
-                >
-                  {[1, 2, 3, 4].map((n) => (
-                    <option key={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Username</span>
-                <input
-                  value={form.username || ""}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
-                />
-              </label>
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  placeholder={value.passwordConfigured ? "••••••••" : "Opsional"}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                />
-              </label>
-            </div>
-            <button className="test-btn" onClick={test}>
-              {testing ? <LoaderCircle className="spin" /> : <Activity />}Test Connection & Refresh Inputs
-            </button>
-            <h3 style={{ marginTop: 20 }}>
-              <Gauge />
-              Mapping GT Title
-            </h3>
-            <div className="mapping-list">
-              {form.mappings.map((m: any) => {
-                const meta = templateMeta[m.templateType as TemplateType];
-                const Icon = meta.icon;
-                return (
-                  <div key={m.templateType}>
-                    <span className="mapping-icon" style={{ background: meta.accent }}>
-                      <Icon />
-                    </span>
-                    <span>
-                      <b>{meta.label}</b>
-                      <small>{m.inputGuid}</small>
-                    </span>
-                    <select
-                      value={m.inputGuid}
-                      onChange={(e) => updateMapping(m.templateType, e.target.value)}
-                    >
-                      <option value={m.inputGuid}>{m.inputTitle}</option>
-                      {inputs
-                        .filter((i) => i.guid !== m.inputGuid)
-                        .map((i) => (
-                          <option key={i.guid} value={i.guid}>
-                            {i.title} · {i.guid.slice(0, 8)}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="settings-card">
-            <h3>
-              <Signal />
-              Status Output Browser
-            </h3>
-            <p>
-              Halaman output web transparan dirancang agar siap dimasukkan ke switcher siaran apa pun (vMix,
-              OBS Studio, Wirecast, Tricaster).
-            </p>
-            <div style={{ background: "#0d1016", border: "1px solid #1b2029", borderRadius: 4, padding: 14 }}>
-              <div
+              <button
+                type="button"
+                className="secondary-small"
                 style={{
+                  background: "#162335",
+                  border: "1px solid #233854",
+                  color: "#cbd5e1",
+                  borderRadius: 4,
+                  padding: "6px 12px",
+                  fontSize: 11,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 12
+                  gap: 6,
+                  cursor: "pointer"
                 }}
+                onClick={() => window.open("/output", "_blank")}
               >
-                <span style={{ fontSize: 11, color: "#8a96a8" }}>Client Overlay Terhubung:</span>
-                <span className="state-badge on-air">
-                  <b>{value.outputMode === "web" ? "Aktif" : "Standby"}</b>
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="primary-small" onClick={() => window.open("/output", "_blank")}>
-                  <ExternalLink size={13} /> Preview Output di Tab Baru
-                </button>
-              </div>
+                <ExternalLink size={13} /> Buka Preview Output di Tab Baru
+              </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </section>
   );

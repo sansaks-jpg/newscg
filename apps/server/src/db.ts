@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem, TemplateType, VmixMapping } from "@newscg/shared";
+import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
 
 const dbPath = resolve(process.cwd(), process.env.DATABASE_PATH || "./data/newscg.db");
@@ -28,9 +28,6 @@ CREATE TABLE IF NOT EXISTS graphic_items (
   draft_fields TEXT NOT NULL, last_pushed_fields TEXT
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS vmix_mappings (
-  template_type TEXT PRIMARY KEY, input_guid TEXT NOT NULL, input_title TEXT NOT NULL, field_map TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS on_air_state (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1), graphic_id TEXT, input_guid TEXT,
   overlay_number INTEGER, snapshot TEXT, status TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -130,18 +127,17 @@ export const saveStory = db.transaction((rundownId: string, itemId: string | nul
 export function markGraphicPushed(id: string, fields: Record<string, string>) { db.prepare("UPDATE graphic_items SET last_pushed_fields=? WHERE id=?").run(JSON.stringify(fields), id); }
 function touch(id: string) { db.prepare("UPDATE rundowns SET updated_at=? WHERE id=?").run(new Date().toISOString(), id); }
 
-const settingDefaults: Record<string, any> = { outputMode: process.env.OUTPUT_MODE || "web", mode: process.env.VMIX_MODE || "mock", vmixHost: process.env.VMIX_HOST || "192.168.1.10", vmixPort: Number(process.env.VMIX_PORT || 8088), overlayNumber: 1, pollingIntervalMs: 1000, username: process.env.VMIX_USERNAME || "", password: process.env.VMIX_PASSWORD || "" };
+const settingDefaults: Record<string, any> = { outputMode: "web" };
 export function getSettingsInternal() {
   const rows = Object.fromEntries((db.prepare("SELECT key,value FROM settings").all() as any[]).map(r => [r.key, JSON.parse(r.value)]));
-  const mappings = (db.prepare("SELECT * FROM vmix_mappings").all() as any[]).map(r => ({ templateType: r.template_type, inputGuid: r.input_guid, inputTitle: r.input_title, fieldMap: JSON.parse(r.field_map) })) as VmixMapping[];
-  return { ...settingDefaults, ...rows, mappings };
+  return { ...settingDefaults, ...rows };
 }
-export function getSettings(): AppSettings { const s = getSettingsInternal(); return { ...s, passwordConfigured: Boolean(s.password), password: undefined } as AppSettings; }
+export function getSettings(): AppSettings { return getSettingsInternal(); }
 export const saveSettings = db.transaction((patch: any) => {
-  const allowed = ["outputMode","mode","vmixHost","vmixPort","overlayNumber","pollingIntervalMs","username","password"];
-  for (const key of allowed) if (patch[key] !== undefined && !(key === "password" && patch[key] === "••••••••")) db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(patch[key]));
-  if (patch.mappings) {
-    for (const m of patch.mappings as VmixMapping[]) db.prepare("INSERT INTO vmix_mappings VALUES(?,?,?,?) ON CONFLICT(template_type) DO UPDATE SET input_guid=excluded.input_guid,input_title=excluded.input_title,field_map=excluded.field_map").run(m.templateType, m.inputGuid, m.inputTitle, JSON.stringify(m.fieldMap));
+  for (const [key, val] of Object.entries(patch)) {
+    if (val !== undefined) {
+      db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(val));
+    }
   }
   return getSettings();
 });
@@ -185,13 +181,6 @@ export function saveHeadlineDefaults(patch: Partial<HeadlineDefaults>): Headline
 export function seedIfEmpty() {
   if ((db.prepare("SELECT COUNT(*) count FROM rundowns").get() as any).count) return;
   const rd = createRundown({ id: "NEWS-001", programName: "NEWS LIVE", title: "Rundown Siaran", items: [] });
-  const defaults: VmixMapping[] = [
-    { templateType:"HEADLINE", inputGuid:"mock-headline-guid", inputTitle:"NewsCG Headline", fieldMap:{headline:"Headline.Text",kicker:"Kicker.Text"}},
-    { templateType:"REPORTER", inputGuid:"mock-reporter-guid", inputTitle:"NewsCG Reporter", fieldMap:{name:"Name.Text",role:"Role.Text",location:"Location.Text"}},
-    { templateType:"LOCATION", inputGuid:"mock-location-guid", inputTitle:"NewsCG Location", fieldMap:{location:"Location.Text"}},
-    { templateType:"BREAKING", inputGuid:"mock-breaking-guid", inputTitle:"NewsCG Breaking", fieldMap:{headline:"Headline.Text",kicker:"Kicker.Text"}}
-  ];
-  saveSettings({ mappings: defaults });
   logAction("SYSTEM", "confirmed", `Rundown baru ${rd.id} dibuat (bersih)`);
 }
 

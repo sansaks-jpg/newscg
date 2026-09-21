@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { graphicInputSchema, graphicPatchSchema, headlineDefaultsSchema, rundownInputSchema, rundownItemInputSchema, validateGraphicPatch } from "@newscg/shared";
 import { createGraphic, createItem, createRundown, deleteGraphic, deleteItem, deleteRundown, getActions, getGraphic, getHeadlineDefaults, getMasterOverlay, getRundown, getRundowns, getSettings, saveHeadlineDefaults, saveSettings, seedIfEmpty, updateGraphic, updateItem, updateRundown } from "./db.js";
-import { addOverlaySubscriber, checkConnection, clearAllLive, clearLive, getLiveState, listInputs, prepare, setMockConnection, take, takeVariantLive, updateLive, updateMasterState } from "./live.js";
+import { addOverlaySubscriber, clearAllLive, clearLive, getLiveState, prepare, take, takeVariantLive, updateLive, updateMasterState } from "./live.js";
 
 seedIfEmpty();
 const app=express(); const port=Number(process.env.PORT||3001);
@@ -47,10 +47,7 @@ app.get("/api/settings",(_req,res)=>res.json(getSettings()));
 app.patch("/api/settings",(req,res)=>res.json(saveSettings(req.body)));
 app.get("/api/settings/headline-defaults",(_req,res)=>res.json(getHeadlineDefaults()));
 app.patch("/api/settings/headline-defaults",(req,res)=>{const parsed=headlineDefaultsSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data default headline tidak valid",details:parsed.error.issues});return res.json(saveHeadlineDefaults(parsed.data));});
-app.get("/api/vmix/status",(_req,res)=>res.json(getLiveState()));
-app.post("/api/vmix/test",asyncRoute(async(_req:any,res:any)=>res.json(await checkConnection())));
-app.get("/api/vmix/inputs",asyncRoute(async(_req:any,res:any)=>res.json(await listInputs())));
-app.post("/api/mock/connection",(req,res)=>res.json(setMockConnection(Boolean(req.body.connected))));
+app.get("/api/live/state",(_req,res)=>res.json(getLiveState()));
 app.post("/api/live/prepare",(req,res)=>{try{return res.json(prepare(req.body.graphicId));}catch(e:any){return res.status(404).json({error:e.message});}});
 app.post("/api/live/take",asyncRoute(async(req:any,res:any)=>res.json(await take(req.body?.graphicId,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID(),{presentation:req.body?.presentation}))));
 app.post("/api/live/variant",asyncRoute(async(req:any,res:any)=>{const{graphicId,action}=req.body||{};if(!graphicId||!action)return res.status(400).json({error:"graphicId dan action wajib diisi"});return res.json(await takeVariantLive(graphicId,action,req.get("Idempotency-Key")||req.body?.idempotencyKey||crypto.randomUUID()));}));
@@ -82,6 +79,7 @@ app.get("/api/live/stream", (req, res) => {
   });
 });
 app.get("/api/actions",(req,res)=>res.json(getActions(Math.min(Number(req.query.limit)||50,200))));
+app.use("/api", (_req, res) => res.status(404).json({ error: "Endpoint API tidak ditemukan" }));
 const webDist=fileURLToPath(new URL("../../web/dist",import.meta.url)); if(existsSync(webDist)){app.use(express.static(webDist));app.get("/{*path}",(_req,res)=>res.sendFile(resolve(webDist,"index.html")));}
 app.use((err:any,_req:any,res:any,_next:any)=>{console.error(err);res.status(500).json({error:err.message||"Kesalahan server"});});
 if(process.env.NODE_ENV!=="test")app.listen(port,"0.0.0.0",()=>console.log(`NewsCG server http://localhost:${port}`));

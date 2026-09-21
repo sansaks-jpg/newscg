@@ -6,7 +6,7 @@ Dokumen ini adalah panduan teknis dan operasional resmi bagi agen AI (Antigravit
 
 ## 1. Ikhtisar Sistem & Arsitektur
 
-NewsCG adalah sistem grafis siaran berita (*Character Generator* / CG) web-native yang memisahkan kontrol operator dengan visual output transparan (*alpha overlay*) berbasis arsitektur **Singular.live**.
+NewsCG adalah sistem grafis siaran berita (*Character Generator* / CG) web-native yang memisahkan kontrol operator dengan visual output transparan (*alpha overlay*) berbasis arsitektur **Singular.live**. Output mandiri `/output` siap diintegrasikan sebagai *Web Browser Input* di berbagai switcher siaran seperti vMix, OBS Studio, dan Wirecast.
 
 ### Struktur Monorepo (npm workspaces)
 
@@ -17,17 +17,17 @@ newscg/
 │   │   ├── src/
 │   │   │   ├── index.ts        # REST endpoints & SSE streaming (/api/live/stream)
 │   │   │   ├── db.ts           # SQLite better-sqlite3, migrasi schema, operasi CRUD
-│   │   │   ├── live.ts         # Live state machine, antrean aksi, idempotency, SSE pub/sub
-│   │   │   └── vmix.ts         # Adapter koneksi vMix (Mock & HTTP Web API)
+│   │   │   └── live.ts         # Live state machine, antrean aksi, idempotency, SSE pub/sub
 │   │   └── tests/              # Pengujian integrasi alur produksi (Vitest)
 │   └── web/                    # Frontend React 19 + Vite + Tailwind CSS v4
 │       ├── src/
-│       │   ├── App.tsx         # Root container & tata letak aplikasi operator
-│       │   ├── BroadcastGraphic.tsx  # Engine render grafis layer siaran (Lower Third, Logo, Ticker)
+│       │   ├── App.tsx         # Root container, routing internal & tata letak operator
+│       │   ├── BroadcastGraphic.tsx  # Engine render grafis layer siaran (Lower Third, Logo, Jam)
 │       │   ├── OverlayWindow.tsx     # Output layar mandiri transparan (/output)
 │       │   ├── AutoSquishText.tsx    # Komponen pencegah teks meluber keluar Safe Area
 │       │   ├── BroadcastTicker.tsx   # Running text / ticker berita bawah
 │       │   ├── Newsroom.tsx          # Panel manajemen rundown, berita, dan grafis
+│       │   ├── SimpleProductionEditor.tsx # Panel kontrol eksekusi live siaran operator
 │       │   ├── TemplatePreview.tsx   # Monitor preview grafis sebelum ditayangkan
 │       │   ├── VisualTemplatePicker.tsx # Selektor templat visual
 │       │   └── useLayerPresence.ts   # Hook transisi masuk/keluar layer grafis
@@ -53,12 +53,14 @@ newscg/
 
 ### C. Keamanan Operasional Siaran (Broadcast Safety)
 - **Terisolasi**: Menyunting draft di dashboard tidak boleh mengubah grafis yang sedang tayang (ON AIR).
-- **Idempotency**: Semua perintah live (`TAKE`, `UPDATE`, `CLEAR`, `CLEAR_ALL`) harus menerima atau menghasilkan `Idempotency-Key` untuk mencegah eksekusi ganda akibat double-click operator.
+- **Idempotency**: Semua perintah live (`TAKE`, `UPDATE`, `CLEAR`, `CLEAR_ALL`, `STAGE`, `VARIANT`) harus menerima atau menghasilkan `Idempotency-Key` untuk mencegah eksekusi ganda akibat double-click operator.
 - **Transisi Halus**: Perubahan konten live harus mendukung pembaruan teks instan (`UPDATE`) tanpa merestart animasi masuk jika template sama, atau transisi keluar (`CLEAR`) sebelum grafis ditutup.
+- **Dukungan `/output`**: Layar output `/output` tidak boleh dirusak atau dihapus karena merupakan antarmuka input utama untuk switcher siaran.
 
 ### D. Penanganan Kesalahan (Error Handling)
 - Jangan pernah menyembunyikan galat (*silent fail* / *empty catch*).
 - Berikan pesan kesalahan berbahasa Indonesia yang jelas dan informatif bagi operator siaran jika terjadi validasi gagal atau konflik live status.
+- Rute API yang tidak ditemukan wajib mengembalikan respon HTTP 404 JSON, bukan fallback halaman HTML.
 
 ---
 
@@ -67,12 +69,13 @@ newscg/
 Output overlay (`/output`) terhubung ke backend melalui Server-Sent Events di `/api/live/stream`.
 
 ### Tipe-Tipe Event Overlay (`OverlayEvent`)
-1. **`SYNC`**: Dikirim saat klien overlay pertama kali terhubung atau melakukan reconnect. Mengirimkan status live saat ini, grafis aktif, dan master state.
+1. **`SYNC`**: Dikirim saat klien overlay pertama kali terhubung atau melakukan reconnect. Mengirimkan status live saat ini, grafis aktif, snapshot fields, dan master state.
 2. **`TAKE`**: Menginstruksikan overlay untuk menampilkan grafis baru dengan animasi masuk.
-3. **`UPDATE`**: Memperbarui teks/data pada grafis yang sedang tayang di layar.
-4. **`CLEAR`**: Memainkan animasi keluar (*exit transition*) untuk grafis utama, membiarkan master overlay tetap aktif.
-5. **`MASTER_UPDATE`**: Memperbarui konfigurasi logo, live badge, ticker, atau zona waktu tanpa mengubah lower third.
-6. **`CLEAR_ALL`**: Menghilangkan seluruh elemen di layar (termasuk master overlay).
+3. **`UPDATE`**: Memperbarui teks/data pada grafis yang sedang tayang di layar secara instan tanpa memicu animasi masuk ulang.
+4. **`CLEAR`**: Memainkan animasi keluar (*exit transition*) untuk grafis lower third, membiarkan master overlay (logo/jam/ticker) tetap aktif.
+5. **`MASTER_UPDATE`**: Memperbarui konfigurasi logo, live badge, running ticker, atau zona waktu tanpa mengubah lower third.
+6. **`CLEAR_ALL_IMMEDIATE`**: Menghilangkan seketika seluruh elemen di layar (blackout total darurat).
+7. **`CLEAR_ALL_ANIMATED`**: Menghilangkan seluruh elemen di layar dengan animasi keluar yang halus.
 
 ---
 

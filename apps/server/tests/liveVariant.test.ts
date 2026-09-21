@@ -9,12 +9,10 @@ let liveModule: typeof import("../src/live.js");
 describe("Live variant & headline defaults API (branch simple)", () => {
   beforeAll(async () => {
     process.env.DATABASE_PATH = testDb;
-    process.env.VMIX_MODE = "mock";
     if (existsSync(testDb)) rmSync(testDb, { force: true });
     dbModule = await import("../src/db.js");
     liveModule = await import("../src/live.js");
     dbModule.seedIfEmpty();
-    dbModule.saveSettings({ outputMode: "web" });
     const rundowns = dbModule.getRundowns();
     if (rundowns.length > 0 && rundowns[0]) {
       const item = dbModule.createItem(rundowns[0].id, {
