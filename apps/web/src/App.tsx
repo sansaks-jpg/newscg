@@ -44,6 +44,7 @@ type View = "editor" | "rundown" | "settings";
 const templateMeta: Record<TemplateType, { label: string; icon: any; accent: string }> = {
   HEADLINE: { label: "Headline", icon: MonitorPlay, accent: "#f1f3f6" },
   REPORTER: { label: "Reporter / Pembawa Acara", icon: UserRound, accent: "#4e8cff" },
+  SOT: { label: "SOT Narasumber", icon: UserRound, accent: "#e11d2e" },
   LOCATION: { label: "Lokasi", icon: MapPin, accent: "#f7b53d" },
   BREAKING: { label: "Breaking News", icon: AlertTriangle, accent: "#ef1b2d" }
 };

@@ -52,6 +52,46 @@ afterEach(async () => {
 });
 
 describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", Component: ProgramMonitor }])("broadcast layer lifecycle ($name)", ({ Component }) => {
+  it("shows the story headline above the SOT speaker and role", async () => {
+    await act(async () => root.render(createElement(Component)));
+    const sotGraphic = { ...graphic, id: "sot-1", templateType: "SOT" as const };
+    await send({ type: "TAKE", graphic: sotGraphic, fields: {
+      headline: "PENCARIAN 5 JURNALIS HILANG", name: "Riski Dwianto",
+      role: "Kasie Ops Basarnas Banten", contentMode: "sot"
+    }, master });
+    expect(element(".cg-headline-row")?.textContent).toBe("PENCARIAN 5 JURNALIS HILANG");
+    expect(element(".cg-sot-name-row")?.textContent).toContain("Riski Dwianto");
+    expect(element(".cg-sot-role-row")?.textContent).toContain("Kasie Ops Basarnas Banten");
+  });
+
+  it("closes detail before SOT enters while keeping the headline panel", async () => {
+    await act(async () => root.render(createElement(Component)));
+    await send({ type: "TAKE", graphic, fields, master });
+    await advance(700);
+    const panel = element(".cg-main-box");
+    const headline = element(".cg-headline-row");
+    const sotGraphic = { ...graphic, id: "sot-2", templateType: "SOT" as const };
+    await send({ type: "SWITCH_DETAIL", graphic: sotGraphic, fields: {
+      headline: fields.headline, name: "Riski Dwianto", role: "Kasie Ops", contentMode: "sot"
+    }, master });
+    expect(element(".cg-main-box")).toBe(panel);
+    expect(element(".cg-headline-row")).toBe(headline);
+    expect(element(".cg-sot-name-row")).toBeNull();
+    expect(getComputedStyle(element(".cg-subline-row > .cg-copy-motion")!).animation).toContain("news-text-out");
+    await advance(broadcastMotion.detailOutMs + 20);
+    expect(element(".cg-main-box")).toBe(panel);
+    expect(element(".cg-headline-row")).toBe(headline);
+    expect(element(".cg-sot-name-row")?.textContent).toContain("Riski Dwianto");
+    await send({ type: "SWITCH_DETAIL", graphic, fields, master });
+    expect(element(".cg-sot-name-row")).not.toBeNull();
+    expect(element(".cg-subline-row")).toBeNull();
+    await advance(broadcastMotion.detailOutMs + 20);
+    expect(element(".cg-main-box")).toBe(panel);
+    expect(element(".cg-headline-row")).toBe(headline);
+    expect(element(".cg-sot-name-row")).toBeNull();
+    expect(element(".cg-subline-row")?.textContent).toBe(fields.subline);
+  });
+
   it("assigns IN animations to every visible layer, including headline text and clock", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
@@ -80,9 +120,9 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await send({ type: "CLEAR", master });
     expect(getComputedStyle(element(".cg-main-box")!).animation).toContain("news-panel-out");
     expect(getComputedStyle(element(".cg-headline-row > .cg-copy-motion")!).animation).toContain("news-text-out");
-    await advance(broadcastMotion.panelOutDelayMs + broadcastMotion.panelOutMs - 1);
+    await advance(broadcastMotion.retainMs - 1);
     expect(element(".cg-main-box")).not.toBeNull();
-    await advance(21);
+    await advance(1);
     expect(element(".cg-main-box")).toBeNull();
     expect(element(".cg-ticker-bar")).not.toBeNull();
     expect(element(".cg-logo-box.standalone")).not.toBeNull();
@@ -125,13 +165,22 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-in");
   });
 
-  it("ALL OUT retains all layers for their animations and emergency clear removes them immediately", async () => {
+  it("ALL OUT plays headline, ticker, and logo in order; emergency clear stays immediate", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
     await send({ type: "CLEAR_ALL_ANIMATED" });
     for (const selector of [".cg-main-box", ".cg-location-tag", ".cg-ticker-bar", ".cg-logo-box.standalone"])
       expect(element(selector), selector).not.toBeNull();
+    expect(getComputedStyle(element(".cg-main-box")!).animation).toContain("news-panel-out");
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).not.toContain("news-ticker-out");
+    expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).not.toContain("news-logo-out");
     await advance(broadcastMotion.retainMs);
+    expect(element(".cg-main-box")).toBeNull();
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-out");
+    expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).not.toContain("news-logo-out");
+    await advance(broadcastMotion.tickerOutMs + 20);
+    expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).toContain("news-logo-out");
+    await advance(broadcastMotion.logoOutMs + 20);
     expect(element(".cg-lower-third")).toBeNull();
     await send({ type: "TAKE", graphic, fields, master });
     await send({ type: "CLEAR_ALL_IMMEDIATE" });

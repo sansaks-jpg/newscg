@@ -8,8 +8,11 @@
   animation: none !important;
 }
 
-/* The headline plate and its copy travel in from the logo side on the right. */
+/* Reveal the headline plate from the right without moving its right edge past
+   the title-safe boundary. The copy has its own clipped motion below. */
 [data-broadcast-motion] .cnn-template .cg-main-box {
+  position: relative;
+  z-index: 1;
   animation: news-panel-in var(--cg-panelInMs, 600ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
 /* Keep the text column and each row fixed as viewports. Motion belongs only to
@@ -20,6 +23,7 @@
 [data-broadcast-motion] .cnn-template .cg-headline-row,
 [data-broadcast-motion] .cnn-template .cg-headline-row-single,
 [data-broadcast-motion] .cnn-template .cg-presenter-row,
+[data-broadcast-motion] .cnn-template .cg-sot-name-row,
 [data-broadcast-motion] .cnn-template .cg-paragraph-row {
   width: 100%;
   min-width: 0;
@@ -28,7 +32,8 @@
   animation: none !important;
 }
 [data-broadcast-motion] .cnn-template .cg-subline-row,
-[data-broadcast-motion] .cnn-template .cg-social-row {
+[data-broadcast-motion] .cnn-template .cg-social-row,
+[data-broadcast-motion] .cnn-template .cg-sot-role-row {
   overflow: hidden;
   clip-path: inset(0);
   animation: none !important;
@@ -42,29 +47,44 @@
   animation: news-text-in var(--cg-textInMs, 360ms) cubic-bezier(.22,.75,.18,1) var(--cg-textInDelayMs, 160ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-subline-row > .cg-copy-motion,
-[data-broadcast-motion] .cnn-template .cg-social-row > .cg-copy-motion {
+[data-broadcast-motion] .cnn-template .cg-sot-name-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-social-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-sot-role-row > .cg-copy-motion {
   width: 100%;
   min-width: 0;
   animation: news-detail-in var(--cg-detailInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-detailInDelayMs, 240ms) 1 both !important;
 }
+[data-broadcast-motion] .cnn-template .cg-sot-name-row > .cg-copy-motion {
+  width: max-content;
+  max-width: 42%;
+  flex: 0 1 auto;
+}
 [data-broadcast-motion] .cnn-template .cg-kicker-tab {
-  animation: news-topic-in var(--cg-topicInMs, 420ms) cubic-bezier(.22,.75,.18,1) var(--cg-topicInDelayMs, 80ms) 1 both !important;
+  z-index: 0;
+  animation: news-topic-in var(--cg-topicInMs, 420ms) cubic-bezier(.22,.75,.18,1) var(--cg-topicInDelayMs, 600ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template.cg-location-tag {
   animation: news-location-in var(--cg-locationInMs, 420ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
 
-/* Copy and topic leave first. The plate closes only after they have cleared. */
+/* A topic retracts into the headline before the copy leaves and the plate closes. */
+[data-broadcast-motion] .cnn-template .cg-content-layer.cg-has-topic {
+  --cg-textOutDelayMs: var(--cg-topicOutMs, 240ms);
+  --cg-panelOutDelayMs: var(--cg-panelOutWithTopicDelayMs, 420ms);
+}
 [data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row > .cg-copy-motion,
 [data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row-single > .cg-copy-motion,
 [data-broadcast-motion] .cnn-template .cg-exit .cg-presenter-row > .cg-copy-motion,
 [data-broadcast-motion] .cnn-template .cg-exit .cg-paragraph-row > .cg-copy-motion {
-  animation: news-text-out var(--cg-textOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+  animation: news-text-out var(--cg-textOutMs, 180ms) cubic-bezier(.55,0,.8,.35) var(--cg-textOutDelayMs, 0ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-exit .cg-subline-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-sot-name-row > .cg-copy-motion,
 [data-broadcast-motion] .cnn-template .cg-exit .cg-social-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-sot-role-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-sot-name-row.cg-detail-out .cg-sot-role-row > .cg-copy-motion,
 [data-broadcast-motion] .cnn-template .cg-detail-out > .cg-copy-motion {
-  animation: news-text-out var(--cg-detailOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+  animation: news-text-out var(--cg-detailOutMs, 180ms) cubic-bezier(.55,0,.8,.35) var(--cg-textOutDelayMs, 0ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-kicker-tab.cg-kicker-out,
 [data-broadcast-motion] .cnn-template .cg-exit .cg-kicker-tab {
@@ -91,7 +111,7 @@
   animation: news-topic-out var(--cg-liveOutMs, 240ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 
-/* The ticker and LIVE descend from above; its badge, copy, and clock follow. */
+/* The ticker rises from below; its badge, copy, and clock follow. */
 [data-broadcast-motion] .cnn-template .cg-ticker-bar.cg-ticker-in {
   animation: news-ticker-in var(--cg-tickerInMs, 560ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
@@ -119,12 +139,12 @@
 }
 
 @keyframes news-panel-in {
-  from { clip-path: inset(0 0 0 100%); transform: translateX(24px); opacity: 0; }
-  to { clip-path: inset(0); transform: translateX(0); opacity: 1; }
+  from { clip-path: inset(0 0 0 100%); opacity: 0; }
+  to { clip-path: inset(0); opacity: 1; }
 }
 @keyframes news-panel-out {
-  from { clip-path: inset(0); transform: translateX(0); opacity: 1; }
-  to { clip-path: inset(0 0 0 100%); transform: translateX(24px); opacity: 0; }
+  from { clip-path: inset(0); opacity: 1; }
+  to { clip-path: inset(0 0 0 100%); opacity: 0; }
 }
 
 @keyframes news-text-in {
@@ -142,12 +162,12 @@
 }
 
 @keyframes news-topic-in {
-  from { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-18px); }
+  from { opacity: 0; clip-path: inset(0); transform: translateY(100%); }
   to { opacity: 1; clip-path: inset(0); transform: translateY(0); }
 }
 @keyframes news-topic-out {
   from { opacity: 1; clip-path: inset(0); transform: translateY(0); }
-  to { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-18px); }
+  to { opacity: 0; clip-path: inset(0); transform: translateY(100%); }
 }
 
 @keyframes news-location-in {
@@ -169,19 +189,19 @@
 }
 
 @keyframes news-ticker-in {
-  from { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-14px); }
-  to { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes news-ticker-out {
-  from { opacity: 1; clip-path: inset(0); transform: translateY(0); }
-  to { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-14px); }
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(100%); }
 }
 
 @keyframes news-ticker-item-in {
-  from { opacity: 0; transform: translateY(-12px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes news-ticker-item-out {
   from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 0; transform: translateY(12px); }
 }

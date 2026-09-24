@@ -13,6 +13,9 @@ const shortcuts: Record<string, LiveShortcut> = {
   "2": "full",
   h: "headline",
   l: "location",
+  k: "sot",
+  ArrowLeft: "previous-sot",
+  ArrowRight: "next-sot",
   t: "topic",
   d: "detail",
   ArrowUp: "previous",
@@ -38,4 +41,8 @@ export async function takeThenAdvance(take: () => Promise<boolean>, advance: () 
   const confirmed = await take();
   if (confirmed) advance();
   return confirmed;
+}
+
+export function primaryGraphicAction(canUpdate: boolean): "take" | "update" {
+  return canUpdate ? "update" : "take";
 }

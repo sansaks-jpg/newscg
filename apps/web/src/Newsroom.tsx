@@ -23,7 +23,9 @@ const duration = (seconds: number) =>
     .padStart(2, "0")}:${(Math.abs(seconds) % 60).toString().padStart(2, "0")}`;
 
 const graphicLabel = (g: GraphicItem) =>
-  g.templateType === "REPORTER"
+  g.templateType === "SOT"
+    ? `SOT · ${g.draftFields.name || "Narasumber"}`
+    : g.templateType === "REPORTER"
     ? `CG · ${g.draftFields.name || "Nama"}`
     : g.templateType === "LOCATION"
     ? `Lokasi · ${g.draftFields.location || "Lokasi"}`
@@ -346,10 +348,10 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
                           }`}
                           title={`${graphicLabel(g)} (${g.status})`}
                         >
-                          {g.templateType === "REPORTER" ? (
+                          {g.templateType === "SOT" || g.templateType === "REPORTER" ? (
                             <>
                               <UserRound size={10} />
-                              <span>{g.draftFields.name || "Nama"}</span>
+                              <span>{g.draftFields.name || (g.templateType === "SOT" ? "SOT" : "Nama")}</span>
                             </>
                           ) : g.templateType === "LOCATION" ? (
                             <>
@@ -652,9 +654,11 @@ function StoryEditor({
           templateType: type,
           status: "DRAFT",
           sortOrder: newIndex,
-          draftFields:
+            draftFields:
             type === "REPORTER"
               ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub", showLocation: "false", visualTemplate: "cnn" }
+              : type === "SOT"
+              ? { headline: base?.headline || title, name: "", role: "", contentMode: "sot", showLocation: "false", visualTemplate: "cnn" }
               : type === "LOCATION"
               ? { location: base?.location || "", contentMode: "location", layoutStyle: "single", showLocation: "true", visualTemplate: "cnn" }
               : {
@@ -897,6 +901,9 @@ function StoryEditor({
                 <button type="button" onClick={() => add("REPORTER")}>
                   + Tambah Narasumber
                 </button>
+                <button type="button" onClick={() => add("SOT")}>
+                  + Tambah SOT Narasumber
+                </button>
                 <button type="button" onClick={() => add("LOCATION")}>
                   + Tambah Lokasi Saja
                 </button>
@@ -918,8 +925,10 @@ function StoryEditor({
                     <div className="cue-header-left">
                       <span className="cue-number">#{index + 1}</span>
                       <b>
-                        {g.templateType === "REPORTER"
-                          ? "CG NAMA / NARASUMBER"
+                        {g.templateType === "SOT"
+                          ? "CG SOT NARASUMBER"
+                          : g.templateType === "REPORTER"
+                          ? "CG NAMA / REPORTER"
                           : g.templateType === "LOCATION"
                           ? "CG LOKASI"
                           : "LOWER THIRD HEADLINE"}
@@ -958,7 +967,35 @@ function StoryEditor({
 
                   <div className="cue-editor-body">
                     <BroadcastTemplateInfo />
-                    {g.templateType === "REPORTER" ? (
+                    {g.templateType === "SOT" ? (
+                      <div className="cue-fields-grid">
+                        <label className="field-full">
+                          <span>Headline Berita (Wajib)</span>
+                          <input required maxLength={120} value={g.draftFields.headline || ""}
+                            onChange={(e) => field(index, "headline", e.target.value)}
+                            placeholder="Judul berita di baris atas LT SOT" />
+                        </label>
+                        <label>
+                          <span>Nama Narasumber (Wajib)</span>
+                          <input
+                            required
+                            maxLength={80}
+                            value={g.draftFields.name || ""}
+                            onChange={(e) => field(index, "name", e.target.value)}
+                            placeholder="Contoh: RISKI DWIANTO"
+                          />
+                        </label>
+                        <label>
+                          <span>Jabatan / Keterangan (Opsional)</span>
+                          <input
+                            maxLength={100}
+                            value={g.draftFields.role || ""}
+                            onChange={(e) => field(index, "role", e.target.value)}
+                            placeholder="Contoh: Kasie Ops Basarnas Banten"
+                          />
+                        </label>
+                      </div>
+                    ) : g.templateType === "REPORTER" ? (
                       <div className="cue-fields-grid">
                         <label>
                           <span>Nama Lengkap Narasumber / Presenter</span>
@@ -1070,7 +1107,7 @@ function StoryEditor({
                         className={`preview-pill-btn ${previewIndex === i ? "active" : ""}`}
                         onClick={() => setPreviewIndex(i)}
                       >
-                        #{i + 1} {g.templateType === "REPORTER" ? "Narasumber" : g.templateType === "LOCATION" ? "Lokasi" : "Headline"}
+                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : "Headline"}
                       </button>
                     ))}
                   </div>

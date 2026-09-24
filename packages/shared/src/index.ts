@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const templateTypes = ["HEADLINE", "REPORTER", "LOCATION", "BREAKING"] as const;
+export const templateTypes = ["HEADLINE", "REPORTER", "SOT", "LOCATION", "BREAKING"] as const;
 export type TemplateType = (typeof templateTypes)[number];
 export type MaterialStatus = "DRAFT" | "READY";
 export type CommandStatus = "idle" | "queued" | "pending" | "confirmed" | "failed" | "unknown";
@@ -53,6 +53,7 @@ export const defaultMasterOverlayState: MasterOverlayState = {
 export type OverlayEvent =
   | { type: "SYNC"; onAir: boolean; graphic: GraphicItem | null; fields: Record<string, string> | null; master: MasterOverlayState; revision?: number }
   | { type: "TAKE"; graphic: GraphicItem; fields: Record<string, string>; master: MasterOverlayState; revision?: number }
+  | { type: "SWITCH_DETAIL"; graphic: GraphicItem; fields: Record<string, string>; master: MasterOverlayState; revision?: number }
   | { type: "UPDATE"; graphicId: string; fields: Record<string, string>; master: MasterOverlayState; revision?: number }
   | { type: "CLEAR"; master: MasterOverlayState; revision?: number }
   | { type: "MASTER_UPDATE"; master: MasterOverlayState; revision?: number }
@@ -60,11 +61,12 @@ export type OverlayEvent =
   | { type: "CLEAR_ALL_IMMEDIATE"; revision?: number }
   | { type: "CLEAR_ALL_ANIMATED"; revision?: number };
 
-// The panel OUT includes its text-first delay; removal must wait for both.
+// With a topic: panel IN -> headline copy -> topic; OUT reverses that order.
+// Retention covers the longest OUT sequence before the content is removed.
 export const broadcastMotion = {
-  panelInMs: 600, panelOutMs: 360, panelOutDelayMs: 260, retainMs: 620,
+  panelInMs: 600, panelOutMs: 360, panelOutDelayMs: 260, panelOutWithTopicDelayMs: 420, retainMs: 780,
   textInMs: 360, textInDelayMs: 160, textOutMs: 180,
-  topicInMs: 420, topicInDelayMs: 80, topicOutMs: 240,
+  topicInMs: 420, topicInDelayMs: 600, topicOutMs: 240,
   detailInMs: 300, detailInDelayMs: 240, detailOutMs: 180,
   locationInMs: 420, locationOutMs: 320,
   logoInMs: 500, logoOutMs: 400,
@@ -125,6 +127,17 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     showDetail: z.string().optional().default("false"),
     headline: z.string().trim().max(120).optional().default(""),
     subline: z.string().trim().max(160).optional().default("")
+  }).passthrough(),
+  SOT: z.object({
+    headline: z.string().trim().min(1).max(120),
+    name: z.string().trim().min(1).max(80),
+    role: z.string().trim().max(100).optional().default(""),
+    location: z.string().trim().max(60).optional().default(""),
+    ticker: z.string().trim().max(160).optional().default(""),
+    brand: z.string().trim().max(40).optional().default("CNNINDONESIA.COM"),
+    visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")),
+    contentMode: z.literal("sot").default("sot"),
+    showLocation: z.string().optional().default("false")
   }).passthrough(),
   LOCATION: z.object({ visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")), location: z.string().trim().min(1).max(50) }).passthrough(),
   BREAKING: z.object({
@@ -258,6 +271,9 @@ export type LiveShortcut =
   | "full"
   | "headline"
   | "location"
+  | "sot"
+  | "previous-sot"
+  | "next-sot"
   | "topic"
   | "detail"
   | "previous"

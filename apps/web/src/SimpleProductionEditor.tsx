@@ -22,7 +22,7 @@ import { mutate } from "./api";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
 import { tickerPresets } from "@newscg/shared";
-import { liveShortcut } from "./productionFlow";
+import { liveShortcut, primaryGraphicAction } from "./productionFlow";
 import "./simple-production.css";
 
 type Props = {
@@ -118,6 +118,11 @@ export function SimpleProductionEditor({
   const isSelectedOnAir = Boolean(
     selectedCue && onAirGraphicId && selectedCue.id === onAirGraphicId
   );
+  const onAirCueInStory = selectedItem?.graphics.find((graphic) => graphic.id === onAirGraphicId);
+  const canSwitchDetail = Boolean(selectedCue && onAirCueInStory && selectedCue.id !== onAirCueInStory.id &&
+    ["HEADLINE", "SOT"].includes(selectedCue.templateType) &&
+    ["HEADLINE", "SOT"].includes(onAirCueInStory.templateType));
+  const canUpdate = isSelectedOnAir || canSwitchDetail;
 
   // Cari apakah berita tertentu sedang ON AIR
   const isItemOnAir = useCallback(
@@ -171,6 +176,8 @@ export function SimpleProductionEditor({
     stagedMaster.tickerText !== master.tickerText;
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sotReturnRef = useRef<{ storyId: string; cueId: string; composition: PreviewComposition } | null>(null);
+  const restoreCompositionRef = useRef<PreviewComposition | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Muat data cue terpilih ke mini editor & komposisi
@@ -180,24 +187,32 @@ export function SimpleProductionEditor({
       return;
     }
     const f = selectedCue.draftFields || {};
-    const headline = selectedCue.templateType === "REPORTER"
+    const headline = selectedCue.templateType === "REPORTER" || selectedCue.templateType === "SOT"
       ? f.name || f.headline || ""
       : f.headline || f.name || selectedItem?.title || "";
-    const subline = selectedCue.templateType === "REPORTER"
+    const subline = selectedCue.templateType === "REPORTER" || selectedCue.templateType === "SOT"
       ? f.role || f.subline || ""
       : f.subline || f.role || "";
+    const sourceCue = selectedCue.templateType === "SOT" && sotReturnRef.current?.storyId === selectedItem?.id
+      ? selectedItem?.graphics.find((graphic) => graphic.id === sotReturnRef.current?.cueId) : null;
+    const location = selectedCue.templateType === "SOT"
+      ? (onAirCueInStory ? live.onAirSnapshot?.location : "") || sourceCue?.draftFields.location || f.location || ""
+      : f.location || "";
     setMiniDraft({
       headline,
-      location: f.location || "",
+      location,
       kicker: f.kicker || "",
       subline
     });
 
-    setComposition({
-      showLocation: f.showLocation === "true" && Boolean(f.location?.trim()),
+    setComposition(restoreCompositionRef.current || {
+      showLocation: selectedCue.templateType === "SOT" && sourceCue
+        ? Boolean(sotReturnRef.current?.composition.showLocation && location.trim())
+        : f.showLocation === "true" && Boolean(location.trim()),
       showKicker: f.showKicker === "true" && Boolean(f.kicker?.trim()),
       showDetail: f.showDetail === "true" && Boolean(f.subline?.trim())
     });
+    restoreCompositionRef.current = null;
     setSaveStatus("idle");
   }, [selectedCue?.id]);
 
@@ -220,10 +235,10 @@ export function SimpleProductionEditor({
           layoutStyle: compToSave.showDetail ? "sub" : "single"
         };
 
-        if (targetCue.templateType === "REPORTER") {
+        if (targetCue.templateType === "REPORTER" || targetCue.templateType === "SOT") {
           patchFields.name = draftToSave.headline.trim();
-          patchFields.role = draftToSave.subline.trim() || "REPORTER";
-          patchFields.headline = draftToSave.headline.trim();
+          patchFields.role = draftToSave.subline.trim() || (targetCue.templateType === "REPORTER" ? "REPORTER" : "");
+          patchFields.headline = targetCue.templateType === "SOT" ? (targetCue.draftFields.headline || "") : draftToSave.headline.trim();
           patchFields.subline = draftToSave.subline.trim();
         } else if (targetCue.templateType === "LOCATION") {
           patchFields.location = draftToSave.location.trim() || draftToSave.headline.trim();
@@ -311,6 +326,45 @@ export function SimpleProductionEditor({
     [items, selectedItem, selectedCue, miniDraft, composition, flushSaveDraft]
   );
 
+  const navigateSot = useCallback((direction: -1 | 0 | 1) => {
+    const sotCues = selectedItem?.graphics.filter((graphic) => graphic.templateType === "SOT") || [];
+    if (!sotCues.length) {
+      toast("Berita ini belum memiliki cue SOT narasumber.");
+      return;
+    }
+    const currentIndex = sotCues.findIndex((graphic) => graphic.id === selectedCue?.id);
+    if (direction === 0 && currentIndex >= 0) {
+      const firstHeadline = selectedItem?.graphics.find((graphic) => graphic.templateType === "HEADLINE");
+      const previous = sotReturnRef.current?.storyId === selectedItem?.id
+        ? selectedItem?.graphics.find((graphic) => graphic.id === sotReturnRef.current?.cueId) : null;
+      const targetHeadline = previous || firstHeadline;
+      if (!targetHeadline) { toast("Headline berita ini belum tersedia."); return; }
+      restoreCompositionRef.current = previous ? sotReturnRef.current!.composition : {
+        showLocation: targetHeadline.draftFields.showLocation === "true",
+        showKicker: targetHeadline.draftFields.showKicker === "true",
+        showDetail: targetHeadline.draftFields.showDetail === "true"
+      };
+      sotReturnRef.current = null;
+      setSelectedCueId(targetHeadline.id);
+      return;
+    }
+    const targetIndex = direction === 0 ? (currentIndex < 0 ? 0 : currentIndex)
+      : currentIndex < 0 ? (direction === 1 ? 0 : sotCues.length - 1) : currentIndex + direction;
+    const target = sotCues[targetIndex];
+    if (!target) {
+      toast(direction === 1 ? "Tidak ada SOT berikutnya di berita ini." : "Tidak ada SOT sebelumnya di berita ini.");
+      return;
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+      if (selectedCue) void flushSaveDraft(miniDraft, composition, selectedCue);
+    }
+    if (currentIndex < 0 && selectedCue && selectedItem)
+      sotReturnRef.current = { storyId: selectedItem.id, cueId: selectedCue.id, composition: { ...composition } };
+    setSelectedCueId(target.id);
+  }, [selectedItem, selectedCue, miniDraft, composition, flushSaveDraft, toast]);
+
   // Perintah Live Terpusat: Memastikan commandStatus terkonfirmasi
   const sendLiveCommand = useCallback(
     async (path: string, body: Record<string, unknown> = {}) => {
@@ -330,7 +384,7 @@ export function SimpleProductionEditor({
 
   const executeGraphic = useCallback(async (action: "take" | "update") => {
     if (commandLock.current || !selectedCue) return;
-    if ((action === "take" && isSelectedOnAir) || (action === "update" && !isSelectedOnAir)) return;
+    if ((action === "take" && isSelectedOnAir) || (action === "update" && !canUpdate)) return;
     commandLock.current = true;
     setBusy(true);
     try {
@@ -350,9 +404,9 @@ export function SimpleProductionEditor({
       commandLock.current = false;
       setBusy(false);
     }
-  }, [selectedCue, isSelectedOnAir, flushSaveDraft, miniDraft, composition, sendLiveCommand, reload, toast]);
-  const executeTake = useCallback(() => executeGraphic("take"), [executeGraphic]);
+  }, [selectedCue, isSelectedOnAir, canUpdate, flushSaveDraft, miniDraft, composition, sendLiveCommand, reload, toast]);
   const executeUpdate = useCallback(() => executeGraphic("update"), [executeGraphic]);
+  const executePrimary = useCallback(() => executeGraphic(primaryGraphicAction(canUpdate)), [executeGraphic, canUpdate]);
 
   const executeMaster = useCallback(async (urgent = false) => {
     if (commandLock.current || (!isMasterChanged && !urgent)) return;
@@ -391,7 +445,7 @@ export function SimpleProductionEditor({
     }
   }, [live.onAirGraphicId, reload, toast, sendLiveCommand]);
 
-  const executeClearAll = useCallback(async (immediate = true) => {
+  const executeClearAll = useCallback(async (immediate: boolean) => {
     if (commandLock.current) return;
     commandLock.current = true;
     setBusy(true);
@@ -447,7 +501,7 @@ export function SimpleProductionEditor({
     const nextComp = { showLocation: false, showKicker: false, showDetail: false };
     setComposition(nextComp);
     void flushSaveDraft(miniDraft, nextComp);
-    toast("Preview: Headline Bersih (TAKE untuk cue baru / U untuk update)");
+    toast("Preview: Headline Bersih (Spasi untuk TAKE atau UPDATE)");
   }, [selectedCue, miniDraft, flushSaveDraft, toast]);
 
   // Aksi Quick Action Lokasi (L) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
@@ -464,8 +518,8 @@ export function SimpleProductionEditor({
     void flushSaveDraft(miniDraft, nextComp);
     toast(
       nextVal
-        ? "Preview: Lokasi AKTIF (TAKE untuk cue baru / U untuk update)"
-        : "Preview: Lokasi NONAKTIF (TAKE untuk cue baru / U untuk update)"
+        ? "Preview: Lokasi AKTIF (Spasi untuk TAKE atau UPDATE)"
+        : "Preview: Lokasi NONAKTIF (Spasi untuk TAKE atau UPDATE)"
     );
   }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
@@ -483,13 +537,24 @@ export function SimpleProductionEditor({
     void flushSaveDraft(miniDraft, nextComp);
     toast(
       nextVal
-        ? "Preview: Topik AKTIF (TAKE untuk cue baru / U untuk update)"
-        : "Preview: Topik NONAKTIF (TAKE untuk cue baru / U untuk update)"
+        ? "Preview: Topik AKTIF (Spasi untuk TAKE atau UPDATE)"
+        : "Preview: Topik NONAKTIF (Spasi untuk TAKE atau UPDATE)"
     );
   }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
   // Aksi Quick Action Detail (D) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
   const actionToggleDetail = useCallback(() => {
+    if (selectedCue?.templateType === "SOT") {
+      const headline = selectedItem?.graphics.find((graphic) => graphic.id === sotReturnRef.current?.cueId) ||
+        selectedItem?.graphics.find((graphic) => graphic.templateType === "HEADLINE");
+      if (!headline?.draftFields.subline?.trim()) { toast("Detail headline belum diisi"); return; }
+      restoreCompositionRef.current = { showLocation: headline.draftFields.showLocation === "true",
+        showKicker: headline.draftFields.showKicker === "true", showDetail: true };
+      sotReturnRef.current = null;
+      setSelectedCueId(headline.id);
+      toast("Preview: Detail headline dipilih (Spasi untuk update)");
+      return;
+    }
     if (!selectedCue) return;
     const hasDetail = Boolean(miniDraft.subline.trim());
     if (!hasDetail) {
@@ -502,10 +567,10 @@ export function SimpleProductionEditor({
     void flushSaveDraft(miniDraft, nextComp);
     toast(
       nextVal
-        ? "Preview: Detail AKTIF (TAKE untuk cue baru / U untuk update)"
-        : "Preview: Detail NONAKTIF (TAKE untuk cue baru / U untuk update)"
+        ? "Preview: Detail AKTIF (Spasi untuk TAKE atau UPDATE)"
+        : "Preview: Detail NONAKTIF (Spasi untuk TAKE atau UPDATE)"
     );
-  }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
+  }, [selectedCue, selectedItem, miniDraft, composition, flushSaveDraft, toast]);
 
   // Keyboard Shortcuts Listener
   useEffect(() => {
@@ -546,6 +611,15 @@ export function SimpleProductionEditor({
         case "location":
           void actionToggleLocation();
           break;
+        case "sot":
+          navigateSot(0);
+          break;
+        case "previous-sot":
+          if (selectedCue?.templateType === "SOT") navigateSot(-1);
+          break;
+        case "next-sot":
+          if (selectedCue?.templateType === "SOT") navigateSot(1);
+          break;
         case "topic":
           void actionToggleTopic();
           break;
@@ -556,7 +630,7 @@ export function SimpleProductionEditor({
           void executeMaster();
           break;
         case "take":
-          void executeTake();
+          void executePrimary();
           break;
         case "update":
           void executeUpdate();
@@ -565,7 +639,7 @@ export function SimpleProductionEditor({
           void executeClear();
           break;
         case "clear-all":
-          void executeClearAll();
+          void executeClearAll(false);
           break;
       }
     };
@@ -581,10 +655,12 @@ export function SimpleProductionEditor({
     toggleMasterTickerLive,
     actionHeadline,
     actionToggleLocation,
+    navigateSot,
+    selectedCue,
     actionToggleTopic,
     actionToggleDetail,
     executeMaster,
-    executeTake,
+    executePrimary,
     executeUpdate,
     executeClear,
     executeClearAll
@@ -594,9 +670,9 @@ export function SimpleProductionEditor({
   const effectivePreviewFields: Record<string, string> | null = selectedCue
     ? {
         ...(selectedCue.draftFields || {}),
-        headline: miniDraft.headline,
-        name: selectedCue.templateType === "REPORTER" ? miniDraft.headline : (selectedCue.draftFields?.name || miniDraft.headline),
-        role: selectedCue.templateType === "REPORTER" ? miniDraft.subline : (selectedCue.draftFields?.role || miniDraft.subline),
+        headline: selectedCue.templateType === "SOT" ? (selectedCue.draftFields.headline || "") : miniDraft.headline,
+        name: selectedCue.templateType === "REPORTER" || selectedCue.templateType === "SOT" ? miniDraft.headline : (selectedCue.draftFields?.name || miniDraft.headline),
+        role: selectedCue.templateType === "REPORTER" || selectedCue.templateType === "SOT" ? miniDraft.subline : (selectedCue.draftFields?.role || miniDraft.subline),
         location: miniDraft.location,
         kicker: miniDraft.kicker,
         subline: miniDraft.subline,
@@ -844,24 +920,21 @@ export function SimpleProductionEditor({
         </div>
 
         <div className="primary-actions-deck" aria-label="Perintah siaran">
-          <button type="button" className="action-btn btn-take" disabled={busy || !selectedCue || selectedCue.status !== "READY" || isSelectedOnAir} onClick={executeTake} title={selectedCue?.status === "DRAFT" ? "Materi masih DRAFT. Setujui di Rundown & CG." : undefined}>
-            <span className="btn-inner"><Play size={16} /><span className="btn-title">TAKE</span></span><kbd>SPACE / ENTER</kbd>
-          </button>
-          <button type="button" className="action-btn btn-update" disabled={busy || !selectedCue || selectedCue.status !== "READY" || !isSelectedOnAir} onClick={executeUpdate}>
-            <span className="btn-inner"><RefreshCw size={16} /><span className="btn-title">UPDATE</span></span><kbd>U</kbd>
+          <button type="button" className={`action-btn ${canUpdate ? "btn-update" : "btn-take"}`} disabled={busy || !selectedCue || selectedCue.status !== "READY"} onClick={executePrimary} title={selectedCue?.status === "DRAFT" ? "Materi masih DRAFT. Setujui di Rundown & CG." : undefined}>
+            <span className="btn-inner">{canUpdate ? <RefreshCw size={16} /> : <Play size={16} />}<span className="btn-title">{canUpdate ? "UPDATE" : "TAKE"}</span></span><kbd>SPACE / ENTER</kbd>
           </button>
           <button type="button" className="action-btn btn-clear" disabled={busy || !live.onAirGraphicId} onClick={executeClear}>
             <span className="btn-inner"><X size={16} /><span className="btn-title">OUT</span></span><kbd>ESC / C</kbd>
           </button>
         </div>
         <div className="live-change-summary" role="status">
-          {busy ? "Mengirim perintah…" : selectedCue ? (selectedCue.status !== "READY" ? "Cue masih DRAFT — setujui di Rundown & CG sebelum TAKE atau UPDATE." : isSelectedOnAir ? "Cue sedang aktif — gunakan UPDATE untuk menerapkan perubahan." : "Cue siap di Preview — gunakan TAKE untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown."}
+          {busy ? "Mengirim perintah…" : selectedCue ? (selectedCue.status !== "READY" ? "Cue masih DRAFT — setujui di Rundown & CG sebelum ditayangkan." : canUpdate ? "Cue siap — tekan Spasi untuk memperbarui Program." : "Cue siap di Preview — tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown."}
           {isMasterChanged && " Perubahan master belum diterapkan (M)."}
           {isSelectedOnAir && <small>{pendingChanges.length ? `Belum diterapkan: ${pendingChanges.join(", ")}.` : "Isi Preview sama dengan snapshot Program."}</small>}
           <small>{live.overlayClientsCount} klien output terhubung · Program ini adalah monitor internal NewsCG, bukan pembacaan switcher.</small>
         </div>
 
-        {/* Quick Actions (H, L, T, D) - Mengatur Stage Preview (Safety: TAKE untuk cue baru / U untuk update) */}
+        {/* Quick Actions (H, K, L, T, D) - Menyiapkan cue Preview sebelum TAKE / UPDATE */}
         <div className="quick-actions-bar">
           <div className="quick-action-btns">
             <button
@@ -885,6 +958,17 @@ export function SimpleProductionEditor({
               <span className="qa-kbd">L</span>
               <span className="qa-text">LOKASI</span>
               <span className={`qa-dot ${composition.showLocation ? "on" : ""}`} />
+            </button>
+
+            <button
+              type="button"
+              className={`qa-btn ${selectedCue?.templateType === "SOT" ? "active" : ""} ${!selectedItem?.graphics.some((graphic) => graphic.templateType === "SOT") ? "disabled" : ""}`}
+              disabled={busy || !selectedItem?.graphics.some((graphic) => graphic.templateType === "SOT")}
+              onClick={() => navigateSot(0)}
+              title="K: buka/tutup LT SOT; panah kiri/kanan: pilih narasumber"
+            >
+              <span className="qa-kbd">K</span>
+              <span className="qa-text">SOT NARASUMBER</span>
             </button>
 
             <button
@@ -914,8 +998,8 @@ export function SimpleProductionEditor({
         </div>
         <div className="all-output-actions" aria-label="Kontrol seluruh output">
           <span>Seluruh layer</span>
-          <button type="button" disabled={busy} onClick={() => executeClearAll(false)}>ALL OUT · Animasi</button>
-          <button type="button" className="emergency-clear" disabled={busy} onClick={() => executeClearAll(true)}><Trash2 size={14} /> CLEAR ALL · Darurat <kbd>0</kbd></button>
+          <button type="button" disabled={busy} onClick={() => executeClearAll(false)}>ALL OUT · Animasi <kbd>0</kbd></button>
+          <button type="button" className="emergency-clear" disabled={busy} onClick={() => executeClearAll(true)}><Trash2 size={14} /> CLEAR ALL · Darurat</button>
         </div>
 
 
@@ -953,7 +1037,9 @@ export function SimpleProductionEditor({
           <div className="mini-editor-grid">
             <div className="mini-input-group span-2">
               <label>
-                {selectedCue?.templateType === "REPORTER"
+                {selectedCue?.templateType === "SOT"
+                  ? "Nama Narasumber"
+                  : selectedCue?.templateType === "REPORTER"
                   ? "Nama Pembawa Berita / Reporter"
                   : selectedCue?.templateType === "LOCATION"
                   ? "Teks Lokasi"
@@ -963,7 +1049,9 @@ export function SimpleProductionEditor({
                 type="text"
                 autoFocus
                 placeholder={
-                  selectedCue?.templateType === "REPORTER"
+                  selectedCue?.templateType === "SOT"
+                    ? "Masukkan nama narasumber..."
+                    : selectedCue?.templateType === "REPORTER"
                     ? "Masukkan nama reporter..."
                     : selectedCue?.templateType === "LOCATION"
                     ? "Masukkan nama lokasi siaran..."
@@ -971,7 +1059,7 @@ export function SimpleProductionEditor({
                     ? "Masukkan judul berita utama..."
                     : "Pilih berita dari daftar untuk mengedit..."
                 }
-                maxLength={selectedCue?.templateType === "REPORTER" ? 60 : 120}
+                maxLength={selectedCue?.templateType === "SOT" ? 80 : selectedCue?.templateType === "REPORTER" ? 60 : 120}
                 disabled={busy || !selectedCue}
                 value={miniDraft.headline}
                 onChange={(e) => handleMiniDraftChange("headline", e.target.value)}
@@ -979,7 +1067,7 @@ export function SimpleProductionEditor({
             </div>
 
             <div className="mini-input-group">
-              <label>Lokasi Siaran</label>
+              <label>Lokasi Siaran · L</label>
               <input
                 type="text"
                 placeholder={selectedCue ? "Contoh: Jakarta Pusat" : "-"}
@@ -996,7 +1084,7 @@ export function SimpleProductionEditor({
                 type="text"
                 placeholder={selectedCue ? "Contoh: BREAKING NEWS" : "-"}
                 maxLength={60}
-                disabled={busy || !selectedCue || selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "LOCATION"}
+                disabled={busy || !selectedCue || selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" || selectedCue?.templateType === "LOCATION"}
                 value={miniDraft.kicker}
                 onChange={(e) => handleMiniDraftChange("kicker", e.target.value)}
               />
@@ -1004,20 +1092,24 @@ export function SimpleProductionEditor({
 
             <div className="mini-input-group span-2">
               <label>
-                {selectedCue?.templateType === "REPORTER"
+                {selectedCue?.templateType === "SOT"
+                  ? "Jabatan / Institusi Narasumber"
+                  : selectedCue?.templateType === "REPORTER"
                   ? "Jabatan / Role"
                   : "Detail / Subline Keterangan"}
               </label>
               <input
                 type="text"
                 placeholder={
-                  selectedCue?.templateType === "REPORTER"
+                  selectedCue?.templateType === "SOT"
+                    ? "Contoh: Kasie Ops Basarnas Banten"
+                    : selectedCue?.templateType === "REPORTER"
                     ? "Contoh: REPORTER, PRESENTER..."
                     : selectedCue
                     ? "Penjelasan ringkas poin berita..."
                     : "-"
                 }
-                maxLength={selectedCue?.templateType === "REPORTER" ? 60 : 160}
+                maxLength={selectedCue?.templateType === "SOT" ? 100 : selectedCue?.templateType === "REPORTER" ? 60 : 160}
                 disabled={busy || !selectedCue || selectedCue?.templateType === "LOCATION"}
                 value={miniDraft.subline}
                 onChange={(e) => handleMiniDraftChange("subline", e.target.value)}

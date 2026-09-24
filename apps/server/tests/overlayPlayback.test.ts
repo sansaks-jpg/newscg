@@ -23,7 +23,7 @@ describe("output playback", () => {
     vi.advanceTimersByTime(320);
     expect(state().graphic?.id).toBe("A");
     expect(state().exiting).toBe(true);
-    vi.advanceTimersByTime(broadcastMotion.panelOutMs + broadcastMotion.panelOutDelayMs - 320);
+    vi.advanceTimersByTime(broadcastMotion.retainMs - 320);
     expect(state().graphic?.id).toBe("B");
     expect(state().exiting).toBe(false);
   });
@@ -112,6 +112,32 @@ describe("ticker canvas motion", () => {
     expect(masterOverlayPatchSchema.safeParse({ outputFps: 30 }).success).toBe(true);
     expect(masterOverlayPatchSchema.safeParse({ outputFps: 60 }).success).toBe(true);
     expect(masterOverlayPatchSchema.safeParse({ outputFps: 45 }).success).toBe(false);
+  });
+  it("exits headline, then ticker, then logo before blackout", () => {
+    const { player, take, state } = setup();
+    take("A");
+    player.receive({ type: "CLEAR_ALL_ANIMATED" });
+    expect(state().graphic?.id).toBe("A");
+    expect(state().master.showLogo).toBe(true);
+    expect(state().master.showTicker).toBe(true);
+    expect(state().exiting).toBe(true);
+    expect(state().exitAll).toBe(true);
+    expect(state().blackout).toBe(false);
+    vi.advanceTimersByTime(broadcastMotion.retainMs - 1);
+    expect(state().graphic?.id).toBe("A");
+    expect(state().master.showTicker).toBe(true);
+    expect(state().blackout).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(state().graphic).toBeNull();
+    expect(state().master.showTicker).toBe(false);
+    expect(state().master.showLogo).toBe(true);
+    vi.advanceTimersByTime(broadcastMotion.tickerOutMs + 19);
+    expect(state().master.showLogo).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(state().master.showLogo).toBe(false);
+    expect(state().blackout).toBe(false);
+    vi.advanceTimersByTime(broadcastMotion.logoOutMs + 20);
+    expect(state().blackout).toBe(true);
   });
   it.each([25, 30, 60] as const)("paces a 60 Hz browser to %i ticker updates per second", (fps) => {
     let nextFrameAt: number | undefined;

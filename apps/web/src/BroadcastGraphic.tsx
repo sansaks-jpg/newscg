@@ -39,12 +39,13 @@ export function BroadcastGraphic({
   ghostFields?: GhostFields | null;
 }) {
   const cnn = true;
-  const logoLayer = useLayerPresence(master.showLogo && !exitAll);
-  const liveLayer = useLayerPresence(master.showLiveBadge && !exitAll);
-  const tickerLayer = useLayerPresence(master.showTicker && !exitAll);
+  const logoLayer = useLayerPresence(master.showLogo, broadcastMotion.logoOutMs + 20);
+  const liveLayer = useLayerPresence(master.showLiveBadge, broadcastMotion.liveOutMs + 20);
+  const tickerLayer = useLayerPresence(master.showTicker, broadcastMotion.tickerOutMs + 20);
   const exitClass = isExiting ? "cg-exit" : "";
   const isBreaking = type === "BREAKING";
   const isReporter = type === "REPORTER";
+  const isSot = type === "SOT";
   const isLocationOnly = type === "LOCATION";
 
   const effectiveFields = fields || {};
@@ -59,7 +60,7 @@ export function BroadcastGraphic({
   useEffect(() => { if (effectiveFields.location) setLastLocation(effectiveFields.location); }, [effectiveFields.location]);
 
   // Content mode: "headline" (default), "paragraph", atau "presenter"
-  const contentMode = effectiveFields.contentMode || (isReporter ? "presenter" : "headline");
+  const contentMode = effectiveFields.contentMode || (isReporter ? "presenter" : isSot ? "sot" : "headline");
 
   // Kicker Tab: Tampil hanya jika sub topik diisi oleh pengguna (dinamis tanpa paksaan default)
   const hasKicker = Boolean(effectiveFields.kicker && effectiveFields.kicker.trim().length > 0);
@@ -77,7 +78,7 @@ export function BroadcastGraphic({
     ? effectiveFields.name || effectiveFields.headline || "NAMA PEMBAWA BERITA"
     : effectiveFields.headline || effectiveFields.text || "";
 
-  const sublineText = isReporter
+  const sublineText = isReporter || isSot
     ? (effectiveFields.role || effectiveFields.subline || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
 
@@ -108,11 +109,17 @@ export function BroadcastGraphic({
   const [lastSocialText, setLastSocialText] = useState(socialText);
   useEffect(() => { if (socialText) setLastSocialText(socialText); }, [socialText]);
   const detailLayer = useLayerPresence(hasSubline && !isSingleLayout && !isExiting && contentMode === "headline", broadcastMotion.detailOutMs + 20);
+  const sotLayer = useLayerPresence(contentMode === "sot" && effectiveFields.showSot !== "false" && !isExiting, broadcastMotion.detailOutMs + 20);
+  const [lastSot, setLastSot] = useState({ name: effectiveFields.name || "", role: effectiveFields.role || "" });
+  useEffect(() => {
+    if (contentMode === "sot" && effectiveFields.showSot !== "false")
+      setLastSot({ name: effectiveFields.name || "", role: effectiveFields.role || "" });
+  }, [contentMode, effectiveFields.showSot, effectiveFields.name, effectiveFields.role]);
   const [lastSubline, setLastSubline] = useState(sublineText);
   useEffect(() => { if (sublineText) setLastSubline(sublineText); }, [sublineText]);
-  const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText && !detailLayer.present;
+  const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText && !detailLayer.present && !sotLayer.present;
 
-  const brandText = effectiveFields.brand?.trim() || master.brandText?.trim() || "CNNINDONESIA.COM";
+  const brandText = master.brandText?.trim() || "CNNINDONESIA.COM";
   const tickerText =
     effectiveFields.ticker?.trim() ||
     master.tickerText?.trim() ||
@@ -135,11 +142,11 @@ export function BroadcastGraphic({
       {/* 2. Lower Third Grafis Siaran */}
       <div
         style={motionStyle}
-        className={`cg-lower-third ${cnn ? "cnn-template" : ""} ${exitAll ? "cg-all-exit" : ""} ${isBreaking ? "breaking" : ""} ${isReporter ? "reporter" : ""} ${isMini ? "mini" : ""} ${!tickerLayer.present ? "no-ticker" : ""}`}
+        className={`cg-lower-third ${cnn ? "cnn-template" : ""} ${exitAll ? "cg-sequential-out" : ""} ${isBreaking ? "breaking" : ""} ${isReporter ? "reporter" : ""} ${isMini ? "mini" : ""} ${!tickerLayer.present ? "no-ticker" : ""}`}
       >
         {/* Layer Konten (Kicker & Main White Box) — Tampil jika ada materi ON AIR */}
         {hasContent && (
-          <div key={contentKey} className={`cg-content-layer ${exitClass}`}>
+          <div key={contentKey} className={`cg-content-layer ${kickerLayer.present ? "cg-has-topic" : ""} ${exitClass}`}>
             {/* Kicker Tab di Atas Kotak Putih (Opsional sesuai Gambar 5 / Gambar 3 — Aktif atau Bayangan Ghost) */}
             {kickerLayer.present ? (
               <div className={`cg-kicker-tab ${kickerLayer.exiting ? "cg-kicker-out" : ""}`}>
@@ -197,7 +204,15 @@ export function BroadcastGraphic({
                         <AutoSquishText text={headlineText} minScale={0.3} className="cg-headline-squish" />
                       </div>
                     </div>
-                    {detailLayer.present ? (
+                    {sotLayer.present ? (
+                      <div className={`cg-sot-name-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
+                        <div className="cg-copy-motion"><AutoSquishText text={sotLayer.exiting ? lastSot.name : effectiveFields.name || lastSot.name} minScale={0.35} className="cg-presenter-squish" style={{ width: "max-content", maxWidth: "100%" }} /></div>
+                        {(sotLayer.exiting ? lastSot.role : effectiveFields.role) && <div className="cg-sot-role-row">
+                          <span className="cg-sot-divider" aria-hidden="true" />
+                          <div className="cg-copy-motion"><AutoSquishText text={sotLayer.exiting ? lastSot.role : effectiveFields.role || lastSot.role} minScale={0.45} className="cg-subline-squish" /></div>
+                        </div>}
+                      </div>
+                    ) : detailLayer.present ? (
                       <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
                         <div className="cg-copy-motion">
                           <AutoSquishText
@@ -427,7 +442,7 @@ export function BroadcastPreviewBox({
             isExiting={isExiting}
             exitAll={exitAll}
             visualTemplate="cnn"
-            contentKey={`${graphic?.id || "preview"}-cnn-${animationKey}`}
+            contentKey={`cnn-${animationKey}`}
             ghostPreview={ghostPreview}
             ghostFields={ghostFields}
           />}

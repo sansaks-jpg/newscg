@@ -8,13 +8,13 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
   };
   let revision = -1;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let pending: Extract<OverlayEvent, { type: "TAKE" }> | null = null;
+  let pending: Extract<OverlayEvent, { type: "TAKE" | "SWITCH_DETAIL" }> | null = null;
   const commit = (patch: Partial<OverlayPlaybackState>) => {
     state = { ...state, ...patch };
     publish(state);
   };
   const cancel = () => { clearTimeout(timer); timer = undefined; pending = null; };
-  const enter = (event: Extract<OverlayEvent, { type: "TAKE" }>) => commit({
+  const enter = (event: Extract<OverlayEvent, { type: "TAKE" | "SWITCH_DETAIL" }>) => commit({
     graphic: event.graphic, fields: event.fields, exiting: false, exitAll: false,
     blackout: false, synced: false, animationKey: state.animationKey + 1
   });
@@ -44,10 +44,31 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
               pending = null;
               timer = undefined;
               if (next) enter(next);
-            }, broadcastMotion.panelOutMs + broadcastMotion.panelOutDelayMs);
+            }, broadcastMotion.retainMs);
           } else if (state.graphic && !state.exiting) {
             commit({ fields: event.fields });
           } else enter(event);
+          break;
+        }
+        case "SWITCH_DETAIL": {
+          cancel();
+          if (!state.graphic || state.exiting) {
+            enter({ ...event, type: "TAKE" });
+            break;
+          }
+          const oldFields = state.fields || {};
+          const hasDetail = state.graphic.templateType === "SOT" ||
+            (oldFields.layoutStyle !== "single" && Boolean(oldFields.subline?.trim()));
+          if (hasDetail) {
+            pending = event;
+            commit({ fields: { ...oldFields, showDetail: "false", layoutStyle: "single", showSot: "false" }, master: event.master });
+            timer = setTimeout(() => {
+              const next = pending;
+              pending = null;
+              timer = undefined;
+              if (next) commit({ graphic: next.graphic, fields: next.fields, master: next.master });
+            }, broadcastMotion.detailOutMs + 20);
+          } else commit({ graphic: event.graphic, fields: event.fields, master: event.master });
           break;
         }
         case "UPDATE":
@@ -79,7 +100,14 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
           };
           if (event.type === "CLEAR_ALL_ANIMATED" || (event.type === "CLEAR_ALL" && event.immediate === false)) {
             commit({ exiting: true, exitAll: true, synced: false });
-            timer = setTimeout(finish, broadcastMotion.retainMs);
+            timer = setTimeout(() => {
+              commit({ graphic: null, fields: null, exiting: false,
+                master: { ...state.master, showTicker: false } });
+              timer = setTimeout(() => {
+                commit({ master: { ...state.master, showLogo: false, showLiveBadge: false } });
+                timer = setTimeout(finish, Math.max(broadcastMotion.logoOutMs, broadcastMotion.liveOutMs) + 20);
+              }, broadcastMotion.tickerOutMs + 20);
+            }, state.graphic ? broadcastMotion.retainMs : 0);
           } else finish();
         }
       }

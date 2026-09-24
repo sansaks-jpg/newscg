@@ -94,9 +94,20 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
       if (!graphic) throw new Error("Grafis tidak ditemukan");
       if (!getItem(graphic.itemId)?.cgRequired) throw new Error("TAKE diblokir: item rundown ditandai tanpa CG.");
       if (graphic.status !== "READY") throw new Error("TAKE diblokir: materi CG masih DRAFT. Setujui di Rundown & CG.");
-      const effectiveFields = options?.presentation === "clean"
+      const previous = getOnAir();
+      const previousGraphic = previous?.graphicId ? getGraphic(previous.graphicId) : null;
+      const switchDetail = Boolean(previousGraphic && previousGraphic.id !== graphic.id &&
+        previousGraphic.itemId === graphic.itemId &&
+        ["HEADLINE", "SOT"].includes(previousGraphic.templateType) &&
+        ["HEADLINE", "SOT"].includes(graphic.templateType));
+      const effectiveFields: Record<string, string> = options?.presentation === "clean"
         ? { ...graphic.draftFields, showLocation: "false", showKicker: "false", layoutStyle: "single" }
-        : graphic.draftFields;
+        : { ...graphic.draftFields };
+      if (switchDetail && previous?.snapshot) {
+        const snapshot = previous.snapshot as Record<string, string>;
+        effectiveFields.location = snapshot.location || effectiveFields.location || "";
+        effectiveFields.showLocation = snapshot.showLocation ?? (snapshot.location?.trim() ? "true" : "false");
+      }
 
       markGraphicPushed(graphic.id, effectiveFields);
       saveOnAir(graphic.id, "web-overlay", 1, effectiveFields, "confirmed");
@@ -108,7 +119,7 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
         onAirSnapshot: effectiveFields,
         error: null
       };
-      broadcastOverlayEvent({ type: "TAKE", graphic, fields: effectiveFields, master: getMasterOverlay() });
+      broadcastOverlayEvent({ type: switchDetail ? "SWITCH_DETAIL" : "TAKE", graphic, fields: effectiveFields, master: getMasterOverlay() });
       logAction("TAKE", "confirmed", `${graphic.templateType} terkonfirmasi ON AIR (Web Overlay)`, graphic.id, requestId);
       return {
         requestId,
@@ -137,7 +148,12 @@ export function updateLive(
     const current = getOnAir();
 
     try {
-      if (!graphic || !current || current.graphicId !== graphicId) {
+      const previousGraphic = current?.graphicId ? getGraphic(current.graphicId) : null;
+      const switchDetail = Boolean(graphic && previousGraphic && previousGraphic.id !== graphic.id &&
+        previousGraphic.itemId === graphic.itemId &&
+        ["HEADLINE", "SOT"].includes(previousGraphic.templateType) &&
+        ["HEADLINE", "SOT"].includes(graphic.templateType));
+      if (!graphic || !current || (current.graphicId !== graphicId && !switchDetail)) {
         throw new Error("UPDATE diblokir: grafis ini tidak terverifikasi ON AIR");
       }
       if (graphic.status !== "READY") throw new Error("UPDATE diblokir: materi CG masih DRAFT. Setujui di Rundown & CG.");
@@ -152,10 +168,16 @@ export function updateLive(
         if (existingSnapshot.showKicker !== undefined) effectiveFields.showKicker = existingSnapshot.showKicker;
         if (existingSnapshot.layoutStyle !== undefined) effectiveFields.layoutStyle = existingSnapshot.layoutStyle;
       }
+      if (switchDetail) {
+        effectiveFields.location = existingSnapshot.location || effectiveFields.location || "";
+        effectiveFields.showLocation = existingSnapshot.showLocation ?? (existingSnapshot.location?.trim() ? "true" : "false");
+      }
       markGraphicPushed(graphic.id, effectiveFields);
       saveOnAir(graphic.id, "web-overlay", 1, effectiveFields, "confirmed");
-      live = { ...live, commandStatus: "confirmed", onAirSnapshot: effectiveFields, lastActionAt: new Date().toISOString() };
-      broadcastOverlayEvent({ type: "UPDATE", graphicId: graphic.id, fields: effectiveFields, master: getMasterOverlay() });
+      live = { ...live, commandStatus: "confirmed", onAirGraphicId: graphic.id, onAirSnapshot: effectiveFields, lastActionAt: new Date().toISOString() };
+      broadcastOverlayEvent(switchDetail
+        ? { type: "SWITCH_DETAIL", graphic, fields: effectiveFields, master: getMasterOverlay() }
+        : { type: "UPDATE", graphicId: graphic.id, fields: effectiveFields, master: getMasterOverlay() });
       logAction("UPDATE", "confirmed", "Konten ON AIR diperbarui (Web Overlay)", graphic.id, requestId);
       return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: "web-overlay", timestamp: new Date().toISOString(), error: null, state: publicState() };
     } catch (e: any) {

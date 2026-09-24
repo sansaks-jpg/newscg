@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { liveShortcut, takeThenAdvance } from "../../web/src/productionFlow";
+import { liveShortcut, primaryGraphicAction, takeThenAdvance } from "../../web/src/productionFlow";
 import { fieldSchemas, headlineDefaultsSchema, validateGraphicPatch } from "@newscg/shared";
 
 describe("operator live workflow", () => {
@@ -35,6 +35,10 @@ describe("operator live workflow", () => {
     expect(liveShortcut("H", {})).toBe("headline");
     expect(liveShortcut("l", {})).toBe("location");
     expect(liveShortcut("L", {})).toBe("location");
+    expect(liveShortcut("k", {})).toBe("sot");
+    expect(liveShortcut("K", {})).toBe("sot");
+    expect(liveShortcut("ArrowLeft", {})).toBe("previous-sot");
+    expect(liveShortcut("ArrowRight", {})).toBe("next-sot");
     expect(liveShortcut("t", {})).toBe("topic");
     expect(liveShortcut("T", {})).toBe("topic");
     expect(liveShortcut("d", {})).toBe("detail");
@@ -44,6 +48,12 @@ describe("operator live workflow", () => {
     expect(liveShortcut("Escape", {})).toBe("clear");
     expect(liveShortcut("c", {})).toBe("clear");
     expect(liveShortcut("C", {})).toBe("clear");
+  });
+
+  it("uses Space for TAKE on a new cue and UPDATE on an active or switchable cue", () => {
+    expect(liveShortcut(" ", {})).toBe("take");
+    expect(primaryGraphicAction(false)).toBe("take");
+    expect(primaryGraphicAction(true)).toBe("update");
   });
 
   it("does not TAKE while typing, holding a key, using modifiers, or activating a focused control", () => {
@@ -80,6 +90,15 @@ describe("operator live workflow", () => {
       expect(result.headline).toBe("JUDUL TETAP");
       expect(result.subline).toBe("Detail tetap");
     }
+  });
+
+  it("validates standalone SOT name and speaker attribution", () => {
+    const sot = fieldSchemas.SOT.parse({ headline: "PENCARIAN 5 JURNALIS HILANG", name: "Riski Dwianto", role: "Kasie Ops Basarnas Banten" });
+    expect(sot.headline).toBe("PENCARIAN 5 JURNALIS HILANG");
+    expect(sot.name).toBe("Riski Dwianto");
+    expect(sot.role).toBe("Kasie Ops Basarnas Banten");
+    expect(sot.contentMode).toBe("sot");
+    expect(fieldSchemas.SOT.safeParse({ headline: "PENCARIAN", name: "" }).success).toBe(false);
   });
 
   it("rejects invalid PATCH with empty headline or overlong fields", () => {

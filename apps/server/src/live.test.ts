@@ -47,12 +47,45 @@ beforeAll(async () => {
           location: "JAKARTA TIMUR"
         }
       });
+      dbModule.createGraphic(item.id, {
+        id: "CG-SOT-1", templateType: "SOT", sortOrder: 3, status: "READY",
+        draftFields: { headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA", name: "Riski Dwianto", role: "Basarnas", contentMode: "sot" }
+      });
     }
   }
   liveModule = await import("./live.js");
 });
 
 describe("Web Overlay (Singular.live style) controller", () => {
+  it("switches headline and SOT within one story without a new panel TAKE", async () => {
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber((event) => events.push(event));
+    await liveModule.take("CG-201", "headline-before-sot");
+    await liveModule.take("CG-SOT-1", "sot-in");
+    expect(events.at(-1)?.type).toBe("SWITCH_DETAIL");
+    await liveModule.take("CG-201", "sot-out");
+    expect(events.at(-1)?.type).toBe("SWITCH_DETAIL");
+    await liveModule.clearLive("sot-switch-cleanup");
+    unsubscribe();
+  });
+  it("uses UPDATE for SOT in the same story and preserves the live location", async () => {
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber((event) => events.push(event));
+    await liveModule.take("CG-201", "headline-before-sot-update");
+    const result = await liveModule.updateLive("CG-SOT-1", "sot-update", { syncComposition: true });
+    expect(result.commandStatus).toBe("confirmed");
+    expect(liveModule.getLiveState().onAirGraphicId).toBe("CG-SOT-1");
+    const switched = events.at(-1);
+    expect(switched?.type).toBe("SWITCH_DETAIL");
+    if (switched?.type === "SWITCH_DETAIL") {
+      expect(switched.fields.location).toBe("Surabaya, Jawa Timur");
+      expect(switched.fields.showLocation).toBe("true");
+    }
+    await liveModule.updateLive("CG-201", "headline-after-sot-update", { syncComposition: true });
+    expect(liveModule.getLiveState().onAirGraphicId).toBe("CG-201");
+    await liveModule.clearLive("sot-update-cleanup");
+    unsubscribe();
+  });
   it("prepare menjaga draft tetap terisolasi tanpa mengubah status ON AIR", () => {
     const prepared = liveModule.prepare("CG-201");
     expect(prepared.selectedGraphicId).toBe("CG-201");
