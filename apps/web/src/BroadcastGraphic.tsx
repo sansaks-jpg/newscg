@@ -158,45 +158,54 @@ export function BroadcastGraphic({
                 {/* Varian A: Paragraf / Keterangan Tunggal (Gambar 3 - Sentence Case Wardah Style) */}
                 {contentMode === "paragraph" ? (
                   <div className="cg-paragraph-row">
-                    <AutoSquishText
-                      text={headlineText}
-                      minScale={0.3}
-                      className="cg-paragraph-squish"
-                    />
+                    <div className="cg-copy-motion">
+                      <AutoSquishText
+                        text={headlineText}
+                        minScale={0.3}
+                        className="cg-paragraph-squish"
+                      />
+                    </div>
                   </div>
                 ) : contentMode === "presenter" ? (
                   /* Varian B: Nama Pembawa Acara + Akun Instagram (Gambar 4) */
                   <div className="cg-presenter-block">
                     <div className="cg-presenter-row">
-                      <AutoSquishText
-                        text={headlineText}
-                        minScale={0.35}
-                        className="cg-presenter-squish"
-                      />
+                      <div className="cg-copy-motion">
+                        <AutoSquishText
+                          text={headlineText}
+                          minScale={0.35}
+                          className="cg-presenter-squish"
+                        />
+                      </div>
                     </div>
                     {socialLayer.present && (
                       <div className={`cg-social-row ${socialLayer.exiting ? "cg-detail-out" : ""}`}>
-                        
-                        <AutoSquishText
-                          text={socialText || lastSocialText}
-                          minScale={0.5}
-                          className="cg-social-squish"
-                        />
+                        <div className="cg-copy-motion">
+                          <AutoSquishText
+                            text={socialText || lastSocialText}
+                            minScale={0.5}
+                            className="cg-social-squish"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
                 ) : (
                   <>
                     <div className={isEffectiveSingleLayout ? "cg-headline-row-single" : "cg-headline-row"}>
-                      <AutoSquishText text={headlineText} minScale={0.3} className="cg-headline-squish" />
+                      <div className="cg-copy-motion">
+                        <AutoSquishText text={headlineText} minScale={0.3} className="cg-headline-squish" />
+                      </div>
                     </div>
                     {detailLayer.present ? (
                       <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
-                        <AutoSquishText
-                          text={sublineText || lastSubline}
-                          minScale={0.45}
-                          className="cg-subline-squish"
-                        />
+                        <div className="cg-copy-motion">
+                          <AutoSquishText
+                            text={sublineText || lastSubline}
+                            minScale={0.45}
+                            className="cg-subline-squish"
+                          />
+                        </div>
                       </div>
                     ) : ghostSublineText ? (
                       <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu TAKE / UPDATE)">

@@ -56,8 +56,8 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
     for (const [selector, name] of [
-      [".cg-main-box", "news-panel-in"], [".cg-headline-row", "news-text-in"],
-      [".cg-subline-row", "news-detail-in"], [".cg-kicker-tab", "news-topic-in"],
+      [".cg-main-box", "news-panel-in"], [".cg-headline-row > .cg-copy-motion", "news-text-in"],
+      [".cg-subline-row > .cg-copy-motion", "news-detail-in"], [".cg-kicker-tab", "news-topic-in"],
       [".cg-location-tag", "news-location-in"], [".cg-logo-box.standalone", "news-logo-in"],
       [".cg-standalone-live-badge", "news-topic-in"], [".cg-ticker-bar", "news-ticker-in"],
       [".cg-ticker-clock", "news-ticker-item-in"]
@@ -68,6 +68,8 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     }
     if (name === "output") {
       expect(getComputedStyle(element(".cg-text-area")!).overflowX).toBe("hidden");
+      expect(getComputedStyle(element(".cg-headline-row")!).overflowX).toBe("hidden");
+      expect(getComputedStyle(element(".cg-headline-row")!).animation).toBe("none");
     }
   });
 
@@ -77,7 +79,7 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await advance(700);
     await send({ type: "CLEAR", master });
     expect(getComputedStyle(element(".cg-main-box")!).animation).toContain("news-panel-out");
-    expect(getComputedStyle(element(".cg-headline-row")!).animation).toContain("news-text-out");
+    expect(getComputedStyle(element(".cg-headline-row > .cg-copy-motion")!).animation).toContain("news-text-out");
     await advance(broadcastMotion.panelOutDelayMs + broadcastMotion.panelOutMs - 1);
     expect(element(".cg-main-box")).not.toBeNull();
     await advance(21);
@@ -97,9 +99,9 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(element(".cg-headline-row")).toBe(headline);
     expect(element(".cg-ticker-track")).toBe(ticker);
     expect(headline?.textContent).toBe("JUDUL DIPERBARUI");
-    expect(getComputedStyle(element(".cg-subline-row")!).animation).toContain("news-detail-in");
+    expect(getComputedStyle(element(".cg-subline-row > .cg-copy-motion")!).animation).toContain("news-detail-in");
     await send({ type: "UPDATE", graphicId: graphic.id, fields: { ...fields, subline: "", layoutStyle: "single", showKicker: "false" }, master });
-    expect(getComputedStyle(element(".cg-subline-row")!).animation).toContain("news-text-out");
+    expect(getComputedStyle(element(".cg-subline-row > .cg-copy-motion")!).animation).toContain("news-text-out");
     expect(getComputedStyle(element(".cg-kicker-tab")!).animation).toContain("news-topic-out");
     await advance(broadcastMotion.topicOutMs + 20);
     expect(element(".cg-subline-row")).toBeNull();
@@ -155,10 +157,10 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic: { ...graphic, templateType: type },
       fields: { ...fields, name: "NAMA REPORTER", role: "REPORTER", contentMode: mode }, master });
-    expect(getComputedStyle(element(selector)!).animation).toContain("news-text-in");
-    if (type === "REPORTER") expect(getComputedStyle(element(".cg-social-row")!).animation).toContain("news-detail-in");
+    expect(getComputedStyle(element(`${selector} > .cg-copy-motion`)!).animation).toContain("news-text-in");
+    if (type === "REPORTER") expect(getComputedStyle(element(".cg-social-row > .cg-copy-motion")!).animation).toContain("news-detail-in");
     await send({ type: "CLEAR", master });
-    expect(getComputedStyle(element(selector)!).animation).toContain("news-text-out");
+    expect(getComputedStyle(element(`${selector} > .cg-copy-motion`)!).animation).toContain("news-text-out");
     await advance(broadcastMotion.retainMs);
     expect(element(selector)).toBeNull();
   });

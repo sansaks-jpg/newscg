@@ -12,7 +12,8 @@
 [data-broadcast-motion] .cnn-template .cg-main-box {
   animation: news-panel-in var(--cg-panelInMs, 600ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
-/* Keep the moving copy inside its column, clear of the logo reserve on the right. */
+/* Keep the text column and each row fixed as viewports. Motion belongs only to
+   the inner copy wrapper so the moving headline can never escape toward logo. */
 [data-broadcast-motion] .cnn-template .cg-main-box .cg-text-area {
   overflow: hidden;
 }
@@ -20,10 +21,30 @@
 [data-broadcast-motion] .cnn-template .cg-headline-row-single,
 [data-broadcast-motion] .cnn-template .cg-presenter-row,
 [data-broadcast-motion] .cnn-template .cg-paragraph-row {
-  animation: news-text-in var(--cg-textInMs, 360ms) cubic-bezier(.22,.75,.18,1) var(--cg-textInDelayMs, 160ms) 1 both !important;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  clip-path: inset(0);
+  animation: none !important;
 }
 [data-broadcast-motion] .cnn-template .cg-subline-row,
 [data-broadcast-motion] .cnn-template .cg-social-row {
+  overflow: hidden;
+  clip-path: inset(0);
+  animation: none !important;
+}
+[data-broadcast-motion] .cnn-template .cg-headline-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-headline-row-single > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-presenter-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-paragraph-row > .cg-copy-motion {
+  width: 100%;
+  min-width: 0;
+  animation: news-text-in var(--cg-textInMs, 360ms) cubic-bezier(.22,.75,.18,1) var(--cg-textInDelayMs, 160ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-subline-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-social-row > .cg-copy-motion {
+  width: 100%;
+  min-width: 0;
   animation: news-detail-in var(--cg-detailInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-detailInDelayMs, 240ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-kicker-tab {
@@ -34,15 +55,15 @@
 }
 
 /* Copy and topic leave first. The plate closes only after they have cleared. */
-[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row,
-[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row-single,
-[data-broadcast-motion] .cnn-template .cg-exit .cg-presenter-row,
-[data-broadcast-motion] .cnn-template .cg-exit .cg-paragraph-row {
+[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row-single > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-presenter-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-paragraph-row > .cg-copy-motion {
   animation: news-text-out var(--cg-textOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
-[data-broadcast-motion] .cnn-template .cg-exit .cg-subline-row,
-[data-broadcast-motion] .cnn-template .cg-exit .cg-social-row,
-[data-broadcast-motion] .cnn-template .cg-detail-out {
+[data-broadcast-motion] .cnn-template .cg-exit .cg-subline-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-social-row > .cg-copy-motion,
+[data-broadcast-motion] .cnn-template .cg-detail-out > .cg-copy-motion {
   animation: news-text-out var(--cg-detailOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-kicker-tab.cg-kicker-out,
@@ -91,6 +112,9 @@
 /* Placeholders and standby ghosts are not on-air elements. */
 [data-broadcast-motion] .cnn-template .cg-logo-space,
 [data-broadcast-motion] .cnn-template .cg-ghost-element {
+  animation: none !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ghost-element > .cg-copy-motion {
   animation: none !important;
 }
 
