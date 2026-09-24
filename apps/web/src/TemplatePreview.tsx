@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { defaultMasterOverlayState } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState } from "@newscg/shared";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 
 const examples = {
@@ -12,6 +12,7 @@ const examples = {
 export default function TemplatePreview() {
   const [variant, setVariant] = useState<keyof typeof examples>("detail");
   const [copy, setCopy] = useState(examples.detail);
+  const [master, setMaster] = useState({ ...defaultMasterOverlayState, showLogo: true, showTicker: true, showLiveBadge: true });
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
   const [animationKey, setAnimationKey] = useState(0);
@@ -19,6 +20,7 @@ export default function TemplatePreview() {
   useEffect(() => () => clearTimeout(timer.current), []);
   const enter = () => {
     clearTimeout(timer.current);
+    setMaster({ ...defaultMasterOverlayState, showLogo: true, showTicker: true, showLiveBadge: true });
     setVisible(true); setExiting(false); setAnimationKey((key) => key + 1);
   };
   const fields = {
@@ -34,9 +36,9 @@ export default function TemplatePreview() {
       <header><div><small>KOLEKSI TEMPLATE · 16:9</small><h1>CNN Indonesia — Putih</h1>
         <p>Uji teks dan animasi di sini. Preview ini tidak mengubah materi atau output siaran.</p></div><a href="/">Kembali ke NewsCG</a></header>
       <div className="template-demo-stage">
-        <BroadcastPreviewBox graphic={visible ? { id: "demo", templateType: "HEADLINE" } : null}
+        <BroadcastPreviewBox key={animationKey} blackout={!visible} exitAll={exiting} graphic={visible ? { id: "demo", templateType: "HEADLINE" } : null}
           fields={visible ? fields : null} visualTemplate="cnn" isExiting={exiting} animationKey={animationKey}
-          master={{ ...defaultMasterOverlayState, showLogo: true, showTicker: true, showLiveBadge: true }} />
+          master={master} />
       </div>
       <div className="template-demo-controls">
         <label>Variasi isi<select value={variant} onChange={(event) => {
@@ -45,10 +47,15 @@ export default function TemplatePreview() {
         }}>{Object.entries(examples).map(([key, example]) => <option key={key} value={key}>{example.label}</option>)}</select></label>
         <label>Headline / nama<input maxLength={120} value={copy.headline} onChange={(event) => setCopy({ ...copy, headline: event.target.value })} /></label>
         <label>Subjudul / jabatan<input maxLength={160} value={copy.subline} onChange={(event) => setCopy({ ...copy, subline: event.target.value })} /></label>
-        <div className="template-demo-actions"><button onClick={enter}>Putar IN</button><button disabled={!visible || exiting} onClick={() => {
+        <div className="template-demo-actions"><button onClick={enter}>Putar IN semua</button><button disabled={!visible || exiting} onClick={() => {
           clearTimeout(timer.current); setExiting(true);
-          timer.current = setTimeout(() => { setVisible(false); setExiting(false); }, 560);
-        }}>Putar OUT</button></div>
+          timer.current = setTimeout(() => { setVisible(false); setExiting(false); }, broadcastMotion.retainMs);
+        }}>Putar OUT semua</button></div>
+      </div>
+      <div className="template-demo-actions" style={{ marginTop: 16 }}>
+        <button disabled={!visible || exiting} onClick={() => setMaster((old) => ({ ...old, showLogo: !old.showLogo }))}>Logo {master.showLogo ? "OUT" : "IN"}</button>
+        <button disabled={!visible || exiting} onClick={() => setMaster((old) => ({ ...old, showLiveBadge: !old.showLiveBadge }))}>LIVE {master.showLiveBadge ? "OUT" : "IN"}</button>
+        <button disabled={!visible || exiting} onClick={() => setMaster((old) => ({ ...old, showTicker: !old.showTicker }))}>Ticker + jam {master.showTicker ? "OUT" : "IN"}</button>
       </div>
     </main>
   );

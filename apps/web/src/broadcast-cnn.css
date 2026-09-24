@@ -27,7 +27,7 @@
 
 .cnn-template.cg-lower-third { left: 70px; right: 70px; bottom: 30px; filter: none; --cg-logo-width: 240px; }
 .cnn-template.cg-lower-third { min-height: 208px; padding-bottom: 62px; justify-content: flex-end; }
-.cnn-template .cg-main-box { height: 146px; border: 0; border-radius: 16px 0 0 0; background: #fff; clip-path: none; animation: cnn-panel-in 520ms cubic-bezier(.16,1,.3,1) both; }
+.cnn-template .cg-main-box { height: 146px; border: 0; border-radius: 16px 0 0 0; background: #fff; clip-path: none; animation: cnn-panel-in var(--panel-in, 520ms) cubic-bezier(.16,1,.3,1) both; }
 .cnn-template .cg-text-area { padding: 10px 28px 10px 38px; gap: 2px; }
 .cnn-template .cg-headline-row,
 .cnn-template .cg-headline-row-single,
@@ -100,7 +100,7 @@
   overflow: hidden;
 }
 .cnn-template .cg-content-layer.cg-exit { animation: none !important; }
-.cnn-template .cg-exit .cg-main-box { animation: cnn-panel-out 360ms 140ms cubic-bezier(.7,0,.84,0) both; }
+.cnn-template .cg-exit .cg-main-box { animation: cnn-panel-out var(--panel-out, 360ms) var(--panel-out-delay, 140ms) cubic-bezier(.7,0,.84,0) both; }
 .cnn-template .cg-exit .cg-kicker-tab { animation: cnn-panel-out 280ms 70ms ease-in both; }
 .cnn-template .cg-exit .cg-text-area { animation: cnn-text-out 160ms ease-in both; }
 .cnn-template.cg-location-tag.cg-exit { animation: cnn-panel-out 320ms ease-in both !important; }
@@ -131,7 +131,7 @@
   width: max-content;
   align-items: center;
   will-change: transform;
-  animation: cg-ticker-loop var(--ticker-duration, 24s) linear infinite !important;
+  animation: none !important;
 }
 .cg-ticker-segment {
   display: flex;
@@ -248,3 +248,5 @@
   flex-shrink: 0;
 }
 
+
+.cnn-template .cg-subline-row.cg-detail-out { animation: cnn-text-out 160ms ease-in both; }

@@ -8,6 +8,8 @@ export type ConnectionStatus = "CONNECTED" | "STANDALONE";
 
 export const timezoneModes = ["WIB", "WITA", "WIT", "CUSTOM"] as const;
 export type TimezoneMode = (typeof timezoneModes)[number];
+export const outputFrameRates = [25, 30, 60] as const;
+export type OutputFrameRate = (typeof outputFrameRates)[number];
 
 export const layoutStyles = ["single", "sub"] as const;
 export type LayoutStyle = (typeof layoutStyles)[number];
@@ -22,6 +24,8 @@ export type MasterOverlayState = {
   brandText: string;
   tickerText: string;
   tickerSpeed?: number;
+  outputFps: OutputFrameRate;
+  tickerRevision?: number;
   logoType: "text" | "image";
   logoImage: string | null;
   logoText: string;
@@ -37,6 +41,7 @@ export const defaultMasterOverlayState: MasterOverlayState = {
   brandText: "CNNINDONESIA.COM",
   tickerText: "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI",
   tickerSpeed: 85,
+  outputFps: 30,
   logoType: "text",
   logoImage: null,
   logoText: "CNN",
@@ -54,6 +59,40 @@ export type OverlayEvent =
   | { type: "CLEAR_ALL"; immediate?: boolean; revision?: number }
   | { type: "CLEAR_ALL_IMMEDIATE"; revision?: number }
   | { type: "CLEAR_ALL_ANIMATED"; revision?: number };
+
+// The panel OUT includes its text-first delay; removal must wait for both.
+export const broadcastMotion = {
+  panelInMs: 600, panelOutMs: 360, panelOutDelayMs: 260, retainMs: 620,
+  textInMs: 360, textInDelayMs: 160, textOutMs: 180,
+  topicInMs: 420, topicInDelayMs: 80, topicOutMs: 240,
+  detailInMs: 300, detailInDelayMs: 240, detailOutMs: 180,
+  locationInMs: 420, locationOutMs: 320,
+  logoInMs: 500, logoOutMs: 400,
+  liveInMs: 340, liveInDelayMs: 100, liveOutMs: 240,
+  tickerInMs: 560, tickerOutMs: 420,
+  tickerItemInMs: 300, tickerItemInDelayMs: 140, tickerItemOutMs: 180
+} as const;
+export const tickerPresets = { slow: 65, normal: 85, fast: 105 } as const;
+export type OverlayPlaybackState = {
+  graphic: GraphicItem | null;
+  fields: Record<string, string> | null;
+  master: MasterOverlayState;
+  exiting: boolean;
+  exitAll: boolean;
+  blackout: boolean;
+  synced: boolean;
+  animationKey: number;
+};
+
+export const masterOverlayPatchSchema = z.object({
+  showLogo: z.boolean(), showLiveBadge: z.boolean(), showTicker: z.boolean(),
+  brandText: z.string().max(120), tickerText: z.string().max(10000),
+  tickerSpeed: z.number().min(30).max(250), tickerRevision: z.number().int().nonnegative(),
+  outputFps: z.union([z.literal(25), z.literal(30), z.literal(60)]),
+  logoType: z.enum(["text", "image"]), logoImage: z.string().nullable(),
+  logoText: z.string().max(120), logoSub: z.string().max(120),
+  timezone: z.enum(timezoneModes), customTimezoneLabel: z.string().max(40)
+}).partial();
 
 export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
   HEADLINE: z.object({
@@ -142,6 +181,7 @@ export const rundownItemInputSchema = z.object({
   slug: z.string().trim().min(1).max(30),
   title: z.string().trim().min(1).max(120),
   format: z.enum(["PKG", "VO", "LIVE", "READER", "LAINNYA"]).default("READER"),
+  cgRequired: z.boolean().optional(),
   estimatedDurationSeconds: z.number().int().min(0).max(21600).default(0),
   sortOrder: z.number().int().nonnegative().default(0)
 });
@@ -165,7 +205,7 @@ export type GraphicItem = {
 };
 export type RundownItem = {
   id: string; rundownId: string; slug: string; title: string; format: string;
-  estimatedDurationSeconds: number; sortOrder: number; graphics: GraphicItem[];
+  cgRequired: boolean; estimatedDurationSeconds: number; sortOrder: number; graphics: GraphicItem[];
 };
 export type Rundown = { id: string; programName: string; title: string; updatedAt: string; items: RundownItem[] };
 export type OverlayState = { overlayNumber: number; inputGuid: string | null };
@@ -207,3 +247,18 @@ export const defaultHeadlineDefaults: HeadlineDefaults = {
   kicker: "",
   subline: ""
 };
+
+export type LiveShortcut =
+  | "master"
+  | "take"
+  | "update"
+  | "clear"
+  | "clear-all"
+  | "logo"
+  | "full"
+  | "headline"
+  | "location"
+  | "topic"
+  | "detail"
+  | "previous"
+  | "next";

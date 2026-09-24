@@ -122,4 +122,22 @@ describe("Live variant & headline defaults API (branch simple)", () => {
     expect(updateRes.commandStatus).toBe("confirmed");
     expect(dbModule.getOnAir()?.snapshot?.showLocation).toBe("true");
   });
+
+  it("rejects a draft cue without replacing the current program", async () => {
+    const rundown = dbModule.getRundowns()[0]!;
+    const item = dbModule.createItem(rundown.id, {
+      slug: "DRAFT-GATE", title: "Materi belum disetujui", format: "VO",
+      cgRequired: true, estimatedDurationSeconds: 30, sortOrder: rundown.items.length
+    })!;
+    const graphic = dbModule.createGraphic(item.id, {
+      templateType: "HEADLINE", sortOrder: 0, status: "DRAFT",
+      draftFields: { headline: "MATERI BELUM DISETUJUI", visualTemplate: "cnn" }
+    })!;
+    const previousProgram = dbModule.getOnAir()?.graphicId;
+
+    const result = await liveModule.take(graphic.id, "key-draft-gate");
+    expect(result.commandStatus).toBe("failed");
+    expect(result.error).toContain("masih DRAFT");
+    expect(dbModule.getOnAir()?.graphicId).toBe(previousProgram);
+  });
 });

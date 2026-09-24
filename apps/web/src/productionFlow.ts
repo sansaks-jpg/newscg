@@ -1,21 +1,11 @@
-export type LiveShortcut =
-  | "take"
-  | "update"
-  | "clear"
-  | "clear-all"
-  | "logo"
-  | "full"
-  | "headline"
-  | "location"
-  | "topic"
-  | "detail"
-  | "previous"
-  | "next";
+import type { LiveShortcut } from "@newscg/shared";
+export type { LiveShortcut } from "@newscg/shared";
 
 const shortcuts: Record<string, LiveShortcut> = {
   " ": "take",
   Enter: "take",
   u: "update",
+  m: "master",
   Escape: "clear",
   c: "clear",
   "0": "clear-all",

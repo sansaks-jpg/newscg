@@ -137,6 +137,7 @@ describe("Web Overlay (Singular.live style) controller", () => {
       timezone: "WITA",
       showLiveBadge: false,
       brandText: "KOMPASTV.COM",
+      outputFps: 30,
       logoType: "image",
       logoImage: "data:image/png;base64,mock"
     });
@@ -145,12 +146,14 @@ describe("Web Overlay (Singular.live style) controller", () => {
     expect(updated.showLiveBadge).toBe(false);
     expect(updated.brandText).toBe("KOMPASTV.COM");
     expect(updated.logoType).toBe("image");
+    expect(updated.outputFps).toBe(30);
 
     const masterEvent = events.find((e) => e.type === "MASTER_UPDATE");
     expect(masterEvent).toBeDefined();
     if (masterEvent && masterEvent.type === "MASTER_UPDATE") {
       expect(masterEvent.master.timezone).toBe("WITA");
       expect(masterEvent.master.brandText).toBe("KOMPASTV.COM");
+      expect(masterEvent.master.outputFps).toBe(30);
     }
 
     unsubscribe();

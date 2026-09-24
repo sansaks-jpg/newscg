@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import {
   ArrowDown,
@@ -32,6 +32,7 @@ const graphicLabel = (g: GraphicItem) =>
       }`;
 
 const isReady = (item: RundownItem) =>
+  item.cgRequired &&
   item.estimatedDurationSeconds > 0 &&
   item.graphics.length > 0 &&
   item.graphics.every((g) => g.status === "READY");
@@ -53,6 +54,11 @@ type Props = {
 // =====================================================================
 export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSetup, master }: Props) {
   const [editing, setEditing] = useState<RundownItem | "new" | null>(null);
+  const editingTrigger = useRef<HTMLButtonElement | null>(null);
+  const closeEditor = () => {
+    setEditing(null);
+    requestAnimationFrame(() => editingTrigger.current?.focus());
+  };
   const [pending, setPending] = useState(false);
   const [search, setSearch] = useState("");
   const [showRenameModal, setShowRenameModal] = useState(false);
@@ -127,8 +133,10 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
       i.slug.toLowerCase().includes(search.toLowerCase())
   );
   const totalDuration = items.reduce((s, i) => s + i.estimatedDurationSeconds, 0);
-  const readyCount = items.filter(isReady).length;
-  const draftCount = items.length - readyCount;
+  const requiredItems = items.filter((item) => item.cgRequired);
+  const readyCount = requiredItems.filter(isReady).length;
+  const draftCount = requiredItems.length - readyCount;
+  const noCgCount = items.length - requiredItems.length;
 
   return (
     <section className="prep-container">
@@ -219,7 +227,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           <button
             className="btn-prep-primary"
             disabled={!rundown}
-            onClick={() => setEditing("new")}
+            onClick={(event) => { editingTrigger.current = event.currentTarget; setEditing("new"); }}
           >
             <Plus size={14} />
             <span>Tambah Berita</span>
@@ -237,7 +245,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
         <div className="prep-metrics-strip">
           <div className="metric-box">
             <small>TOTAL BERITA</small>
-            <b>{items.length} Segmen</b>
+            <b>{items.length} Item Rundown</b>
           </div>
           <div className="metric-box">
             <small>ESTIMASI DURASI SIARAN</small>
@@ -250,6 +258,10 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           <div className="metric-box">
             <small>PERLU DICEK</small>
             <b className={draftCount > 0 ? "text-warn" : ""}>{draftCount} Berita</b>
+          </div>
+          <div className="metric-box">
+            <small>TANPA CG</small>
+            <b>{noCgCount} Item</b>
           </div>
 
           <div className="prep-filter-box">
@@ -353,21 +365,21 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
                         </span>
                       ))}
                       {item.graphics.length === 0 && (
-                        <span className="cg-chip-empty">Belum ada CG</span>
+                        <span className="cg-chip-empty">{item.cgRequired ? "Belum ada CG" : "CG tidak diperlukan"}</span>
                       )}
                     </div>
                   </div>
 
                   <div className="col-stat">
-                    <span className={`status-pill ${ready ? "is-ready" : "is-warn"}`}>
-                      {ready ? "✓ Siap Tayang" : "⚠ Perlu Dicek"}
+                    <span className={`status-pill ${!item.cgRequired ? "" : ready ? "is-ready" : "is-warn"}`}>
+                      {!item.cgRequired ? "Tanpa CG" : ready ? "✓ Siap CG" : "⚠ Perlu Dicek"}
                     </span>
                   </div>
 
                   <div className="col-act">
                     <button
                       className="btn-act-edit"
-                      onClick={() => setEditing(item)}
+                      onClick={(event) => { editingTrigger.current = event.currentTarget; setEditing(item); }}
                       title="Edit materi berita dan daftar grafis"
                     >
                       <Edit3 size={12} />
@@ -419,10 +431,10 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           item={editing === "new" ? null : editing}
           rundown={rundown}
           master={master}
-          onClose={() => setEditing(null)}
+          onClose={closeEditor}
           onSaved={async () => {
             await reload();
-            setEditing(null);
+            closeEditor();
             toast("Berita dan seluruh materi CG berhasil disimpan");
           }}
         />
@@ -535,19 +547,20 @@ function StoryEditor({
   const [title, setTitle] = useState(item?.title || "");
   const [slug, setSlug] = useState(item?.slug || `NEWS-${rundown.items.length + 1}`);
   const [format, setFormat] = useState(item?.format || "PKG");
+  const [cgRequired, setCgRequired] = useState(item?.cgRequired ?? true);
   const [seconds, setSeconds] = useState(item?.estimatedDurationSeconds || 60);
   const [graphics, setGraphics] = useState<DraftGraphic[]>(() => {
-    if (item && item.graphics.length > 0) {
+    if (item) {
       return item.graphics.map((g) => ({ ...g, draftFields: { ...g.draftFields } }));
     }
     // Default otomatis untuk Berita Baru: langsung tampilkan 1 cue HEADLINE siap isi
     return [
       {
         templateType: "HEADLINE",
-        status: "READY",
+        status: "DRAFT",
         sortOrder: 0,
         draftFields: {
-          headline: item?.title || "",
+          headline: "",
           kicker: "",
           subline: "",
           location: "",
@@ -563,6 +576,21 @@ function StoryEditor({
   const [previewIndex, setPreviewIndex] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const onDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (event.key === "Escape" && !saving) {
+      event.stopPropagation();
+      onClose();
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]'
+    ) || []).filter((element) => element.getClientRects().length > 0);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  };
 
   useEffect(() => {
     if (!item) {
@@ -622,7 +650,7 @@ function StoryEditor({
         ...gs,
         {
           templateType: type,
-          status: "READY",
+          status: "DRAFT",
           sortOrder: newIndex,
           draftFields:
             type === "REPORTER"
@@ -659,7 +687,7 @@ function StoryEditor({
     setGraphics([
       {
         templateType: "HEADLINE",
-        status: "READY",
+        status: "DRAFT",
         sortOrder: 0,
         draftFields: {
           headline,
@@ -673,7 +701,7 @@ function StoryEditor({
       },
       {
         templateType: "HEADLINE",
-        status: "READY",
+        status: "DRAFT",
         sortOrder: 1,
         draftFields: {
           headline,
@@ -687,7 +715,7 @@ function StoryEditor({
       },
       {
         templateType: "HEADLINE",
-        status: "READY",
+        status: "DRAFT",
         sortOrder: 2,
         draftFields: {
           headline,
@@ -730,7 +758,12 @@ function StoryEditor({
   return (
     <div className="nr-modal-backdrop">
       <form
+        ref={dialogRef}
         className="story-editor-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={item ? "Edit berita dan materi CG" : "Tambah berita baru"}
+        onKeyDown={onDialogKeyDown}
         onSubmit={async (e) => {
           e.preventDefault();
           if (seconds < 1 || seconds > 21600) {
@@ -745,6 +778,7 @@ function StoryEditor({
               title,
               slug,
               format,
+              cgRequired,
               estimatedDurationSeconds: seconds,
               sortOrder: item?.sortOrder ?? rundown.items.length,
               graphics: graphics.map((g, i) => ({ ...g, sortOrder: i }))
@@ -803,6 +837,13 @@ function StoryEditor({
                       {f}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label>
+                <span>Kebutuhan CG</span>
+                <select value={cgRequired ? "required" : "none"} onChange={(e) => setCgRequired(e.target.value === "required")}>
+                  <option value="required">Butuh CG lower third</option>
+                  <option value="none">Tanpa CG lower third</option>
                 </select>
               </label>
 
@@ -1011,9 +1052,9 @@ function StoryEditor({
               <div className="preview-header-left">
                 <span className="dot-led green pulse" />
                 <div>
-                  <h3 className="section-title">PREVIEW GRAFIS SIARAN (REAL-TIME)</h3>
+                    <h3 className="section-title">PRATINJAU DRAFT CG</h3>
                   <span className="preview-subtitle">
-                    Visual siaran langsung (WYSIWYG 1080p) otomatis merespons teks yang diisi pada form di atas
+                    Perubahan form terlihat di sini sebelum disimpan; output siaran tidak berubah.
                   </span>
                 </div>
               </div>
@@ -1050,7 +1091,7 @@ function StoryEditor({
               />
             </div>
             <div className="story-preview-caption">
-              <span>● Visual di atas adalah representasi langsung (*alpha overlay*) di layar siaran.</span>
+              <span>Pratinjau lokal materi CG. Setujui cue sebelum TAKE.</span>
             </div>
           </div>
         </div>
@@ -1058,7 +1099,7 @@ function StoryEditor({
         {error && <div className="modal-error-banner">{error}</div>}
 
         <div className="modal-footer">
-          <span className="modal-tip">Semua perubahan tersimpan di database materi siaran.</span>
+          <span className="modal-tip">Perubahan belum tersimpan sampai tombol Simpan ditekan.</span>
           <div className="footer-actions">
             <button type="button" className="btn-modal-cancel" disabled={saving} onClick={onClose}>
               Batal

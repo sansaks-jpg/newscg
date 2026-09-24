@@ -1,10 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { MasterOverlayState, TemplateType, TimezoneMode } from "@newscg/shared";
-import { defaultMasterOverlayState } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState } from "@newscg/shared";
 import { MonitorPlay } from "lucide-react";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { useLayerPresence } from "./useLayerPresence";
 import { AutoSquishText } from "./AutoSquishText";
+
+const motionStyle = Object.fromEntries(Object.entries(broadcastMotion).map(([name, milliseconds]) =>
+  [`--cg-${name}`, `${milliseconds}ms`])) as CSSProperties;
 
 export type GhostFields = {
   location?: string;
@@ -51,7 +54,7 @@ export function BroadcastGraphic({
   const hasLocation = Boolean(effectiveFields.location && effectiveFields.location.trim().length > 0);
   const showLocationTag = isLocationOnly ? hasLocation : (hasLocation && effectiveFields.showLocation !== "false");
 
-  const locationLayer = useLayerPresence(showLocationTag && !isExiting);
+  const locationLayer = useLayerPresence(showLocationTag && !isExiting, broadcastMotion.locationOutMs + 20);
   const [lastLocation, setLastLocation] = useState(effectiveFields.location || "");
   useEffect(() => { if (effectiveFields.location) setLastLocation(effectiveFields.location); }, [effectiveFields.location]);
 
@@ -65,7 +68,7 @@ export function BroadcastGraphic({
     contentMode === "headline" &&
     hasKicker;
 
-  const kickerLayer = useLayerPresence(shouldShowKicker && !isExiting);
+  const kickerLayer = useLayerPresence(shouldShowKicker && !isExiting, broadcastMotion.topicOutMs + 20);
   const [lastKicker, setLastKicker] = useState(effectiveFields.kicker || "");
   useEffect(() => { if (effectiveFields.kicker) setLastKicker(effectiveFields.kicker); }, [effectiveFields.kicker]);
   const kickerText = effectiveFields.kicker || (isBreaking ? "BREAKING NEWS" : "");
@@ -100,7 +103,14 @@ export function BroadcastGraphic({
       ? ghostFields!.subline!.trim()
       : null;
 
-  const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText;
+  const socialText = effectiveFields.socialHandle || sublineText;
+  const socialLayer = useLayerPresence(contentMode === "presenter" && Boolean(socialText) && !isExiting, broadcastMotion.detailOutMs + 20);
+  const [lastSocialText, setLastSocialText] = useState(socialText);
+  useEffect(() => { if (socialText) setLastSocialText(socialText); }, [socialText]);
+  const detailLayer = useLayerPresence(hasSubline && !isSingleLayout && !isExiting && contentMode === "headline", broadcastMotion.detailOutMs + 20);
+  const [lastSubline, setLastSubline] = useState(sublineText);
+  useEffect(() => { if (sublineText) setLastSubline(sublineText); }, [sublineText]);
+  const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText && !detailLayer.present;
 
   const brandText = effectiveFields.brand?.trim() || master.brandText?.trim() || "CNNINDONESIA.COM";
   const tickerText =
@@ -112,11 +122,11 @@ export function BroadcastGraphic({
     <>
       {/* 1. Location Tag di Pojok Kiri Atas (Aktif atau Bayangan Ghost) */}
       {locationLayer.present ? (
-        <div key={`location-${contentKey}`} className={`cg-location-tag ${cnn ? "cnn-template" : ""} ${isExiting || locationLayer.exiting ? "cg-exit" : ""} ${isMini ? "mini" : ""}`}>
+        <div key={`location-${contentKey}`} style={motionStyle} className={`cg-location-tag ${cnn ? "cnn-template" : ""} ${isExiting || locationLayer.exiting ? "cg-exit" : ""} ${isMini ? "mini" : ""}`}>
           <span>{effectiveFields.location || lastLocation}</span>
         </div>
       ) : ghostLocationText ? (
-        <div key="location-ghost" className={`cg-location-tag cg-ghost-element ${cnn ? "cnn-template" : ""} ${isMini ? "mini" : ""}`} title="Lokasi (Belum Aktif — Tekan L lalu Spasi)">
+        <div key="location-ghost" className={`cg-location-tag cg-ghost-element ${cnn ? "cnn-template" : ""} ${isMini ? "mini" : ""}`} title="Lokasi (Belum Aktif — Tekan L lalu TAKE / UPDATE)">
           <span className="cg-ghost-pill">[L]</span>
           <span>{ghostLocationText}</span>
         </div>
@@ -124,6 +134,7 @@ export function BroadcastGraphic({
 
       {/* 2. Lower Third Grafis Siaran */}
       <div
+        style={motionStyle}
         className={`cg-lower-third ${cnn ? "cnn-template" : ""} ${exitAll ? "cg-all-exit" : ""} ${isBreaking ? "breaking" : ""} ${isReporter ? "reporter" : ""} ${isMini ? "mini" : ""} ${!tickerLayer.present ? "no-ticker" : ""}`}
       >
         {/* Layer Konten (Kicker & Main White Box) — Tampil jika ada materi ON AIR */}
@@ -135,7 +146,7 @@ export function BroadcastGraphic({
                 <AutoSquishText text={effectiveFields.kicker || lastKicker || kickerText} minScale={0.7} />
               </div>
             ) : ghostKickerText ? (
-              <div className="cg-kicker-tab cg-ghost-element" title="Topik (Belum Aktif — Tekan T lalu Spasi)">
+              <div className="cg-kicker-tab cg-ghost-element" title="Topik (Belum Aktif — Tekan T lalu TAKE / UPDATE)">
                 <span className="cg-ghost-pill">[T]</span>
                 <AutoSquishText text={ghostKickerText} minScale={0.7} />
               </div>
@@ -163,46 +174,32 @@ export function BroadcastGraphic({
                         className="cg-presenter-squish"
                       />
                     </div>
-                    {(effectiveFields.socialHandle || sublineText) && (
-                      <div className="cg-social-row">
+                    {socialLayer.present && (
+                      <div className={`cg-social-row ${socialLayer.exiting ? "cg-detail-out" : ""}`}>
                         
                         <AutoSquishText
-                          text={effectiveFields.socialHandle || sublineText}
+                          text={socialText || lastSocialText}
                           minScale={0.5}
                           className="cg-social-squish"
                         />
                       </div>
                     )}
                   </div>
-                ) : isEffectiveSingleLayout ? (
-                  /* Varian C: Headline Tunggal Gede Semua (Gambar 5 - Studio Style) */
-                  <div className="cg-headline-row-single">
-                    <AutoSquishText
-                      text={headlineText}
-                      minScale={0.3}
-                      className="cg-headline-squish-single"
-                    />
-                  </div>
                 ) : (
-                  /* Varian D: Headline Utama + Subline Keterangan (Aktif atau Bayangan Ghost) */
                   <>
-                    <div className="cg-headline-row">
-                      <AutoSquishText
-                        text={headlineText}
-                        minScale={0.35}
-                        className="cg-headline-squish"
-                      />
+                    <div className={isEffectiveSingleLayout ? "cg-headline-row-single" : "cg-headline-row"}>
+                      <AutoSquishText text={headlineText} minScale={0.3} className="cg-headline-squish" />
                     </div>
-                    {sublineText ? (
-                      <div className="cg-subline-row">
+                    {detailLayer.present ? (
+                      <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
                         <AutoSquishText
-                          text={sublineText}
+                          text={sublineText || lastSubline}
                           minScale={0.45}
                           className="cg-subline-squish"
                         />
                       </div>
                     ) : ghostSublineText ? (
-                      <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu Spasi)">
+                      <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu TAKE / UPDATE)">
                         <span className="cg-ghost-pill">[D]</span>
                         <AutoSquishText
                           text={ghostSublineText}
@@ -247,7 +244,7 @@ export function BroadcastGraphic({
             <div className="cg-ticker-badge" title="Nama Berita / Kategori Ticker">
               <AutoSquishText text={brandText} style={{ width: "max-content", maxWidth: "100%" }} />
             </div>
-            <BroadcastTicker text={tickerText} speed={master.tickerSpeed} />
+            <BroadcastTicker text={tickerText} speed={master.tickerSpeed} revision={master.tickerRevision} fps={master.outputFps} />
             <div className="cg-ticker-clock">
               <BroadcastClock
                 timezone={master.timezone}
@@ -328,6 +325,8 @@ export function BroadcastPreviewBox({
   master = defaultMasterOverlayState,
   emptyText,
   isExiting = false,
+  exitAll = false,
+  blackout = false,
   visualTemplate,
   animationKey = 0,
   ghostPreview = false,
@@ -338,6 +337,8 @@ export function BroadcastPreviewBox({
   master?: MasterOverlayState;
   emptyText?: string;
   isExiting?: boolean;
+  exitAll?: boolean;
+  blackout?: boolean;
   visualTemplate?: string;
   animationKey?: number;
   ghostPreview?: boolean;
@@ -347,6 +348,7 @@ export function BroadcastPreviewBox({
   const [scale, setScale] = useState(0.2);
 
   const visible = Boolean((graphic && fields) || master.showLogo || master.showTicker || master.showLiveBadge);
+  const previewPresence = useLayerPresence(visible && !blackout);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -397,6 +399,7 @@ export function BroadcastPreviewBox({
         {/* 1920x1080 Stage identical to /output */}
         <div
           className="overlay-stage-1080"
+          data-broadcast-motion
           style={{
             width: 1920,
             height: 1080,
@@ -408,19 +411,20 @@ export function BroadcastPreviewBox({
             pointerEvents: "none"
           }}
         >
-          <BroadcastGraphic
+          {!blackout && <BroadcastGraphic
             type={graphic?.templateType || null}
             fields={fields}
-            master={master}
+            master={{ ...master, outputFps: 30 }}
             isExiting={isExiting}
+            exitAll={exitAll}
             visualTemplate="cnn"
             contentKey={`${graphic?.id || "preview"}-cnn-${animationKey}`}
             ghostPreview={ghostPreview}
             ghostFields={ghostFields}
-          />
+          />}
         </div>
 
-        {!hasGraphic && !showMaster && (
+        {!hasGraphic && !showMaster && (!previewPresence.present || blackout) && (
           <div className="empty-stage-center">
             <MonitorPlay size={24} />
             <span>{emptyText || "LAYAR BERSIH"}</span>

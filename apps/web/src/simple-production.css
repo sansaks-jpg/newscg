@@ -71,11 +71,26 @@
   border-left: 3px solid #334155;
   border-radius: 5px;
   padding: 8px 10px;
-  cursor: pointer;
   transition: all 120ms ease;
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+.story-select-button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.story-select-button:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 4px;
 }
 
 .sidebar-story-card:hover {
@@ -417,7 +432,8 @@
 /* Monitor Pratinjau Dual Deck (Standby Stage + Mini Live Monitor) */
 .production-preview-deck {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: stretch;
   justify-content: center;
   gap: 12px;
@@ -487,9 +503,9 @@
 
 /* Mini Live Monitor Panel */
 .live-mini-panel {
-  width: 280px;
-  min-width: 240px;
-  max-width: 320px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -665,10 +681,10 @@
 /* Primary Broadcast Actions Deck */
 .primary-actions-deck {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
   width: 100%;
-  max-width: 860px;
+  max-width: 1140px;
   margin: 0 auto;
 }
 
@@ -784,6 +800,25 @@
   max-width: 860px;
   margin: 0 auto;
 }
+.quick-edit-drawer {
+  position: fixed;
+  z-index: 45;
+  top: 48px;
+  right: 0;
+  bottom: 0;
+  width: min(430px, calc(100vw - 16px));
+  max-width: none;
+  overflow-y: auto;
+  border-radius: 0;
+  border-left: 2px solid #38bdf8;
+  box-shadow: -18px 0 35px rgba(0, 0, 0, .55);
+}
+.quick-edit-close {
+  border: 0;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+}
 
 .mini-editor-header {
   display: flex;
@@ -862,4 +897,51 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* Keep transmission controls reachable while the editor scrolls. */
+.cg-production-main { min-width: 0; }
+.cg-production-main > * { flex-shrink: 0; }
+.production-preview-deck { align-items: center; }
+.preview-screen-wrapper { width: 100%; max-width: none; border-color: #16835d; }
+.live-mini-panel { box-sizing: border-box; }
+.primary-actions-deck { position: sticky; top: 0; z-index: 30; background: #090d14; padding: 8px 0; }
+.primary-actions-deck .action-btn { min-height: 62px; }
+.primary-actions-deck kbd { margin-top: 5px; font-size: 11px; }
+.live-change-summary { width: 100%; max-width: 1140px; margin: 0 auto; color: #e2e8f0; font-size: 12px; line-height: 1.6; }
+.live-change-summary small { display: block; color: #94a3b8; font-size: 11px; }
+.live-ticker-settings { border: 1px solid #334155; border-radius: 4px; padding: 8px 10px; font-size: 12px; }
+.live-ticker-settings[open] {
+  position: absolute;
+  top: 108px;
+  right: 16px;
+  z-index: 35;
+  width: min(460px, calc(100vw - 340px));
+  max-height: calc(100vh - 125px);
+  overflow-y: auto;
+  background: #111827;
+  box-shadow: -12px 14px 30px rgba(0, 0, 0, .55);
+}
+.live-ticker-settings summary { cursor: pointer; }
+.live-ticker-settings label { display: grid; gap: 5px; margin: 10px 0; }
+.live-ticker-settings input, .live-ticker-settings select, .live-ticker-settings textarea { width: 100%; color: #f1f5f9; background: #111827; border: 1px solid #475569; padding: 8px; font: inherit; }
+.live-ticker-settings textarea { resize: vertical; }
+.live-ticker-settings button, .all-output-actions button { padding: 8px 12px; border: 1px solid #475569; background: #1e293b; color: white; border-radius: 4px; cursor: pointer; }
+.live-ticker-settings button { margin: 0 8px 8px 0; }
+.live-ticker-settings small { display: block; color: #94a3b8; line-height: 1.5; }
+.all-output-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-top: 1px solid #334155; font-size: 11px; }
+.all-output-actions .emergency-clear { display: flex; align-items: center; gap: 8px; color: #fecaca; border-color: #991b1b; background: #280e13; }
+.simple-cg-workspace button:disabled { cursor: not-allowed; opacity: .45; }
+.simple-cg-workspace button:focus-visible, .simple-cg-workspace summary:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+.master-btn-group { flex-wrap: wrap; }
+@media (max-width: 1100px) {
+  .cg-story-sidebar { width: 245px; min-width: 220px; }
+  .cg-production-main { padding: 8px; }
+  .preview-meta-badge .cue-name { max-width: 120px; }
+}
+@media (max-width: 900px) {
+  .cg-story-sidebar { width: 205px; min-width: 185px; }
+  .production-preview-deck { grid-template-columns: minmax(0, 1fr); }
+  .primary-actions-deck { gap: 5px; }
+  .action-btn { min-width: 0; }
 }

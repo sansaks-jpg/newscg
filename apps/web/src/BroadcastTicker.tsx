@@ -1,87 +1,104 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { tickerPresets } from "@newscg/shared";
+import type { OutputFrameRate } from "@newscg/shared";
+import { advanceTicker, tickerCopies, tickerFrameDue } from "./tickerMotion";
 
-/**
- * Engine animasi running ticker siaran televisi.
- * Menggunakan arsitektur dua segmen identik (mirrored dual-segment) dengan translasi -50%.
- * Menjamin putaran looping 100% mulus (seamless), bebas race-condition piksel,
- * dan berjalan stabil baik pada layar output 1080p maupun pratinjau monitor kecil.
- */
-export function BroadcastTicker({ text, speed = 85 }: { text: string; speed?: number }) {
-  const [displayText, setDisplayText] = useState(text);
-  const changing = displayText !== text;
-  const segmentRef = useRef<HTMLDivElement>(null);
-  const [actualSegmentWidth, setActualSegmentWidth] = useState<number>(0);
+export function BroadcastTicker({ text, speed = tickerPresets.normal, revision = 0, fps = 60 }: {
+  text: string; speed?: number; revision?: number; fps?: OutputFrameRate;
+}) {
+  const normalized = text.trim() || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI";
+  const [segments, setSegments] = useState<[string, string]>([normalized, normalized]);
+  const [copies, setCopies] = useState([2, 2]);
+  const viewport = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const position = useRef(0);
+  const segmentWidth = useRef(0);
+  const latest = useRef({ text: normalized, speed });
+  const activeSegments = useRef(segments);
+  const revisionRef = useRef(revision);
 
-  useEffect(() => {
-    if (text === displayText) return;
-    const timer = setTimeout(() => setDisplayText(text), 150);
-    return () => clearTimeout(timer);
-  }, [text, displayText]);
+  useLayoutEffect(() => {
+    latest.current = { text: normalized, speed };
+    if (revisionRef.current !== revision) {
+      revisionRef.current = revision;
+      position.current = 0;
+      setSegments([normalized, normalized]);
+    }
+  }, [normalized, speed, revision]);
 
-  const safeText = (displayText || "").trim() || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI";
-  const charLength = safeText.length;
-
-  // Pastikan segmen cukup panjang melebihi lebar layar kanvas (minimal 2000px)
-  const repeatCount = Math.max(3, Math.ceil(140 / Math.max(1, charLength)));
-
-  // Ukur lebar aktual segmen menggunakan ResizeObserver
-  useEffect(() => {
-    const el = segmentRef.current;
-    if (!el) return;
-
+  useLayoutEffect(() => {
+    activeSegments.current = segments;
+    if (track.current) track.current.style.transform = `translate3d(${-position.current}px,0,0)`;
     const measure = () => {
-      const width = el.getBoundingClientRect().width || el.scrollWidth;
-      if (width > 0) {
-        setActualSegmentWidth(width);
+      const children = track.current?.children;
+      if (!children || !viewport.current) return;
+      segmentWidth.current = children[0] ? parseFloat(getComputedStyle(children[0]).width) || 0 : 0;
+      // Computed widths remain in canvas pixels even inside a scaled preview.
+      const next = segments.map((_, index) => tickerCopies(
+        viewport.current!.clientWidth,
+        children[index]?.firstElementChild
+          ? parseFloat(getComputedStyle(children[index].firstElementChild!).width) || 1 : 1
+      ));
+      setCopies((old) => old.every((count, index) => count === next[index]) ? old : next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (viewport.current) observer.observe(viewport.current);
+    for (const child of Array.from(track.current?.children || [])) {
+      observer.observe(child);
+      if (child.firstElementChild) observer.observe(child.firstElementChild);
+    }
+    return () => observer.disconnect();
+  }, [segments, copies]);
+
+  useEffect(() => {
+    let frame = 0;
+    let lastTime: number | undefined;
+    let nextFrameAt: number | undefined;
+    const tick = (now: number) => {
+      frame = requestAnimationFrame(tick);
+      const cadence = tickerFrameDue(now, nextFrameAt, fps);
+      nextFrameAt = cadence.nextFrameAt;
+      if (!cadence.render) return;
+      const el = track.current;
+      const width = segmentWidth.current;
+      const elapsed = lastTime === undefined ? 0 : now - lastTime;
+      lastTime = now;
+      if (el && width > 0) {
+        const next = advanceTicker(position.current, elapsed, latest.current.speed, width);
+        position.current = next.position;
+        if (next.wrapped) {
+          setSegments([activeSegments.current[1], latest.current.text]);
+        } else if (position.current + (viewport.current?.clientWidth || 0) < width
+          && activeSegments.current[1] !== latest.current.text) {
+          // Replace the following segment only while it is completely off screen.
+          setSegments([activeSegments.current[0], latest.current.text]);
+        }
+        el.style.transform = `translate3d(${-position.current}px,0,0)`;
       }
     };
-
-    measure();
-
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const w = entry.contentRect.width;
-          if (w > 0) setActualSegmentWidth(w);
-        }
-      });
-      observer.observe(el);
-      return () => observer.disconnect();
-    }
-  }, [displayText, repeatCount]);
-
-  // Hitung durasi agar kecepatan linear sesuai prop speed (default 85 px/detik)
-  const currentSpeed = Math.max(30, Math.min(250, speed || 85));
-  const effectiveWidth = actualSegmentWidth > 0 ? actualSegmentWidth : repeatCount * (charLength * 18 + 80);
-  const durationSec = Math.max(6, Math.min(180, Math.round(effectiveWidth / currentSpeed)));
+    const resetClock = () => { lastTime = undefined; nextFrameAt = undefined; };
+    document.addEventListener("visibilitychange", resetClock);
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", resetClock);
+    };
+  }, [fps]);
 
   return (
-    <div className={`cg-ticker-content ${changing ? "ticker-changing" : ""}`}>
-      <div
-        className="cg-ticker-track"
-        style={{
-          "--ticker-duration": `${durationSec}s`
-        } as CSSProperties}
-      >
-        {/* Segmen Utama */}
-        <div ref={segmentRef} className="cg-ticker-segment">
-          {Array.from({ length: repeatCount }, (_, index) => (
-            <span key={index} className="cg-ticker-copy">
-              <span className="cg-ticker-text">{safeText}</span>
-              <span className="cg-ticker-bullet" aria-hidden="true">■</span>
-            </span>
-          ))}
-        </div>
-
-        {/* Segmen Duplikat (Menjamin loop -50% tanpa jeda/gap) */}
-        <div className="cg-ticker-segment" aria-hidden="true">
-          {Array.from({ length: repeatCount }, (_, index) => (
-            <span key={`dup-${index}`} className="cg-ticker-copy">
-              <span className="cg-ticker-text">{safeText}</span>
-              <span className="cg-ticker-bullet" aria-hidden="true">■</span>
-            </span>
-          ))}
-        </div>
+    <div ref={viewport} className="cg-ticker-content">
+      <div ref={track} className="cg-ticker-track">
+        {segments.map((segment, index) => (
+          <div key={index} className="cg-ticker-segment" aria-hidden={index === 1 || undefined}>
+            {Array.from({ length: copies[index] || 2 }, (_, copy) => (
+              <span key={copy} className="cg-ticker-copy">
+                <span className="cg-ticker-text">{segment}</span>
+                <span className="cg-ticker-bullet" aria-hidden="true">■</span>
+              </span>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );

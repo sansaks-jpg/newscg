@@ -2,10 +2,12 @@ import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
 
-const dbPath = resolve(process.cwd(), process.env.DATABASE_PATH || "./data/newscg.db");
+const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const dbPath = resolve(serverRoot, process.env.DATABASE_PATH || "./data/newscg.db");
 mkdirSync(dirname(dbPath), { recursive: true });
 export const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
@@ -38,6 +40,11 @@ CREATE TABLE IF NOT EXISTS action_logs (
 );
 INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (1, datetime('now'));
 `);
+const itemColumns = db.prepare("PRAGMA table_info(rundown_items)").all() as Array<{ name: string }>;
+if (!itemColumns.some((column) => column.name === "cg_required")) {
+  db.exec("ALTER TABLE rundown_items ADD COLUMN cg_required INTEGER NOT NULL DEFAULT 1");
+  db.exec("UPDATE rundown_items SET cg_required = 0 WHERE format = 'LAINNYA' AND NOT EXISTS (SELECT 1 FROM graphic_items WHERE item_id = rundown_items.id)");
+}
 
 const json = <T>(value: string | null): T | null => value ? JSON.parse(value) as T : null;
 
@@ -54,7 +61,11 @@ function readRundownRow(row: any): Rundown {
 }
 function readItemRow(row: any): RundownItem {
   const graphics = (db.prepare("SELECT * FROM graphic_items WHERE item_id = ? ORDER BY sort_order, rowid").all(row.id) as any[]).map(readGraphicRow);
-  return { id: row.id, rundownId: row.rundown_id, slug: row.slug, title: row.title, format: row.format, estimatedDurationSeconds: row.estimated_duration_seconds, sortOrder: row.sort_order, graphics };
+  return { id: row.id, rundownId: row.rundown_id, slug: row.slug, title: row.title, format: row.format, cgRequired: Boolean(row.cg_required), estimatedDurationSeconds: row.estimated_duration_seconds, sortOrder: row.sort_order, graphics };
+}
+export function getItem(id: string): RundownItem | null {
+  const row = db.prepare("SELECT * FROM rundown_items WHERE id = ?").get(id) as any;
+  return row ? readItemRow(row) : null;
 }
 function readGraphicRow(row: any): GraphicItem {
   return { id: row.id, itemId: row.item_id, templateType: row.template_type, sortOrder: row.sort_order, status: row.status, draftFields: json(row.draft_fields) || {}, lastPushedFields: json(row.last_pushed_fields) };
@@ -70,7 +81,7 @@ export const createRundown = db.transaction((input: { id?: string; programName: 
   db.prepare("INSERT INTO rundowns(id, program_name, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(id, input.programName, input.title, now, now);
   for (const item of input.items || []) {
     const itemId = item.id || randomUUID();
-    db.prepare("INSERT INTO rundown_items VALUES (?, ?, ?, ?, ?, ?, ?)").run(itemId, id, item.slug, item.title, item.format, item.estimatedDurationSeconds, item.sortOrder);
+    db.prepare("INSERT INTO rundown_items(id,rundown_id,slug,title,format,estimated_duration_seconds,sort_order,cg_required) VALUES (?,?,?,?,?,?,?,?)").run(itemId, id, item.slug, item.title, item.format, item.estimatedDurationSeconds, item.sortOrder, Number(item.cgRequired ?? item.format !== "LAINNYA"));
     for (const graphic of item.graphics || []) {
       db.prepare("INSERT INTO graphic_items VALUES (?, ?, ?, ?, ?, ?, NULL)").run(graphic.id || randomUUID(), itemId, graphic.templateType, graphic.sortOrder, graphic.status || "DRAFT", JSON.stringify(graphic.draftFields));
     }
@@ -86,12 +97,12 @@ export function updateRundown(id: string, patch: any) {
 export function deleteRundown(id: string) { return db.prepare("DELETE FROM rundowns WHERE id = ?").run(id).changes > 0; }
 export function createItem(rundownId: string, input: any) {
   const id = randomUUID();
-  db.prepare("INSERT INTO rundown_items VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, rundownId, input.slug, input.title, input.format, input.estimatedDurationSeconds, input.sortOrder);
+  db.prepare("INSERT INTO rundown_items(id,rundown_id,slug,title,format,estimated_duration_seconds,sort_order,cg_required) VALUES (?,?,?,?,?,?,?,?)").run(id, rundownId, input.slug, input.title, input.format, input.estimatedDurationSeconds, input.sortOrder, Number(input.cgRequired ?? input.format !== "LAINNYA"));
   touch(rundownId); return (getRundown(rundownId)?.items.find(x => x.id === id)) || null;
 }
 export function updateItem(id: string, patch: any) {
   const row = db.prepare("SELECT * FROM rundown_items WHERE id = ?").get(id) as any; if (!row) return null;
-  db.prepare("UPDATE rundown_items SET slug=?,title=?,format=?,estimated_duration_seconds=?,sort_order=? WHERE id=?").run(patch.slug ?? row.slug, patch.title ?? row.title, patch.format ?? row.format, patch.estimatedDurationSeconds ?? row.estimated_duration_seconds, patch.sortOrder ?? row.sort_order, id);
+  db.prepare("UPDATE rundown_items SET slug=?,title=?,format=?,estimated_duration_seconds=?,sort_order=?,cg_required=? WHERE id=?").run(patch.slug ?? row.slug, patch.title ?? row.title, patch.format ?? row.format, patch.estimatedDurationSeconds ?? row.estimated_duration_seconds, patch.sortOrder ?? row.sort_order, Number(patch.cgRequired ?? Boolean(row.cg_required)), id);
   touch(row.rundown_id); return readItemRow(db.prepare("SELECT * FROM rundown_items WHERE id=?").get(id));
 }
 export function deleteItem(id: string) {
@@ -183,4 +194,3 @@ export function seedIfEmpty() {
   const rd = createRundown({ id: "NEWS-001", programName: "NEWS LIVE", title: "Rundown Siaran", items: [] });
   logAction("SYSTEM", "confirmed", `Rundown baru ${rd.id} dibuat (bersih)`);
 }
-

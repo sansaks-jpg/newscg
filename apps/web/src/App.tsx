@@ -26,11 +26,12 @@ import type {
   HeadlineDefaults,
   LiveState,
   MasterOverlayState,
+  OutputFrameRate,
   Rundown,
   TemplateType,
   TimezoneMode
 } from "@newscg/shared";
-import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
+import { defaultHeadlineDefaults, defaultMasterOverlayState, masterOverlayPatchSchema } from "@newscg/shared";
 import { api, mutate } from "./api";
 import TemplatePreview from "./TemplatePreview";
 import OverlayWindow from "./OverlayWindow";
@@ -87,7 +88,7 @@ export default function App() {
       api<AppSettings>("/api/settings"),
       api<LiveState>("/api/live/state"),
       api<any[]>("/api/actions?limit=12"),
-      api<MasterOverlayState>("/api/live/master").catch(() => defaultMasterOverlayState)
+      api<MasterOverlayState>("/api/live/master")
     ]);
     setRundowns(r);
     setSettings(s);
@@ -103,7 +104,13 @@ export default function App() {
       () =>
         api<LiveState>("/api/live/state")
           .then(setLive)
-          .catch(() => {}),
+          .catch(() => setLive((previous) => ({
+            ...previous,
+            connection: "STANDALONE",
+            overlayClientsCount: 0,
+            commandStatus: "unknown",
+            error: "Koneksi ke server NewsCG terputus"
+          }))),
       2000
     );
     return () => clearInterval(id);
@@ -111,9 +118,11 @@ export default function App() {
 
   async function updateMaster(patch: Partial<MasterOverlayState>) {
     try {
-      const res = await mutate<MasterOverlayState>("/api/live/master", "PATCH", patch);
+      const parsed = masterOverlayPatchSchema.safeParse(patch);
+      if (!parsed.success) throw new Error("Pengaturan master tidak valid. Periksa isi ticker dan kecepatan (30–250 px/detik).");
+      const res = await mutate<MasterOverlayState>("/api/live/master", "PATCH", parsed.data);
       setMaster(res);
-      setToast("Master broadcast layer diperbarui");
+      setToast("Pengaturan master diterapkan ke output NewsCG");
     } catch (e: any) {
       setToast(e.message);
       throw e;
@@ -127,9 +136,11 @@ export default function App() {
   }
 
   const status =
-    live.overlayClientsCount > 0
-      ? { label: `OVERLAY: ${live.overlayClientsCount} AKTIF`, kind: "ok" }
-      : { label: "OVERLAY STANDALONE", kind: "mock" };
+    live.error === "Koneksi ke server NewsCG terputus"
+      ? { label: "SERVER TERPUTUS", kind: "bad" }
+      : live.overlayClientsCount > 0
+      ? { label: `${live.overlayClientsCount} KLIEN OUTPUT`, kind: "ok" }
+      : { label: "0 KLIEN OUTPUT", kind: "mock" };
 
   return (
     <div className="app-shell-zero-scroll">
@@ -162,9 +173,9 @@ export default function App() {
         <nav className="topbar-nav-tabs">
           {(
             [
-              ["editor", PencilLine, "Editor CG"],
-              ["rundown", LayoutList, "Persiapan"],
-              ["settings", Settings, "Pengaturan"]
+              ["editor", PencilLine, "Kontrol Siaran"],
+              ["rundown", LayoutList, "Rundown & CG"],
+              ["settings", Settings, "Pengaturan Default"]
             ] as const
           ).map(([id, Icon, label]) => (
             <button
@@ -301,11 +312,54 @@ function BroadcastSetupModal({
   onClose
 }: {
   master: MasterOverlayState;
-  onUpdate: (patch: Partial<MasterOverlayState>) => void;
+  onUpdate: (patch: Partial<MasterOverlayState>) => Promise<void>;
   onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"broadcast" | "logo">("broadcast");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState<MasterOverlayState>({ ...master });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
+  useEffect(() => {
+    dialogRef.current?.querySelector<HTMLElement>("input,select,button")?.focus();
+    return () => openerRef.current?.focus();
+  }, []);
+  const onDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !saving) { event.stopPropagation(); onClose(); }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    ) || []).filter((element) => element.getClientRects().length > 0);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  };
+  const changed = JSON.stringify(draft) !== JSON.stringify(master);
+  const patchDraft = (patch: Partial<MasterOverlayState>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+    setError("");
+  };
+  const apply = async () => {
+    if (!changed || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const patch = Object.fromEntries(
+        (Object.keys(draft) as Array<keyof MasterOverlayState>)
+          .filter((key) => JSON.stringify(draft[key]) !== JSON.stringify(master[key]))
+          .map((key) => [key, draft[key]])
+      ) as Partial<MasterOverlayState>;
+      await onUpdate(patch);
+      onClose();
+    } catch (reason) {
+      setError((reason as Error).message || "Pengaturan gagal diterapkan.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -313,14 +367,14 @@ function BroadcastSetupModal({
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
-      onUpdate({ logoType: "image", logoImage: dataUrl });
+      patchDraft({ logoType: "image", logoImage: dataUrl });
     };
     reader.readAsDataURL(file);
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box broadcast-setup-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div ref={dialogRef} className="modal-box broadcast-setup-modal" role="dialog" aria-modal="true" aria-label="Pengaturan siaran dan identitas" onKeyDown={onDialogKeyDown}>
         <div className="modal-header">
           <h3>
             <SlidersHorizontal size={16} /> Pengaturan Siaran & Identitas Brand
@@ -352,9 +406,9 @@ function BroadcastSetupModal({
                 <span className="master-label">Nama Berita di Ticker (Badge Merah — Fit Huruf)</span>
                 <input
                   className="master-input full"
-                  value={master.brandText || ""}
+                   value={draft.brandText || ""}
                   placeholder="CNNINDONESIA.COM"
-                  onChange={(e) => onUpdate({ brandText: e.target.value })}
+                   onChange={(e) => patchDraft({ brandText: e.target.value })}
                 />
                 <small className="field-hint">Warna merah pada layar siaran otomatis fit membungkus teks tanpa space kosong.</small>
               </label>
@@ -364,21 +418,21 @@ function BroadcastSetupModal({
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <select
                     className="master-select full"
-                    value={master.timezone}
-                    onChange={(e) => onUpdate({ timezone: e.target.value as TimezoneMode })}
+                     value={draft.timezone}
+                     onChange={(e) => patchDraft({ timezone: e.target.value as TimezoneMode })}
                   >
                     <option value="WIB">WIB — Waktu Indonesia Barat (UTC+7)</option>
                     <option value="WITA">WITA — Waktu Indonesia Tengah (UTC+8)</option>
                     <option value="WIT">WIT — Waktu Indonesia Timur (UTC+9)</option>
                     <option value="CUSTOM">Custom Label Zona Waktu</option>
                   </select>
-                  {master.timezone === "CUSTOM" && (
+                   {draft.timezone === "CUSTOM" && (
                     <input
                       className="master-input"
                       style={{ width: 90 }}
                       placeholder="Label"
-                      value={master.customTimezoneLabel || ""}
-                      onChange={(e) => onUpdate({ customTimezoneLabel: e.target.value })}
+                       value={draft.customTimezoneLabel || ""}
+                       onChange={(e) => patchDraft({ customTimezoneLabel: e.target.value })}
                     />
                   )}
                 </div>
@@ -386,19 +440,20 @@ function BroadcastSetupModal({
 
               <label style={{ marginTop: 10 }}>
                 <span className="master-label">Isi Running Ticker Berita Default</span>
-                <input
+                <textarea
                   className="master-input full"
-                  value={master.tickerText || ""}
+                  value={draft.tickerText || ""}
                   placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"
-                  onChange={(e) => onUpdate({ tickerText: e.target.value })}
+                  onChange={(e) => patchDraft({ tickerText: e.target.value })}
+                  rows={4}
                 />
-                <small className="field-hint">Animasi teks berjalan mulus 60fps berputar tanpa henti (seamless loop).</small>
+                <small className="field-hint">Ticker berjalan sesuai target fps output yang dipilih di Settings.</small>
               </label>
 
               {/* Pratinjau Interaktif Ticker */}
               <div style={{ marginTop: 14 }}>
                 <span className="master-label" style={{ display: "block", marginBottom: 6, color: "#38bdf8" }}>
-                  PRATINJAU LANGSUNG TICKER (BADGE FIT & ANIMASI):
+                   PRATINJAU DRAFT TICKER (BADGE FIT & ANIMASI):
                 </span>
                 <div
                   className="cg-ticker-bar cnn-template"
@@ -413,11 +468,11 @@ function BroadcastSetupModal({
                   }}
                 >
                   <div className="cg-ticker-badge" style={{ height: "100%", fontSize: 18 }}>
-                    <span>{master.brandText || "CNNINDONESIA.COM"}</span>
+                     <span>{draft.brandText || "CNNINDONESIA.COM"}</span>
                   </div>
-                  <BroadcastTicker text={master.tickerText || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"} />
+                   <BroadcastTicker text={draft.tickerText || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"} fps={30} />
                   <div className="cg-ticker-clock" style={{ height: "100%", fontSize: 20 }}>
-                    <BroadcastClock timezone={master.timezone} customLabel={master.customTimezoneLabel} />
+                     <BroadcastClock timezone={draft.timezone} customLabel={draft.customTimezoneLabel} />
                   </div>
                 </div>
               </div>
@@ -429,30 +484,30 @@ function BroadcastSetupModal({
           <div className="modal-tab-content">
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
               <button
-                className={`toggle-btn ${master.logoType === "text" ? "active" : ""}`}
+                 className={`toggle-btn ${draft.logoType === "text" ? "active" : ""}`}
                 style={{ flex: 1, justifyContent: "center", padding: "8px 12px" }}
-                onClick={() => onUpdate({ logoType: "text" })}
+                 onClick={() => patchDraft({ logoType: "text" })}
               >
                 Teks Bawaan (CNN Indonesia)
               </button>
               <button
-                className={`toggle-btn ${master.logoType === "image" ? "active" : ""}`}
+                 className={`toggle-btn ${draft.logoType === "image" ? "active" : ""}`}
                 style={{ flex: 1, justifyContent: "center", padding: "8px 12px" }}
-                onClick={() => onUpdate({ logoType: "image" })}
+                 onClick={() => patchDraft({ logoType: "image" })}
               >
                 Upload Gambar Logo Kustom
               </button>
             </div>
 
-            {master.logoType === "text" ? (
+             {draft.logoType === "text" ? (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <label>
                   <span className="master-label">Teks Logo Utama</span>
                   <input
                     className="master-input full"
                     style={{ marginTop: 4 }}
-                    value={master.logoText || "CNN"}
-                    onChange={(e) => onUpdate({ logoText: e.target.value })}
+                     value={draft.logoText || "CNN"}
+                     onChange={(e) => patchDraft({ logoText: e.target.value })}
                   />
                 </label>
                 <label>
@@ -460,8 +515,8 @@ function BroadcastSetupModal({
                   <input
                     className="master-input full"
                     style={{ marginTop: 4 }}
-                    value={master.logoSub || "Indonesia"}
-                    onChange={(e) => onUpdate({ logoSub: e.target.value })}
+                     value={draft.logoSub || "Indonesia"}
+                     onChange={(e) => patchDraft({ logoSub: e.target.value })}
                   />
                 </label>
               </div>
@@ -496,7 +551,7 @@ function BroadcastSetupModal({
                     Rekomendasi file upload: <b>310 × 196 piksel</b> (format <b>PNG Transparan</b> atau SVG).
                   </p>
                 </div>
-                {master.logoImage && (
+                 {draft.logoImage && (
                   <button
                     style={{
                       marginTop: 8,
@@ -506,7 +561,7 @@ function BroadcastSetupModal({
                       fontSize: 11,
                       cursor: "pointer"
                     }}
-                    onClick={() => onUpdate({ logoImage: null, logoType: "text" })}
+                     onClick={() => patchDraft({ logoImage: null, logoType: "text" })}
                   >
                     Hapus logo kustom (kembali ke teks bawaan)
                   </button>
@@ -517,15 +572,15 @@ function BroadcastSetupModal({
             <div style={{ marginTop: 14 }}>
               <span className="master-label">PRATINJAU LOGO DI DALAM KOTAK SIARAN:</span>
               <div className="logo-preview-box">
-                {master.logoType === "image" && master.logoImage ? (
-                  <img src={master.logoImage} alt="Logo Preview" className="cg-custom-logo-img" />
+                 {draft.logoType === "image" && draft.logoImage ? (
+                   <img src={draft.logoImage} alt="Logo Preview" className="cg-custom-logo-img" />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                     <span className="cg-cnn-logo" style={{ fontSize: 36 }}>
-                      {master.logoText || "CNN"}
+                       {draft.logoText || "CNN"}
                     </span>
                     <span className="cg-cnn-sub" style={{ fontSize: 12 }}>
-                      {master.logoSub || "Indonesia"}
+                       {draft.logoSub || "Indonesia"}
                     </span>
                   </div>
                 )}
@@ -535,8 +590,10 @@ function BroadcastSetupModal({
         )}
 
         <div className="modal-footer">
-          <button className="primary-small" onClick={onClose}>
-            Selesai & Tutup
+          <span role="status">{error || (changed ? "Perubahan belum diterapkan ke output." : "Belum ada perubahan.")}</span>
+          <button className="btn-modal-cancel" onClick={onClose} disabled={saving}>Batal</button>
+          <button className="primary-small" onClick={() => void apply()} disabled={!changed || saving}>
+            {saving ? "Menerapkan…" : "Terapkan ke Output"}
           </button>
         </div>
       </div>
@@ -556,7 +613,7 @@ function SettingsView({
   value: AppSettings;
   master: MasterOverlayState;
   live: LiveState;
-  onUpdateMaster: (p: Partial<MasterOverlayState>) => void;
+  onUpdateMaster: (p: Partial<MasterOverlayState>) => Promise<void>;
   onOpenSetupModal: () => void;
   onSaved: () => Promise<void>;
   toast: (s: string) => void;
@@ -578,19 +635,27 @@ function SettingsView({
   }, []);
 
   async function save() {
-    await mutate("/api/settings", "PATCH", form);
-    await onUpdateMaster(masterForm);
-    await saveHeadlineDefaultsData();
-    await onSaved();
-    toast("Semua pengaturan berhasil disimpan");
+    try {
+      await mutate("/api/settings", "PATCH", form);
+      await onUpdateMaster(masterForm);
+      await saveHeadlineDefaultsData(false);
+      await onSaved();
+      toast("Semua pengaturan berhasil disimpan");
+    } catch (error) {
+      toast(`Sebagian pengaturan belum tersimpan: ${(error as Error).message}`);
+    }
   }
 
   async function saveMaster() {
-    await onUpdateMaster(masterForm);
-    toast("Pengaturan default elemen master berhasil disimpan");
+    try {
+      await onUpdateMaster(masterForm);
+      toast("Pengaturan default elemen master berhasil disimpan");
+    } catch (error) {
+      toast((error as Error).message || "Gagal menerapkan master");
+    }
   }
 
-  async function saveHeadlineDefaultsData() {
+  async function saveHeadlineDefaultsData(notify = true) {
     setSavingHeadline(true);
     try {
       const updated = await mutate<HeadlineDefaults>(
@@ -599,9 +664,10 @@ function SettingsView({
         headlineDefaults
       );
       setHeadlineDefaults(updated);
-      toast("Pengaturan default headline berita berhasil disimpan");
+      if (notify) toast("Pengaturan default headline berita berhasil disimpan");
     } catch (e: any) {
-      toast(e.message || "Gagal menyimpan default headline");
+      if (notify) toast(e.message || "Gagal menyimpan default headline");
+      else throw e;
     } finally {
       setSavingHeadline(false);
     }
@@ -828,13 +894,15 @@ function SettingsView({
           <div className="form-grid" style={{ marginBottom: 12 }}>
             <label className="wide">
               <span>Isi Running Ticker Berita Default (Animasi Berjalan Kontinu)</span>
-              <input
+              <textarea
                 value={masterForm.tickerText || ""}
                 placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"
                 onChange={(e) => setMasterForm({ ...masterForm, tickerText: e.target.value })}
+                rows={4}
+                style={{ width: "100%", resize: "vertical", font: "inherit" }}
               />
               <small style={{ color: "#94a3b8", fontSize: 10, marginTop: 4, display: "block" }}>
-                Animasi running text berputar mulus 60fps tanpa jeda (looping seamless kontinu).
+                Isi baru masuk pada batas segmen. Kecepatan dihitung pada kanvas 1920 × 1080.
               </small>
             </label>
           </div>
@@ -847,14 +915,14 @@ function SettingsView({
                 <div className="tab-pill-group" style={{ display: "flex", gap: 4 }}>
                   <button
                     type="button"
-                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 55 ? "active" : ""}`}
+                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 65 ? "active" : ""}`}
                     onClick={() => {
-                      const u = { ...masterForm, tickerSpeed: 55 };
+                      const u = { ...masterForm, tickerSpeed: 65 };
                       setMasterForm(u);
                       onUpdateMaster(u);
                     }}
                   >
-                    Lambat (55)
+                    Lambat (65)
                   </button>
                   <button
                     type="button"
@@ -869,14 +937,14 @@ function SettingsView({
                   </button>
                   <button
                     type="button"
-                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 130 ? "active" : ""}`}
+                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 105 ? "active" : ""}`}
                     onClick={() => {
-                      const u = { ...masterForm, tickerSpeed: 130 };
+                      const u = { ...masterForm, tickerSpeed: 105 };
                       setMasterForm(u);
                       onUpdateMaster(u);
                     }}
                   >
-                    Cepat (130)
+                    Cepat (105)
                   </button>
                 </div>
               </div>
@@ -896,7 +964,7 @@ function SettingsView({
               />
               <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: 10, marginTop: 2 }}>
                 <span>40 px/s (Sangat Santai)</span>
-                <span>85 px/s (Standar Siaran TV)</span>
+                <span>85 px/s (Normal)</span>
                 <span>200 px/s (Sangat Cepat)</span>
               </div>
             </label>
@@ -1021,7 +1089,7 @@ function SettingsView({
           >
             <button
               className="primary-small"
-              onClick={saveHeadlineDefaultsData}
+              onClick={() => void saveHeadlineDefaultsData()}
               disabled={savingHeadline}
             >
               <Save size={13} /> {savingHeadline ? "Menyimpan..." : "Simpan Default Headline"}
@@ -1042,6 +1110,23 @@ function SettingsView({
             NewsCG beroperasi dengan arsitektur web overlay transparan (Singular.live style). Tambahkan URL Output sebagai input Web Browser pada switcher siaran Anda (vMix, OBS Studio, Wirecast, Tricaster).
           </p>
 
+          <div className="form-grid" style={{ marginTop: 14 }}>
+            <label>
+              <span>Target FPS animasi output</span>
+              <select
+                value={masterForm.outputFps || 30}
+                onChange={(event) => setMasterForm((previous) => ({ ...previous, outputFps: Number(event.target.value) as OutputFrameRate }))}
+              >
+                <option value={25}>25 fps — cocok untuk proyek vMix 25p</option>
+                <option value={30}>30 fps — direkomendasikan, lebih ringan</option>
+                <option value={60}>60 fps — gerak lebih halus</option>
+              </select>
+            </label>
+            <p style={{ margin: 0, alignSelf: "end", fontSize: 11, color: "#9cb1c9", lineHeight: 1.5 }}>
+              Pilihan ini mengatur pembaruan ticker di /output. Klik Simpan Semua untuk menerapkan; Preview dan Program di dashboard tetap 30 fps agar ringan.
+            </p>
+          </div>
+
           <div
             style={{
               marginTop: 14,
@@ -1061,12 +1146,12 @@ function SettingsView({
                 borderBottom: "1px solid #162335"
               }}
             >
-              <span style={{ fontSize: 11, color: "#8a96a8" }}>Status Layar Overlay Siaran:</span>
+              <span style={{ fontSize: 11, color: "#8a96a8" }}>Koneksi output NewsCG (tab/Browser Source):</span>
               <span className={`state-badge ${live.overlayClientsCount > 0 ? "on-air" : "cued"}`}>
                 <b>
                   {live.overlayClientsCount > 0
-                    ? `${live.overlayClientsCount} Layar Terhubung (Siap Siar)`
-                    : "Standby (Buka di Switcher / Tab)"}
+                    ? `${live.overlayClientsCount} klien terhubung`
+                    : "Belum ada klien terhubung"}
                 </b>
               </span>
             </div>
@@ -1095,6 +1180,9 @@ function SettingsView({
               </li>
               <li>
                 Atur Resolusi ke <b>1920 × 1080</b> (Full HD) dengan transparansi alpha aktif.
+              </li>
+              <li>
+                Samakan <b>Settings → Display → Master Frame Rate</b> di vMix dengan target {master.outputFps || 30}p. Frame rate akhir tetap ditentukan oleh proyek vMix dan kemampuan browser/GPU.
               </li>
               <li>
                 Pilih nomor overlay di vMix (misal Overlay 1 atau 2). Animasi grafis, ticker, dan logo siaran akan otomatis sinkron real-time saat Anda menekan TAKE / CLEAR.

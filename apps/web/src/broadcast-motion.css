@@ -1,0 +1,163 @@
+/* Motion on the output canvas is part of the broadcast picture. Each OUT uses
+   the exact endpoints of its matching IN in reverse order. Keep transforms on
+   wrappers so AutoSquishText can continue measuring and fitting its own text. */
+[data-broadcast-motion] .cg-content-layer,
+[data-broadcast-motion] .cg-content-layer.cg-exit,
+[data-broadcast-motion] .cg-content-layer.cg-exit .cg-text-area,
+[data-broadcast-motion] .cg-all-exit .cg-persistent-master {
+  animation: none !important;
+}
+
+/* Lower-third plate opens from the left; copy follows after the plate starts. */
+[data-broadcast-motion] .cnn-template .cg-main-box {
+  animation: news-panel-in var(--cg-panelInMs, 600ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-headline-row,
+[data-broadcast-motion] .cnn-template .cg-headline-row-single,
+[data-broadcast-motion] .cnn-template .cg-presenter-row,
+[data-broadcast-motion] .cnn-template .cg-paragraph-row {
+  animation: news-text-in var(--cg-textInMs, 360ms) cubic-bezier(.22,.75,.18,1) var(--cg-textInDelayMs, 160ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-subline-row,
+[data-broadcast-motion] .cnn-template .cg-social-row {
+  animation: news-detail-in var(--cg-detailInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-detailInDelayMs, 240ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-kicker-tab {
+  animation: news-topic-in var(--cg-topicInMs, 420ms) cubic-bezier(.22,.75,.18,1) var(--cg-topicInDelayMs, 80ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template.cg-location-tag {
+  animation: news-location-in var(--cg-locationInMs, 420ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
+}
+
+/* Copy and topic leave first. The plate closes only after they have cleared. */
+[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-row-single,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-presenter-row,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-paragraph-row {
+  animation: news-text-out var(--cg-textOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-exit .cg-subline-row,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-social-row,
+[data-broadcast-motion] .cnn-template .cg-detail-out {
+  animation: news-text-out var(--cg-detailOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-kicker-tab.cg-kicker-out,
+[data-broadcast-motion] .cnn-template .cg-exit .cg-kicker-tab {
+  animation: news-topic-out var(--cg-topicOutMs, 240ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-exit .cg-main-box {
+  animation: news-panel-out var(--cg-panelOutMs, 360ms) cubic-bezier(.55,0,.8,.35) var(--cg-panelOutDelayMs, 260ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template.cg-location-tag.cg-exit {
+  animation: news-location-out var(--cg-locationOutMs, 320ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+
+/* Persistent broadcast layers also retain their own complete IN/OUT motion. */
+[data-broadcast-motion] .cnn-template .cg-logo-box.standalone.cg-layer-in {
+  animation: news-logo-in var(--cg-logoInMs, 500ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-logo-box.standalone.cg-layer-out {
+  animation: news-logo-out var(--cg-logoOutMs, 400ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-standalone-live-badge.cg-layer-in {
+  animation: news-topic-in var(--cg-liveInMs, 340ms) cubic-bezier(.22,.75,.18,1) var(--cg-liveInDelayMs, 100ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-standalone-live-badge.cg-layer-out {
+  animation: news-topic-out var(--cg-liveOutMs, 240ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+
+/* The ticker strip rises from below; its badge, running copy, and clock follow. */
+[data-broadcast-motion] .cnn-template .cg-ticker-bar.cg-ticker-in {
+  animation: news-ticker-in var(--cg-tickerInMs, 560ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-badge,
+[data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-content {
+  animation: news-ticker-item-in var(--cg-tickerItemInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-tickerItemInDelayMs, 140ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-clock {
+  animation: news-detail-in var(--cg-tickerItemInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-tickerItemInDelayMs, 140ms) 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ticker-bar.cg-ticker-out {
+  animation: news-ticker-out var(--cg-tickerOutMs, 420ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-badge,
+[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-content {
+  animation: news-ticker-item-out var(--cg-tickerItemOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-clock {
+  animation: news-text-out var(--cg-tickerItemOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+
+/* Placeholders and standby ghosts are not on-air elements. */
+[data-broadcast-motion] .cnn-template .cg-logo-space,
+[data-broadcast-motion] .cnn-template .cg-ghost-element {
+  animation: none !important;
+}
+
+@keyframes news-panel-in {
+  from { clip-path: inset(0 100% 0 0); transform: translateX(-24px); opacity: 0; }
+  to { clip-path: inset(0); transform: translateX(0); opacity: 1; }
+}
+@keyframes news-panel-out {
+  from { clip-path: inset(0); transform: translateX(0); opacity: 1; }
+  to { clip-path: inset(0 100% 0 0); transform: translateX(-24px); opacity: 0; }
+}
+
+@keyframes news-text-in {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes news-text-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-24px); }
+}
+
+@keyframes news-detail-in {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes news-topic-in {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px); }
+  to { opacity: 1; clip-path: inset(0); transform: translateX(0); }
+}
+@keyframes news-topic-out {
+  from { opacity: 1; clip-path: inset(0); transform: translateX(0); }
+  to { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px); }
+}
+
+@keyframes news-location-in {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px); }
+  to { opacity: 1; clip-path: inset(0); transform: translateX(0); }
+}
+@keyframes news-location-out {
+  from { opacity: 1; clip-path: inset(0); transform: translateX(0); }
+  to { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px); }
+}
+
+@keyframes news-logo-in {
+  from { opacity: 0; clip-path: inset(100% 0 0); transform: translateY(20px); }
+  to { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+}
+@keyframes news-logo-out {
+  from { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+  to { opacity: 0; clip-path: inset(100% 0 0); transform: translateY(20px); }
+}
+
+@keyframes news-ticker-in {
+  from { opacity: 0; clip-path: inset(100% 0 0); transform: translateY(14px); }
+  to { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+}
+@keyframes news-ticker-out {
+  from { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+  to { opacity: 0; clip-path: inset(100% 0 0); transform: translateY(14px); }
+}
+
+@keyframes news-ticker-item-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes news-ticker-item-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-12px); }
+}

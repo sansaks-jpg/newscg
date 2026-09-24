@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { GraphicItem, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
-import { getGraphic, getMasterOverlay, getOnAir, logAction, markGraphicPushed, saveMasterOverlay, saveOnAir } from "./db.js";
+import { getGraphic, getItem, getMasterOverlay, getOnAir, logAction, markGraphicPushed, saveMasterOverlay, saveOnAir } from "./db.js";
 
 let selectedGraphicId: string | null = null;
 let live: LiveState = {
@@ -88,10 +88,12 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
   return enqueue(idempotencyKey, async () => {
     const requestId = randomUUID();
     const graphic = getGraphic(graphicId);
-    if (!graphic) throw new Error("Grafis tidak ditemukan");
     live = { ...live, commandStatus: "pending", error: null, lastActionAt: new Date().toISOString() };
 
     try {
+      if (!graphic) throw new Error("Grafis tidak ditemukan");
+      if (!getItem(graphic.itemId)?.cgRequired) throw new Error("TAKE diblokir: item rundown ditandai tanpa CG.");
+      if (graphic.status !== "READY") throw new Error("TAKE diblokir: materi CG masih DRAFT. Setujui di Rundown & CG.");
       const effectiveFields = options?.presentation === "clean"
         ? { ...graphic.draftFields, showLocation: "false", showKicker: "false", layoutStyle: "single" }
         : graphic.draftFields;
@@ -118,7 +120,7 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
       };
     } catch (e: any) {
       live = { ...live, commandStatus: "failed", error: e.message };
-      logAction("TAKE", "failed", e.message, graphic.id, requestId);
+      logAction("TAKE", "failed", e.message, graphic?.id, requestId);
       return { requestId, commandStatus: "failed", actualOverlayInputGuid: null, timestamp: new Date().toISOString(), error: e.message, state: publicState() };
     }
   });
@@ -138,6 +140,7 @@ export function updateLive(
       if (!graphic || !current || current.graphicId !== graphicId) {
         throw new Error("UPDATE diblokir: grafis ini tidak terverifikasi ON AIR");
       }
+      if (graphic.status !== "READY") throw new Error("UPDATE diblokir: materi CG masih DRAFT. Setujui di Rundown & CG.");
       live = { ...live, commandStatus: "pending", error: null };
 
       const existingSnapshot = (current.snapshot as Record<string, string>) || {};

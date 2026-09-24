@@ -28,6 +28,8 @@ describe("operator live workflow", () => {
   it("hotkeys map correctly for master and news elements", () => {
     expect(liveShortcut("1", {})).toBe("logo");
     expect(liveShortcut("2", {})).toBe("full");
+    expect(liveShortcut("m", {})).toBe("master");
+    expect(liveShortcut("M", { editing: true })).toBeNull();
     expect(liveShortcut("0", {})).toBe("clear-all");
     expect(liveShortcut("h", {})).toBe("headline");
     expect(liveShortcut("H", {})).toBe("headline");

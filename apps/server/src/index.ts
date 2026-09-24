@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { storyInputSchema } from "@newscg/shared";
+import { storyInputSchema, masterOverlayPatchSchema } from "@newscg/shared";
 import { saveStory } from "./db.js";
 import { setStage } from "./live.js";
 import cors from "cors";
@@ -59,7 +59,11 @@ app.post("/api/live/stage",asyncRoute(async(req:any,res:any) => {
   return res.json(await setStage(req.body.mode,req.get("Idempotency-Key") || crypto.randomUUID()));
 }));
 app.get("/api/live/master",(_req,res)=>res.json(getMasterOverlay()));
-app.patch("/api/live/master",(req,res)=>res.json(updateMasterState(req.body)));
+app.patch("/api/live/master", (req, res) => {
+  const parsed = masterOverlayPatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Pengaturan master tidak valid. Periksa isi ticker dan kecepatan (30–250 px/detik).", details: parsed.error.issues });
+  return res.json(updateMasterState(parsed.data));
+});
 app.get("/api/live/stream", (req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
