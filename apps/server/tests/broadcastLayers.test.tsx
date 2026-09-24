@@ -66,6 +66,9 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
       expect(node, selector).not.toBeNull();
       expect(getComputedStyle(node!).animation, selector).toContain(name);
     }
+    if (name === "output") {
+      expect(getComputedStyle(element(".cg-text-area")!).overflowX).toBe("hidden");
+    }
   });
 
   it("retains the headline throughout OUT in both Program and /output", async () => {

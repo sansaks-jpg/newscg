@@ -12,6 +12,10 @@
 [data-broadcast-motion] .cnn-template .cg-main-box {
   animation: news-panel-in var(--cg-panelInMs, 600ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
+/* Keep the moving copy inside its column, clear of the logo reserve on the right. */
+[data-broadcast-motion] .cnn-template .cg-main-box .cg-text-area {
+  overflow: hidden;
+}
 [data-broadcast-motion] .cnn-template .cg-headline-row,
 [data-broadcast-motion] .cnn-template .cg-headline-row-single,
 [data-broadcast-motion] .cnn-template .cg-presenter-row,
