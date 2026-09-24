@@ -8,7 +8,7 @@
   animation: none !important;
 }
 
-/* Lower-third plate opens from the left; copy follows after the plate starts. */
+/* The headline plate and its copy travel in from the logo side on the right. */
 [data-broadcast-motion] .cnn-template .cg-main-box {
   animation: news-panel-in var(--cg-panelInMs, 600ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
@@ -66,26 +66,22 @@
   animation: news-topic-out var(--cg-liveOutMs, 240ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 
-/* The ticker strip rises from below; its badge, running copy, and clock follow. */
+/* The ticker and LIVE descend from above; its badge, copy, and clock follow. */
 [data-broadcast-motion] .cnn-template .cg-ticker-bar.cg-ticker-in {
   animation: news-ticker-in var(--cg-tickerInMs, 560ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-badge,
-[data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-content {
-  animation: news-ticker-item-in var(--cg-tickerItemInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-tickerItemInDelayMs, 140ms) 1 both !important;
-}
+[data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-content,
 [data-broadcast-motion] .cnn-template .cg-ticker-in > .cg-ticker-clock {
-  animation: news-detail-in var(--cg-tickerItemInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-tickerItemInDelayMs, 140ms) 1 both !important;
+  animation: news-ticker-item-in var(--cg-tickerItemInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-tickerItemInDelayMs, 140ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-ticker-bar.cg-ticker-out {
   animation: news-ticker-out var(--cg-tickerOutMs, 420ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-badge,
-[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-content {
-  animation: news-ticker-item-out var(--cg-tickerItemOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
-}
+[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-content,
 [data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-clock {
-  animation: news-text-out var(--cg-tickerItemOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+  animation: news-ticker-item-out var(--cg-tickerItemOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 
 /* Placeholders and standby ghosts are not on-air elements. */
@@ -95,35 +91,35 @@
 }
 
 @keyframes news-panel-in {
-  from { clip-path: inset(0 100% 0 0); transform: translateX(-24px); opacity: 0; }
+  from { clip-path: inset(0 0 0 100%); transform: translateX(24px); opacity: 0; }
   to { clip-path: inset(0); transform: translateX(0); opacity: 1; }
 }
 @keyframes news-panel-out {
   from { clip-path: inset(0); transform: translateX(0); opacity: 1; }
-  to { clip-path: inset(0 100% 0 0); transform: translateX(-24px); opacity: 0; }
+  to { clip-path: inset(0 0 0 100%); transform: translateX(24px); opacity: 0; }
 }
 
 @keyframes news-text-in {
-  from { opacity: 0; transform: translateX(-24px); }
+  from { opacity: 0; transform: translateX(24px); }
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes news-text-out {
   from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 0; transform: translateX(24px); }
 }
 
 @keyframes news-detail-in {
-  from { opacity: 0; transform: translateX(-24px); }
+  from { opacity: 0; transform: translateX(24px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes news-topic-in {
-  from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px); }
-  to { opacity: 1; clip-path: inset(0); transform: translateX(0); }
+  from { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-18px); }
+  to { opacity: 1; clip-path: inset(0); transform: translateY(0); }
 }
 @keyframes news-topic-out {
-  from { opacity: 1; clip-path: inset(0); transform: translateX(0); }
-  to { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-18px); }
+  from { opacity: 1; clip-path: inset(0); transform: translateY(0); }
+  to { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-18px); }
 }
 
 @keyframes news-location-in {
@@ -145,19 +141,19 @@
 }
 
 @keyframes news-ticker-in {
-  from { opacity: 0; clip-path: inset(100% 0 0); transform: translateY(14px); }
+  from { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-14px); }
   to { opacity: 1; clip-path: inset(0); transform: translateY(0); }
 }
 @keyframes news-ticker-out {
   from { opacity: 1; clip-path: inset(0); transform: translateY(0); }
-  to { opacity: 0; clip-path: inset(100% 0 0); transform: translateY(14px); }
+  to { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(-14px); }
 }
 
 @keyframes news-ticker-item-in {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes news-ticker-item-out {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(-12px); }
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-12px); }
 }

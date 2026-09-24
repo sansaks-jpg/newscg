@@ -60,7 +60,7 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
       [".cg-subline-row", "news-detail-in"], [".cg-kicker-tab", "news-topic-in"],
       [".cg-location-tag", "news-location-in"], [".cg-logo-box.standalone", "news-logo-in"],
       [".cg-standalone-live-badge", "news-topic-in"], [".cg-ticker-bar", "news-ticker-in"],
-      [".cg-ticker-clock", "news-detail-in"]
+      [".cg-ticker-clock", "news-ticker-item-in"]
     ]) {
       const node = element(selector!);
       expect(node, selector).not.toBeNull();
@@ -111,7 +111,7 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).toContain("news-logo-out");
     expect(getComputedStyle(element(".cg-standalone-live-badge")!).animation).toContain("news-topic-out");
     expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-out");
-    expect(getComputedStyle(element(".cg-ticker-clock")!).animation).toContain("news-text-out");
+    expect(getComputedStyle(element(".cg-ticker-clock")!).animation).toContain("news-ticker-item-out");
     expect(element(".empty-stage-center")).toBeNull();
     await advance(200);
     await send({ type: "MASTER_UPDATE", master });
