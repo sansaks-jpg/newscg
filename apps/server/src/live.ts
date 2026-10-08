@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { GraphicItem, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
+import type { LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
 import { getGraphic, getItem, getMasterOverlay, getOnAir, logAction, markGraphicPushed, saveMasterOverlay, saveOnAir } from "./db.js";
 
 let selectedGraphicId: string | null = null;
@@ -17,11 +17,21 @@ let live: LiveState = {
 const idempotency = new Map<string, Promise<any>>();
 let queue: Promise<unknown> = Promise.resolve();
 
-const subscribers = new Set<(event: OverlayEvent) => void>();
+type OverlaySubscriberRole = "output" | "monitor";
+type OverlaySubscriber = {
+  id: string;
+  role: OverlaySubscriberRole;
+  handler: (event: OverlayEvent) => void;
+};
+const subscribers = new Map<string, OverlaySubscriber>();
 let currentRevision = 1;
 
-export function addOverlaySubscriber(handler: (event: OverlayEvent) => void) {
-  subscribers.add(handler);
+export function addOverlaySubscriber(
+  handler: (event: OverlayEvent) => void,
+  role: OverlaySubscriberRole = "output"
+) {
+  const id = randomUUID();
+  subscribers.set(id, { id, role, handler });
   const current = getOnAir();
   const graphic = current?.graphicId ? getGraphic(current.graphicId) : null;
   const master = getMasterOverlay();
@@ -34,20 +44,28 @@ export function addOverlaySubscriber(handler: (event: OverlayEvent) => void) {
     revision: currentRevision
   });
   return () => {
-    subscribers.delete(handler);
+    subscribers.delete(id);
   };
 }
 
 export function broadcastOverlayEvent(event: OverlayEvent) {
   currentRevision++;
   const eventWithRevision: OverlayEvent = { ...event, revision: currentRevision };
-  for (const sub of subscribers) {
+  for (const sub of subscribers.values()) {
     try {
-      sub(eventWithRevision);
+      sub.handler(eventWithRevision);
     } catch (e) {
       console.error("Gagal mengirim event overlay", e);
     }
   }
+}
+
+export function getOutputClientsCount(): number {
+  let count = 0;
+  for (const sub of subscribers.values()) {
+    if (sub.role === "output") count++;
+  }
+  return count;
 }
 
 function enqueue<T>(key: string, action: () => Promise<T>): Promise<T> {
@@ -63,12 +81,13 @@ function enqueue<T>(key: string, action: () => Promise<T>): Promise<T> {
 
 function publicState(): LiveState {
   const persisted = getOnAir();
-  const connection = subscribers.size > 0 ? "CONNECTED" : "STANDALONE";
+  const outputClientsCount = getOutputClientsCount();
+  const connection = outputClientsCount > 0 ? "CONNECTED" : "STANDALONE";
   return {
     ...live,
     selectedGraphicId,
     connection,
-    overlayClientsCount: subscribers.size,
+    overlayClientsCount: outputClientsCount,
     onAirGraphicId: persisted?.graphicId || null,
     actualOverlayInputGuid: persisted?.graphicId ? "web-overlay" : null,
     onAirSnapshot: (persisted?.snapshot as Record<string, string> | null) || null
@@ -120,7 +139,9 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
         error: null
       };
       broadcastOverlayEvent({ type: switchDetail ? "SWITCH_DETAIL" : "TAKE", graphic, fields: effectiveFields, master: getMasterOverlay() });
-      logAction("TAKE", "confirmed", `${graphic.templateType} terkonfirmasi ON AIR (Web Overlay)`, graphic.id, requestId);
+      const currentOutputs = getOutputClientsCount();
+      const statusNote = currentOutputs > 0 ? `(${currentOutputs} output terhubung)` : "(siaga / belum ada output vMix-OBS)";
+      logAction("TAKE", "confirmed", `${graphic.templateType} terkonfirmasi ON AIR ${statusNote}`, graphic.id, requestId);
       return {
         requestId,
         commandStatus: "confirmed",
@@ -231,6 +252,8 @@ export function takeVariantLive(
         }
         const isCurrentSub = currentSnapshot.layoutStyle === "sub";
         updatedSnapshot.layoutStyle = isCurrentSub ? "single" : "sub";
+      } else {
+        throw new Error(`Aksi varian '${action}' tidak dikenal`);
       }
 
       saveOnAir(graphic.id, "web-overlay", 1, updatedSnapshot, "confirmed");

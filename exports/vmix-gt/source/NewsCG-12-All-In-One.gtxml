@@ -1,0 +1,224 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="TopicLayer" Dimensions="1540,62,0" Location="70,780,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1540" Height="62">
+        <Rectangle Name="TopicColor" Dimensions="760,62,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FF282828" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Topic" Text="TOPIK BERITA" Dimensions="684,62,0" Location="38,0,0" FontFamily="Arial" FontSize="46" FontWeight="DemiBold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="HeadlinePlate" Dimensions="1780,146,0" Location="70,842,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1780" Height="146">
+        <Rectangle Name="PanelColor" Dimensions="1780,146,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Headline" Text="JUDUL BERITA UTAMA" Dimensions="1474,70,0" Location="38,10,0" FontFamily="Arial Narrow" FontSize="64" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+        <TextBlock Name="Description" Text="Keterangan tambahan berita" Dimensions="1474,55,0" Location="38,81,0" FontFamily="Arial" FontSize="46" FontWeight="Regular" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="LiveLayer" Dimensions="240,64,0" Location="1610,778,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="240" Height="64">
+        <Rectangle Name="LiveColor" Dimensions="240,64,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFF21212" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FFF21212" />
+                <GradientStop Position="1" Color="#FFCC0000" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="LiveLabel" Text="LIVE" Dimensions="240,64,0" Location="0,0,0" FontFamily="Arial" FontSize="46" FontWeight="Regular" TextAlign="Center" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="LogoLayer" Dimensions="240,146,0" Location="1610,842,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="240" Height="146">
+        <Rectangle Name="LogoPanelColor" Dimensions="240,146,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <Image Name="Logo" Dimensions="184,86,0" Location="28,10,0" SizeMode="Centered" DataFlags="NoEvents, ShowVisible">
+          <Image.Bitmap>
+            <Bitmap Source="assets\logo.png" />
+          </Image.Bitmap>
+        </Image>
+        <TextBlock Name="LogoSub" Text="Indonesia" Dimensions="220,38,0" Location="10,98,0" FontFamily="Arial" FontSize="38" FontWeight="Regular" TextAlign="Center" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="TickerLayer" Dimensions="1780,56,0" Location="70,994,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1780" Height="56">
+        <Rectangle Name="TickerColor" Dimensions="1780,56,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible" Radius="14,14">
+          <Rectangle.Fill>
+            <Brush Color="#FF303030" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FF303030" />
+                <GradientStop Position="1" Color="#FF060606" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <Rectangle Name="BrandColor" Dimensions="340,56,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFF0000" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FFFF0000" />
+                <GradientStop Position="1" Color="#FFCC0000" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Brand" Text="CNNINDONESIA.COM" Dimensions="300,56,0" Location="20,0,0" FontFamily="Arial Narrow" FontSize="28" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+        <Ticker Name="Ticker" Text="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI • " Dimensions="1200,56,0" Location="340,0,0" FontFamily="Arial Narrow" FontSize="34" FontWeight="Regular" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" Speed="3.4" Direction="Left" Type="Replace">
+          <Ticker.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Ticker.Fill>
+        </Ticker>
+        <Rectangle Name="ClockColor" Dimensions="240,56,0" Location="1540,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FF606060" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FF606060" />
+                <GradientStop Position="1" Color="#FF383838" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Clock" Text="{0:HH:mm} WIB" Dimensions="216,56,0" Location="1552,0,0" FontFamily="Arial" FontSize="36" FontWeight="Bold" TextAlign="Center" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="LocationLayer" Dimensions="700,53,0" Location="70,76,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="700" Height="53">
+        <Rectangle Name="LocationColor" Dimensions="700,53,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FF262626" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FF262626" />
+                <GradientStop Position="1" Color="#FF030303" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Location" Text="JAKARTA" Dimensions="648,53,0" Location="26,0,0" FontFamily="Arial" FontSize="32" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Fly Object="TopicColor" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="TopicColor" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" />
+      <Fly Object="Topic" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Topic" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" />
+      <Reveal Object="HeadlinePlate" Duration="0.6" Delay="0.0" Interpolation="CubicEasingOut" Direction="Right" />
+      <Fade Object="HeadlinePlate" Duration="0.6" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fade Object="Headline" Duration="0.36" Delay="0.16" Interpolation="CubicEasingOut" />
+      <Fade Object="Description" Duration="0.3" Delay="0.24" Interpolation="CubicEasingOut" />
+      <Reveal Object="LiveLayer" Duration="0.34" Delay="0.1" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="LiveLayer" Duration="0.34" Delay="0.1" Interpolation="CubicEasingOut" />
+      <Reveal Object="LogoLayer" Duration="0.5" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="LogoLayer" Duration="0.5" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="TickerColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="TickerColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="BrandColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="BrandColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="Brand" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Brand" Duration="0.3" Delay="0.14" Interpolation="CubicEasingOut" />
+      <Fly Object="Ticker" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Ticker" Duration="0.3" Delay="0.14" Interpolation="CubicEasingOut" />
+      <Fly Object="ClockColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="ClockColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="Clock" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Clock" Duration="0.3" Delay="0.14" Interpolation="CubicEasingOut" />
+      <Reveal Object="LocationLayer" Duration="0.42" Delay="0.0" Interpolation="CubicEasingOut" Direction="Left" />
+      <Fade Object="LocationLayer" Duration="0.42" Delay="0.0" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="TransitionOut">
+    <Storyboard.Animations>
+      <Fly Object="TopicColor" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="TopicColor" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Topic" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Topic" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Reveal Object="HeadlinePlate" Duration="0.36" Delay="0.42" Interpolation="CubicEasingIn" Direction="Right" />
+      <Fade Object="HeadlinePlate" Duration="0.36" Delay="0.42" Interpolation="CubicEasingIn" />
+      <Fade Object="Headline" Duration="0.18" Delay="0.24" Interpolation="CubicEasingIn" />
+      <Fade Object="Description" Duration="0.18" Delay="0.24" Interpolation="CubicEasingIn" />
+      <Reveal Object="LiveLayer" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="LiveLayer" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Reveal Object="LogoLayer" Duration="0.4" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="LogoLayer" Duration="0.4" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="TickerColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="TickerColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="BrandColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="BrandColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Brand" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Brand" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Ticker" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Ticker" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="ClockColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="ClockColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Clock" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Clock" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Reveal Object="LocationLayer" Duration="0.32" Delay="0.0" Interpolation="CubicEasingIn" Direction="Left" />
+      <Fade Object="LocationLayer" Duration="0.32" Delay="0.0" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="Page1">
+    <Storyboard.Animations>
+      <Reveal Object="LiveLayer" Direction="Bottom" Duration="0.24" Reverse="True" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="Page2">
+    <Storyboard.Animations>
+      <Reveal Object="LiveLayer" Direction="Bottom" Duration="0.34" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>

@@ -140,4 +140,24 @@ describe("Live variant & headline defaults API (branch simple)", () => {
     expect(result.error).toContain("masih DRAFT");
     expect(dbModule.getOnAir()?.graphicId).toBe(previousProgram);
   });
+
+  it("rejects unknown variant action", async () => {
+    const graphicId = "CG-TEST-201";
+    await liveModule.take(graphicId, "key-take-for-variant-test");
+    const res = await liveModule.takeVariantLive(graphicId, "invalid-action" as any, "key-invalid-var");
+    expect(res.commandStatus).toBe("failed");
+    expect(res.error).toContain("tidak dikenal");
+  });
+
+  it("imports a duplicate rundown successfully without unique constraint failure", () => {
+    const rundowns = dbModule.getRundowns();
+    const original = rundowns[0]!;
+    const imported = dbModule.createRundown(original, { regenerateIds: true });
+    expect(imported.id).not.toBe(original.id);
+    expect(imported.title).toBe(original.title);
+    if (original.items.length > 0) {
+      expect(imported.items.length).toBe(original.items.length);
+      expect(imported.items[0]!.id).not.toBe(original.items[0]!.id);
+    }
+  });
 });

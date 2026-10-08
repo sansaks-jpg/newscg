@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="LiveLayer" Dimensions="240,64,0" Location="1610,778,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="240" Height="64">
+        <Rectangle Name="LiveColor" Dimensions="240,64,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFF21212" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FFF21212" />
+                <GradientStop Position="1" Color="#FFCC0000" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="LiveLabel" Text="LIVE" Dimensions="240,64,0" Location="0,0,0" FontFamily="Arial" FontSize="46" FontWeight="Regular" TextAlign="Center" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="LogoLayer" Dimensions="240,146,0" Location="1610,842,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="240" Height="146">
+        <Rectangle Name="LogoPanelColor" Dimensions="240,146,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <Image Name="Logo" Dimensions="184,86,0" Location="28,10,0" SizeMode="Centered" DataFlags="NoEvents, ShowVisible">
+          <Image.Bitmap>
+            <Bitmap Source="assets\logo.png" />
+          </Image.Bitmap>
+        </Image>
+        <TextBlock Name="LogoSub" Text="Indonesia" Dimensions="220,38,0" Location="10,98,0" FontFamily="Arial" FontSize="38" FontWeight="Regular" TextAlign="Center" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Reveal Object="LiveLayer" Duration="0.34" Delay="0.1" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="LiveLayer" Duration="0.34" Delay="0.1" Interpolation="CubicEasingOut" />
+      <Reveal Object="LogoLayer" Duration="0.5" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="LogoLayer" Duration="0.5" Delay="0.0" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="TransitionOut">
+    <Storyboard.Animations>
+      <Reveal Object="LiveLayer" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="LiveLayer" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Reveal Object="LogoLayer" Duration="0.4" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="LogoLayer" Duration="0.4" Delay="0.0" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="Page1">
+    <Storyboard.Animations>
+      <Reveal Object="LiveLayer" Direction="Bottom" Duration="0.24" Reverse="True" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="Page2">
+    <Storyboard.Animations>
+      <Reveal Object="LiveLayer" Direction="Bottom" Duration="0.34" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>

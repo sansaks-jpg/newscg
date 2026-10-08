@@ -23,9 +23,27 @@ Sistem ini beroperasi 100% berbasis web-native yang siap di-embed langsung ke be
   - Live Bug & Jam Digital otomatis berbasis zona waktu (WIB, WITA, WIT, CUSTOM).
   - Running Ticker / Crawl Berita di bagian bawah layar dengan pengaturan kecepatan (px/detik) dan label program otomatis pas huruf (*auto-fit*).
 - **Auto-Squish Typography**: Algoritma cerdas yang otomatis menyesuaikan rasio kompresi font (*horizontal squish*) agar teks panjang tidak pernah meluber melewati batas *Safe Area* siaran.
-- **Keyboard Shortcuts Cepat**: Dukungan penuh shortcut keyboard (`Space`/`T` untuk TAKE, `Enter` untuk TAKE & Advance, `U` untuk Update, `Esc`/`C` untuk Clear, `0` untuk Clear All, dll.).
+- **Keyboard Shortcuts Cepat**: Dukungan penuh shortcut keyboard (`Space`/`Enter` untuk TAKE/UPDATE, `U` untuk Update, `Esc`/`C` untuk OUT, `0` untuk ALL OUT (animasi), `M` untuk Terapkan Master, dll.).
 - **Impor & Ekspor Rundown**: Dukungan pencadangan dan pemindahan rundown siaran dalam format JSON.
 - **100% Offline & LAN-Ready**: Berjalan sepenuhnya di jaringan lokal tanpa ketergantungan koneksi internet publik.
+
+---
+
+## Template Warna Studio
+
+Pilihan warna mengikuti virtual set dengan meja navy, dinding abu gelap, dan lampu hangat:
+
+- **Studio Navy** (rekomendasi): biru navy, putih gading, dan garis tembaga tipis.
+- **Studio Graphite**: abu arang, perak kebiruan, dan panel terang yang lebih redup.
+- **Studio Copper**: tembaga redup dan krem hangat.
+
+Ketiganya memakai ukuran, susunan, serta animasi IN/UPDATE/OUT CNN yang sama. Warna berlaku untuk headline, nama/SOT, topik, lokasi, logo teks, LIVE, ticker, dan jam. Template CNN awal tetap tersedia.
+
+Di panel Produksi, pilih **Warna template**, periksa Preview, lalu tekan **TERAPKAN MASTER / M**. Pilih warna saja belum mengubah Program. **TICKER SEGERA** hanya menerapkan teks/kecepatan ticker; pilihan warna yang masih di Preview tetap menunggu MASTER. Warna juga dapat dipilih di **Settings → Pengaturan Default Siaran & Ticker**, lalu diterapkan lewat **Simpan Default Master**.
+
+Galeri `/templates/studio` memperlihatkan CG di atas foto virtual set referensi, dengan kontrol variasi teks dan animasi. Galeri tidak terhubung ke output live. `/templates/cnn` tetap dapat dibuka. Pilihan warna disimpan pada master overlay sebagai `colorTheme` dan ikut dikirim dalam event SSE. Data lama tanpa pilihan warna tetap menggunakan CNN.
+
+Logo upload yang disarankan: **PNG transparan 800 × 500 px**, ruang kosong sekitar **40 px** di setiap tepi, maksimal **2 MB**. SVG juga didukung. Logo ditempatkan secara proporsional tanpa dipotong. Saat memilih warna studio, identitas contoh CNN diganti menjadi teks sementara NEWS; nama kustom dan logo yang sudah diunggah tetap dipertahankan.
 
 ---
 
@@ -121,15 +139,38 @@ Server produksi terpadu akan melayani dashboard dan overlay di `http://localhost
 | `Space` / `Enter` | **TAKE / COMMIT** | Menayangkan grafis terpilih ke siaran live (atau perbarui live jika grafis yang sama sedang tayang) |
 | `U` | **UPDATE LIVE** | Memperbarui teks/data pada grafis yang sedang tayang tanpa animasi ulang |
 | `Escape` / `C` | **CLEAR CG** | Menarik grafis lower third keluar dari siaran live dengan animasi transisi keluar |
-| `0` | **CLEAR ALL (BLACKOUT)** | Membersihkan seketika seluruh grafis di layar termasuk logo dan ticker |
-| `1` | **TOGGLE LOGO** | Menampilkan atau menyembunyikan Logo siaran |
-| `2` | **TOGGLE TICKER & LIVE** | Menampilkan atau menyembunyikan Ticker bawah dan badge LIVE |
+| `0` | **ALL OUT (ANIMASI)** | Menarik keluar seluruh grafis di layar (termasuk logo dan ticker) dengan transisi animasi halus. Untuk blackout instan darurat, gunakan tombol UI 'CLEAR ALL Darurat' |
+| `1` | **STAGE LOGO** | Toggle Logo di Preview (tekan `M` untuk menerapkan ke siaran live) |
+| `2` | **STAGE TICKER & LIVE** | Toggle Ticker dan badge LIVE di Preview (tekan `M` untuk menerapkan ke siaran live) |
+| `M` | **TERAPKAN MASTER** | Menerapkan perubahan staging logo / ticker / live badge ke siaran live |
+| `K` | **SOT NARASUMBER** | Buka/tutup LT SOT narasumber (`ArrowLeft`/`ArrowRight` untuk pilih narasumber) |
 | `H` | **MODE HEADLINE** | Mengatur template ke mode Headline Bersih |
 | `L` | **TOGGLE LOKASI** | Menampilkan atau menyembunyikan elemen lokasi pada grafis |
 | `T` | **TOGGLE TOPIK** | Menampilkan atau menyembunyikan kicker / topik di atas headline |
 | `D` | **TOGGLE DETAIL** | Menampilkan atau menyembunyikan baris detail / sub-judul |
 | `ArrowUp` | **PREVIOUS STORY** | Berpindah ke berita sebelumnya pada rundown |
 | `ArrowDown` | **NEXT STORY** | Berpindah ke berita berikutnya pada rundown |
+
+---
+
+## 🔌 Integrasi API Siaran & Remote Control Eksternal
+
+NewsCG menyediakan REST API yang siap dihubungkan ke switcher siaran, Stream Deck, atau Bitfocus Companion:
+
+| Endpoint | Method | Fungsi |
+|---|---|---|
+| `/api/live/stream?role=output` | GET (SSE) | Real-time event stream untuk browser overlay (/output) |
+| `/api/live/stream?role=monitor` | GET (SSE) | Real-time event stream untuk operator preview monitor |
+| `/api/live/take` | POST | Menayangkan grafis (`graphicId`) ke siaran live |
+| `/api/live/update` | POST | Memperbarui teks/data grafis yang sedang tayang |
+| `/api/live/clear` | POST | Menarik keluar grafis lower third (animasi keluar) |
+| `/api/live/clear-all` | POST | Menghilangkan seluruh layer (`immediate: true/false`) |
+| `/api/live/prepare` | POST | Menyiapkan cue standby tanpa mengubah status live |
+| `/api/live/variant` | POST | Men-toggle elemen live (`toggle-location`, `toggle-topic`, `toggle-detail`, `clean-headline`) |
+| `/api/live/stage` | POST | Menyetel preset master staging (`empty`, `logo`, `full`) |
+| `/api/live/master` | PATCH | Mengonfigurasi master overlay (logo, jam digital, ticker) |
+| `/api/rundowns/:id/export` | GET | Mengunduh berkas JSON backup rundown siaran |
+| `/api/rundowns/import` | POST | Mengimpor berkas JSON rundown baru |
 
 ---
 

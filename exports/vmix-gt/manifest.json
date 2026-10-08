@@ -1,0 +1,378 @@
+{
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "alpha": true
+  },
+  "motionSource": "packages/shared/src/index.ts#broadcastMotion",
+  "motionMs": {
+    "panelInMs": 600,
+    "panelOutMs": 360,
+    "panelOutDelayMs": 260,
+    "panelOutWithTopicDelayMs": 420,
+    "retainMs": 780,
+    "textInMs": 360,
+    "textInDelayMs": 160,
+    "textOutMs": 180,
+    "topicInMs": 420,
+    "topicInDelayMs": 600,
+    "topicOutMs": 240,
+    "detailInMs": 300,
+    "detailInDelayMs": 240,
+    "detailOutMs": 180,
+    "locationInMs": 420,
+    "locationOutMs": 320,
+    "logoInMs": 500,
+    "logoOutMs": 400,
+    "liveInMs": 340,
+    "liveInDelayMs": 100,
+    "liveOutMs": 240,
+    "tickerInMs": 560,
+    "tickerOutMs": 420,
+    "tickerItemInMs": 300,
+    "tickerItemInDelayMs": 140,
+    "tickerItemOutMs": 180
+  },
+  "engine": "vMix GT native",
+  "differences": [
+    "GT uses CubicEasingOut/In; arbitrary CSS cubic-bezier curves are not supported.",
+    "Text fades at the original timings; the CSS 24px translation is not reproduced.",
+    "Logo/LIVE use directional reveals; CSS 20px translation is not reproduced.",
+    "Topic and location widths are fixed editable design dimensions, rather than browser content measurement.",
+    "GT auto-shrink changes font size instead of browser horizontal text squishing.",
+    "Headline panel corners are square; the browser has a 16px top-left radius.",
+    "Clock follows Windows local time; change WIB suffix and Windows timezone together."
+  ],
+  "templates": [
+    {
+      "file": "NewsCG-01-Headline.gtzip",
+      "description": "Headline satu baris",
+      "fields": [
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-02-Headline-Detail.gtzip",
+      "description": "Headline dengan detail",
+      "fields": [
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Description",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-03-Headline-Topic.gtzip",
+      "description": "Headline dengan topik bertahap",
+      "fields": [
+        {
+          "name": "TopicColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Topic",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-04-Headline-Topic-Detail.gtzip",
+      "description": "Headline, topik dan detail",
+      "fields": [
+        {
+          "name": "TopicColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Topic",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Description",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-05-Breaking.gtzip",
+      "description": "Breaking news",
+      "fields": [
+        {
+          "name": "TopicColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Topic",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Description",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-06-Presenter.gtzip",
+      "description": "Nama presenter dan akun sosial",
+      "fields": [
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Name",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "SocialHandle",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-07-SOT.gtzip",
+      "description": "Headline, nama narasumber dan jabatan",
+      "fields": [
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Name",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "DividerColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Role",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-08-Paragraph.gtzip",
+      "description": "Keterangan berbentuk paragraf",
+      "fields": [
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Paragraph",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-09-Location.gtzip",
+      "description": "Lokasi independen",
+      "fields": [
+        {
+          "name": "LocationColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Location",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-10-Logo-LIVE.gtzip",
+      "description": "Logo dan LIVE independen; Page1 LIVE OUT, Page2 LIVE IN",
+      "fields": [
+        {
+          "name": "LiveColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "LiveLabel",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "LogoPanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Logo",
+          "kind": "Image"
+        },
+        {
+          "name": "LogoSub",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": [
+        "Page1",
+        "Page2"
+      ]
+    },
+    {
+      "file": "NewsCG-11-Ticker-Clock.gtzip",
+      "description": "Running text, identitas program dan jam komputer",
+      "fields": [
+        {
+          "name": "TickerColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "BrandColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Brand",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Ticker",
+          "kind": "Ticker"
+        },
+        {
+          "name": "ClockColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Clock",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": []
+    },
+    {
+      "file": "NewsCG-12-All-In-One.gtzip",
+      "description": "Template lengkap untuk mulai cepat",
+      "fields": [
+        {
+          "name": "TopicColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Topic",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "PanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Headline",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Description",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "LiveColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "LiveLabel",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "LogoPanelColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Logo",
+          "kind": "Image"
+        },
+        {
+          "name": "LogoSub",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "TickerColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "BrandColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Brand",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "Ticker",
+          "kind": "Ticker"
+        },
+        {
+          "name": "ClockColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Clock",
+          "kind": "TextBlock"
+        },
+        {
+          "name": "LocationColor",
+          "kind": "Rectangle"
+        },
+        {
+          "name": "Location",
+          "kind": "TextBlock"
+        }
+      ],
+      "pages": [
+        "Page1",
+        "Page2"
+      ]
+    }
+  ]
+}

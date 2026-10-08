@@ -4,10 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { broadcastMotion, defaultMasterOverlayState } from "@newscg/shared";
-import type { GraphicItem, OverlayEvent } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, selectBroadcastColorTheme } from "@newscg/shared";
+import type { GraphicItem, MasterOverlayState, OverlayEvent } from "@newscg/shared";
 import OverlayWindow from "../../web/src/OverlayWindow";
 import { ProgramMonitor } from "../../web/src/ProgramMonitor";
+import { SimpleProductionEditor } from "../../web/src/SimpleProductionEditor";
+import TemplatePreview from "../../web/src/TemplatePreview";
 
 let root: Root;
 let host: HTMLDivElement;
@@ -36,7 +38,7 @@ beforeEach(() => {
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: Promise.resolve() } });
   const style = document.createElement("style");
   // Load both the legacy template and the new motion rules in application order.
-  style.textContent = ["broadcast-cnn.css", "broadcast-motion.css"]
+  style.textContent = ["broadcast-cnn.css", "broadcast-motion.css", "broadcast-palettes.css"]
     .map((file) => readFileSync(resolve(process.cwd(), "../web/src", file), "utf8")).join("\n");
   document.head.append(style);
   host = document.createElement("div");
@@ -52,6 +54,32 @@ afterEach(async () => {
 });
 
 describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", Component: ProgramMonitor }])("broadcast layer lifecycle ($name)", ({ Component }) => {
+  it.each(["studio-navy", "studio-graphite", "studio-copper"] as const)("applies %s to every layer without replaying the headline or ticker", async (colorTheme) => {
+    await act(async () => root.render(createElement(Component)));
+    await send({ type: "TAKE", graphic, fields, master });
+    const panel = element(".cg-main-box");
+    const headline = element(".cg-headline-row");
+    const ticker = element(".cg-ticker-track");
+    const logo = element(".cg-logo-box.standalone");
+    const themedMaster = selectBroadcastColorTheme(master, colorTheme);
+    await send({ type: "MASTER_UPDATE", master: themedMaster });
+    expect(element(".cg-main-box")).toBe(panel);
+    expect(element(".cg-headline-row")).toBe(headline);
+    expect(element(".cg-ticker-track")).toBe(ticker);
+    expect(element(".cg-logo-box.standalone")).toBe(logo);
+    expect(element(".cg-lower-third")?.dataset.colorTheme).toBe(colorTheme);
+    expect(element(".cg-location-tag")?.dataset.colorTheme).toBe(colorTheme);
+    expect(element(".cg-lower-third")?.style.getPropertyValue("--cg-color-panel")).toBe(getBroadcastColorTheme(colorTheme).colors.panel);
+    expect(element(".cg-brand-cnn")).toBeNull();
+    expect(element(".cg-ticker-badge")?.textContent).toBe("NEWS UPDATE");
+    expect(getComputedStyle(panel!).animation).toContain("news-panel-in");
+    await send({ type: "CLEAR", master: themedMaster });
+    expect(getComputedStyle(panel!).animation).toContain("news-panel-out");
+    await advance(broadcastMotion.retainMs);
+    expect(element(".cg-main-box")).toBeNull();
+    expect(element(".cg-lower-third")?.dataset.colorTheme).toBe(colorTheme);
+  });
+
   it("shows the story headline above the SOT speaker and role", async () => {
     await act(async () => root.render(createElement(Component)));
     const sotGraphic = { ...graphic, id: "sot-1", templateType: "SOT" as const };
@@ -212,5 +240,65 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(getComputedStyle(element(`${selector} > .cg-copy-motion`)!).animation).toContain("news-text-out");
     await advance(broadcastMotion.retainMs);
     expect(element(selector)).toBeNull();
+  });
+});
+
+describe("broadcast color selection", () => {
+  it("stages a color in Preview and only sends it when the operator applies MASTER", async () => {
+    const updateMaster = vi.fn(async (_patch: Partial<MasterOverlayState>) => {});
+    await act(async () => root.render(createElement(SimpleProductionEditor, {
+      master, live: { connection: "STANDALONE", commandStatus: "idle", selectedGraphicId: null,
+        onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: null,
+        error: null, overlayClientsCount: 1 },
+      reload: vi.fn(async () => {}), toast: vi.fn(), onUpdateMaster: updateMaster
+    })));
+    await send({ type: "SYNC", onAir: true, graphic, fields, master });
+    const programPanel = element(".live-mini-screen-wrapper .cg-main-box");
+    expect(programPanel).not.toBeNull();
+    const select = element(".broadcast-color-select select") as HTMLSelectElement;
+    await act(async () => {
+      select.value = "studio-navy";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(updateMaster).not.toHaveBeenCalled();
+    const layers = Array.from(host.querySelectorAll<HTMLElement>(".cg-lower-third"));
+    expect(layers.map((node) => node.dataset.colorTheme)).toContain("studio-navy");
+    expect(layers.map((node) => node.dataset.colorTheme)).toContain("cnn");
+    expect(master.colorTheme).toBe("cnn");
+    const urgent = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "TICKER SEGERA")!;
+    await act(async () => urgent.click());
+    expect(updateMaster).toHaveBeenCalledTimes(1);
+    expect(updateMaster.mock.calls[0]?.[0]).not.toHaveProperty("colorTheme");
+    expect(updateMaster.mock.calls[0]?.[0]).not.toHaveProperty("brandText");
+    expect(select.value).toBe("studio-navy");
+    const apply = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.startsWith("TERAPKAN MASTER"))!;
+    expect(apply.disabled).toBe(false);
+    await act(async () => apply.click());
+    expect(updateMaster).toHaveBeenCalledTimes(2);
+    expect(updateMaster.mock.calls[1]?.[0]).toMatchObject({ colorTheme: "studio-navy", brandText: "NEWS UPDATE", logoText: "NEWS" });
+    await send({ type: "MASTER_UPDATE", master: selectBroadcastColorTheme(master, "studio-navy") });
+    expect(Array.from(host.querySelectorAll<HTMLElement>(".cg-lower-third")).every((node) => node.dataset.colorTheme === "studio-navy")).toBe(true);
+    expect(host.contains(programPanel)).toBe(true);
+  });
+
+  it("the studio gallery uses the sequential production OUT and makes no live connection", async () => {
+    await act(async () => root.render(createElement(TemplatePreview)));
+    expect(streams).toHaveLength(0);
+    expect(element(".preview-studio-reference")).not.toBeNull();
+    const out = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "Putar OUT semua")!;
+    await act(async () => out.click());
+    expect(element(".cg-main-box")).not.toBeNull();
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).not.toContain("news-ticker-out");
+    await advance(broadcastMotion.retainMs);
+    expect(element(".cg-main-box")).toBeNull();
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-out");
+    expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).not.toContain("news-logo-out");
+    await advance(broadcastMotion.tickerOutMs + 20);
+    expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).toContain("news-logo-out");
+    await advance(broadcastMotion.logoOutMs + 20);
+    expect(element(".cg-lower-third")).toBeNull();
   });
 });

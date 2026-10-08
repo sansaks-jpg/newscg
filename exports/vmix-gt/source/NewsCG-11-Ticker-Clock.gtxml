@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="TickerLayer" Dimensions="1780,56,0" Location="70,994,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1780" Height="56">
+        <Rectangle Name="TickerColor" Dimensions="1780,56,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible" Radius="14,14">
+          <Rectangle.Fill>
+            <Brush Color="#FF303030" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FF303030" />
+                <GradientStop Position="1" Color="#FF060606" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <Rectangle Name="BrandColor" Dimensions="340,56,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFF0000" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FFFF0000" />
+                <GradientStop Position="1" Color="#FFCC0000" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Brand" Text="CNNINDONESIA.COM" Dimensions="300,56,0" Location="20,0,0" FontFamily="Arial Narrow" FontSize="28" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+        <Ticker Name="Ticker" Text="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI • " Dimensions="1200,56,0" Location="340,0,0" FontFamily="Arial Narrow" FontSize="34" FontWeight="Regular" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" Speed="3.4" Direction="Left" Type="Replace">
+          <Ticker.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Ticker.Fill>
+        </Ticker>
+        <Rectangle Name="ClockColor" Dimensions="240,56,0" Location="1540,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FF606060" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FF606060" />
+                <GradientStop Position="1" Color="#FF383838" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Clock" Text="{0:HH:mm} WIB" Dimensions="216,56,0" Location="1552,0,0" FontFamily="Arial" FontSize="36" FontWeight="Bold" TextAlign="Center" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Fly Object="TickerColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="TickerColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="BrandColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="BrandColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="Brand" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Brand" Duration="0.3" Delay="0.14" Interpolation="CubicEasingOut" />
+      <Fly Object="Ticker" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Ticker" Duration="0.3" Delay="0.14" Interpolation="CubicEasingOut" />
+      <Fly Object="ClockColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="ClockColor" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fly Object="Clock" Duration="0.56" Delay="0.0" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Clock" Duration="0.3" Delay="0.14" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="TransitionOut">
+    <Storyboard.Animations>
+      <Fly Object="TickerColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="TickerColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="BrandColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="BrandColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Brand" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Brand" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Ticker" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Ticker" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="ClockColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="ClockColor" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Clock" Duration="0.42" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Clock" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>

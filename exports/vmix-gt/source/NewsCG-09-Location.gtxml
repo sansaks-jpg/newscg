@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="LocationLayer" Dimensions="700,53,0" Location="70,76,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="700" Height="53">
+        <Rectangle Name="LocationColor" Dimensions="700,53,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FF262626" Type="LinearGradient" StartPoint="0.5,0" EndPoint="0.5,1">
+              <Brush.Stops>
+                <GradientStop Color="#FF262626" />
+                <GradientStop Position="1" Color="#FF030303" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Location" Text="JAKARTA" Dimensions="648,53,0" Location="26,0,0" FontFamily="Arial" FontSize="32" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Reveal Object="LocationLayer" Duration="0.42" Delay="0.0" Interpolation="CubicEasingOut" Direction="Left" />
+      <Fade Object="LocationLayer" Duration="0.42" Delay="0.0" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="TransitionOut">
+    <Storyboard.Animations>
+      <Reveal Object="LocationLayer" Duration="0.32" Delay="0.0" Interpolation="CubicEasingIn" Direction="Left" />
+      <Fade Object="LocationLayer" Duration="0.32" Delay="0.0" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>

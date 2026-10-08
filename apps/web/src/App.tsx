@@ -8,7 +8,7 @@ import {
   Globe,
   Image as ImageIcon,
   LayoutList,
-  LoaderCircle,
+
   MapPin,
   MonitorPlay,
   PencilLine,
@@ -31,23 +31,24 @@ import type {
   TemplateType,
   TimezoneMode
 } from "@newscg/shared";
-import { defaultHeadlineDefaults, defaultMasterOverlayState, masterOverlayPatchSchema } from "@newscg/shared";
+import { broadcastLogoUploadSpec, defaultHeadlineDefaults, defaultMasterOverlayState, masterOverlayPatchSchema, selectBroadcastColorTheme } from "@newscg/shared";
 import { api, mutate } from "./api";
 import TemplatePreview from "./TemplatePreview";
 import OverlayWindow from "./OverlayWindow";
 import { Preparation } from "./Newsroom";
 import { SimpleProductionEditor } from "./SimpleProductionEditor";
-import { BroadcastClock } from "./BroadcastGraphic";
+import { BroadcastClock, BroadcastPreviewBox } from "./BroadcastGraphic";
+import { BroadcastColorThemePicker } from "./VisualTemplatePicker";
 import { BroadcastTicker } from "./BroadcastTicker";
 
 type View = "editor" | "rundown" | "settings";
-const templateMeta: Record<TemplateType, { label: string; icon: any; accent: string }> = {
-  HEADLINE: { label: "Headline", icon: MonitorPlay, accent: "#f1f3f6" },
-  REPORTER: { label: "Reporter / Pembawa Acara", icon: UserRound, accent: "#4e8cff" },
-  SOT: { label: "SOT Narasumber", icon: UserRound, accent: "#e11d2e" },
-  LOCATION: { label: "Lokasi", icon: MapPin, accent: "#f7b53d" },
-  BREAKING: { label: "Breaking News", icon: AlertTriangle, accent: "#ef1b2d" }
-};
+
+
+
+
+
+
+
 const blankLive: LiveState = {
   connection: "STANDALONE",
   commandStatus: "idle",
@@ -60,8 +61,34 @@ const blankLive: LiveState = {
   overlayClientsCount: 0
 };
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fallback
+    }
+  }
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return successful;
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
-  if (window.location.pathname === "/templates/cnn") return <TemplatePreview />;
+  if (window.location.pathname === "/templates/cnn" || window.location.pathname === "/templates/studio") return <TemplatePreview />;
   const isOverlayRoute =
     window.location.pathname === "/output" ||
     window.location.pathname === "/overlay" ||
@@ -78,23 +105,23 @@ export default function App() {
   const [master, setMaster] = useState<MasterOverlayState>(defaultMasterOverlayState);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [actions, setActions] = useState<any[]>([]);
+
   const [toast, setToast] = useState("");
 
   const active = rundowns.find((r) => r.id === activeId) || rundowns[0];
 
   const reload = useCallback(async () => {
-    const [r, s, l, a, m] = await Promise.all([
+    const [r, s, l, m] = await Promise.all([
       api<Rundown[]>("/api/rundowns"),
       api<AppSettings>("/api/settings"),
       api<LiveState>("/api/live/state"),
-      api<any[]>("/api/actions?limit=12"),
+
       api<MasterOverlayState>("/api/live/master")
     ]);
     setRundowns(r);
     setSettings(s);
     setLive(l);
-    setActions(a);
+
     if (m) setMaster(m);
     setActiveId((id) => id || r[0]?.id || "");
   }, []);
@@ -130,10 +157,14 @@ export default function App() {
     }
   }
 
-  function copyOutputUrl() {
+  async function copyOutputUrl() {
     const url = `${window.location.origin}/output`;
-    navigator.clipboard.writeText(url);
-    setToast(`Output URL disalin: ${url}`);
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setToast(`Output URL disalin: ${url}`);
+    } else {
+      setToast(`Gagal menyalin otomatis. Silakan salin manual: ${url}`);
+    }
   }
 
   const status =
@@ -231,14 +262,14 @@ export default function App() {
         {view === "editor" && (
           <SimpleProductionEditor
             rundown={active}
-            rundowns={rundowns}
-            onRundown={setActiveId}
+
+
             reload={reload}
             toast={setToast}
             master={master}
             live={live}
             onUpdateMaster={updateMaster}
-            onSetup={() => setShowSetupModal(true)}
+
           />
         )}
         {view === "rundown" && (
@@ -259,7 +290,7 @@ export default function App() {
             master={master}
             live={live}
             onUpdateMaster={updateMaster}
-            onOpenSetupModal={() => setShowSetupModal(true)}
+
             onSaved={reload}
             toast={setToast}
           />
@@ -362,15 +393,42 @@ function BroadcastSetupModal({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      patchDraft({ logoType: "image", logoImage: dataUrl });
-    };
-    reader.readAsDataURL(file);
+    if (file.size > broadcastLogoUploadSpec.maxBytes) {
+      setError("Ukuran file gambar melebihi batas 2MB");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    fetch("/api/uploads/logo", {
+      method: "POST",
+      headers: { "Content-Type": file.type || "image/png" },
+      body: file
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || "Gagal mengunggah file gambar");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        patchDraft({ logoType: "image", logoImage: data.url });
+      })
+      .catch((err: any) => {
+        setError(err.message || "Gagal mengunggah logo");
+      })
+      .finally(() => {
+        setSaving(false);
+      });
+    return;
+
+
+
+
+
   };
 
   return (
@@ -607,7 +665,7 @@ function SettingsView({
   master,
   live,
   onUpdateMaster,
-  onOpenSetupModal,
+
   onSaved,
   toast
 }: {
@@ -615,7 +673,7 @@ function SettingsView({
   master: MasterOverlayState;
   live: LiveState;
   onUpdateMaster: (p: Partial<MasterOverlayState>) => Promise<void>;
-  onOpenSetupModal: () => void;
+
   onSaved: () => Promise<void>;
   toast: (s: string) => void;
 }) {
@@ -681,15 +739,35 @@ function SettingsView({
       toast("Ukuran file gambar melebihi batas 2MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      const updated = { ...masterForm, logoType: "image" as const, logoImage: dataUrl };
-      setMasterForm(updated);
-      onUpdateMaster(updated);
-      toast("Gambar logo berhasil diunggah");
-    };
-    reader.readAsDataURL(file);
+    fetch("/api/uploads/logo", {
+      method: "POST",
+      headers: { "Content-Type": file.type || "image/png" },
+      body: file
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || "Gagal mengunggah file logo");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        const updated = { ...masterForm, logoType: "image" as const, logoImage: data.url };
+        setMasterForm(updated);
+        toast("Gambar logo berhasil diunggah (klik Simpan Default Master untuk menerapkan)");
+      })
+      .catch((err: any) => {
+        toast(err.message || "Gagal mengunggah logo");
+      });
+    return;
+
+
+
+
+
+
+
+
   };
 
   const outputUrl = `${window.location.origin}/output`;
@@ -714,8 +792,19 @@ function SettingsView({
             Pengaturan Default Siaran & Ticker
           </h3>
           <p>
-            Konfigurasi master bawaan yang berlaku otomatis di layar siaran. Nilai ini menjadi acuan default dan tetap dapat di-override secara manual per grafis saat produksi jika diperlukan.
+            Atur warna, logo, dan ticker di Preview. Klik Simpan Default Master untuk menyimpan dan menerapkan perubahan ke siaran.
           </p>
+
+          <BroadcastColorThemePicker value={masterForm.colorTheme} onChange={(colorTheme) => {
+            setMasterForm((previous) => selectBroadcastColorTheme(previous, colorTheme));
+          }} />
+          <small className="settings-palette-note">Preview warna pada studio referensi. Perubahan diterapkan ke output setelah Simpan Default Master.</small>
+          <div className="settings-palette-preview">
+            <BroadcastPreviewBox graphic={{ templateType: "HEADLINE" }} fields={{
+              headline: headlineDefaults.headline || "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN",
+              layoutStyle: "single", showLocation: "false"
+            }} master={{ ...masterForm, showLogo: true, showTicker: true, showLiveBadge: true }} studioReference />
+          </div>
 
           {/* Subgrup 1: Logo Siaran Default */}
           <div
@@ -739,7 +828,7 @@ function SettingsView({
                   onClick={() => {
                     const u = { ...masterForm, logoType: "text" as const };
                     setMasterForm(u);
-                    onUpdateMaster(u);
+
                   }}
                 >
                   Teks Logo
@@ -750,7 +839,7 @@ function SettingsView({
                   onClick={() => {
                     const u = { ...masterForm, logoType: "image" as const };
                     setMasterForm(u);
-                    onUpdateMaster(u);
+
                   }}
                 >
                   Upload Gambar
@@ -758,6 +847,10 @@ function SettingsView({
               </div>
             </div>
 
+            <small className="settings-palette-note">
+              Logo: <b>PNG transparan {broadcastLogoUploadSpec.width} × {broadcastLogoUploadSpec.height} px</b>,
+              ruang kosong sekitar {broadcastLogoUploadSpec.padding} px di tepi, maksimal 2 MB. SVG juga didukung. Logo ditampilkan proporsional.
+            </small>
             {masterForm.logoType === "image" ? (
               <div>
                 <input
@@ -818,7 +911,7 @@ function SettingsView({
                           onClick={() => {
                             const u = { ...masterForm, logoImage: null, logoType: "text" as const };
                             setMasterForm(u);
-                            onUpdateMaster(u);
+
                             toast("Logo gambar dihapus (kembali ke teks bawaan)");
                           }}
                         >
@@ -826,9 +919,6 @@ function SettingsView({
                         </button>
                       )}
                     </div>
-                    <small style={{ display: "block", marginTop: 6, color: "#94a3b8", fontSize: 10, lineHeight: 1.4 }}>
-                      Format rekomendasi: <b>PNG Transparan</b> atau <b>SVG</b>. Kotak logo siaran berukuran rasio 155 × 98 px.
-                    </small>
                   </div>
                 </div>
               </div>
@@ -879,14 +969,14 @@ function SettingsView({
           {/* Subgrup 2: Nama Berita di Ticker (Badge Merah Fit) */}
           <div className="form-grid" style={{ marginBottom: 12 }}>
             <label className="wide">
-              <span>Nama Berita di Ticker (Badge Merah — Fit Otomatis Sesuai Huruf)</span>
+              <span>Nama Berita di Ticker (Lebar Otomatis Sesuai Huruf)</span>
               <input
                 value={masterForm.brandText || ""}
-                placeholder="CNNINDONESIA.COM"
+                placeholder="NAMA NEWS ANDA"
                 onChange={(e) => setMasterForm({ ...masterForm, brandText: e.target.value })}
               />
               <small style={{ color: "#94a3b8", fontSize: 10, marginTop: 4, display: "block" }}>
-                Label merah di sebelah kiri running text. Lebar warna merah otomatis pas (fit-content) membungkus huruf tanpa ruang kosong berlebih.
+                Label di sebelah kiri running text mengikuti warna template. Lebarnya otomatis menyesuaikan nama berita.
               </small>
             </label>
           </div>
@@ -920,7 +1010,7 @@ function SettingsView({
                     onClick={() => {
                       const u = { ...masterForm, tickerSpeed: 65 };
                       setMasterForm(u);
-                      onUpdateMaster(u);
+
                     }}
                   >
                     Lambat (65)
@@ -931,7 +1021,7 @@ function SettingsView({
                     onClick={() => {
                       const u = { ...masterForm, tickerSpeed: 85 };
                       setMasterForm(u);
-                      onUpdateMaster(u);
+
                     }}
                   >
                     Standar (85)
@@ -942,7 +1032,7 @@ function SettingsView({
                     onClick={() => {
                       const u = { ...masterForm, tickerSpeed: 105 };
                       setMasterForm(u);
-                      onUpdateMaster(u);
+
                     }}
                   >
                     Cepat (105)
@@ -959,7 +1049,7 @@ function SettingsView({
                   const val = Number(e.target.value);
                   const u = { ...masterForm, tickerSpeed: val };
                   setMasterForm(u);
-                  onUpdateMaster(u);
+
                 }}
                 style={{ width: "100%", cursor: "pointer", accentColor: "#e11d48" }}
               />
@@ -1194,9 +1284,13 @@ function SettingsView({
               <button
                 type="button"
                 className="primary-small"
-                onClick={() => {
-                  navigator.clipboard.writeText(outputUrl);
-                  toast("URL Output disalin ke clipboard!");
+                onClick={async () => {
+                  const ok = await copyToClipboard(outputUrl);
+                  if (ok) {
+                    toast("URL Output disalin ke clipboard!");
+                  } else {
+                    toast(`Gagal menyalin otomatis. URL: ${outputUrl}`);
+                  }
                 }}
               >
                 <Copy size={13} /> Salin URL Output vMix

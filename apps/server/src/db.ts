@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
+import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem } from "@newscg/shared";
 import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS action_logs (
   id TEXT PRIMARY KEY, action TEXT NOT NULL, status TEXT NOT NULL, message TEXT NOT NULL,
   graphic_id TEXT, request_id TEXT, created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_action_logs_created_at ON action_logs(created_at DESC);
 INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (1, datetime('now'));
 `);
 const itemColumns = db.prepare("PRAGMA table_info(rundown_items)").all() as Array<{ name: string }>;
@@ -75,18 +76,28 @@ export function getGraphic(id: string): GraphicItem | null {
   return row ? readGraphicRow(row) : null;
 }
 
-export const createRundown = db.transaction((input: { id?: string; programName: string; title: string; items?: any[] }) => {
-  const id = input.id || `RD-${randomUUID().slice(0, 8).toUpperCase()}`;
+export const createRundown = db.transaction((input: { id?: string; programName: string; title: string; items?: any[] }, options?: { regenerateIds?: boolean }) => {
+  const id = (options?.regenerateIds || !input.id) ? `RD-${randomUUID().slice(0, 8).toUpperCase()}` : input.id;
   const now = new Date().toISOString();
   db.prepare("INSERT INTO rundowns(id, program_name, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(id, input.programName, input.title, now, now);
   for (const item of input.items || []) {
-    const itemId = item.id || randomUUID();
+    const itemId = (options?.regenerateIds || !item.id) ? randomUUID() : item.id;
     db.prepare("INSERT INTO rundown_items(id,rundown_id,slug,title,format,estimated_duration_seconds,sort_order,cg_required) VALUES (?,?,?,?,?,?,?,?)").run(itemId, id, item.slug, item.title, item.format, item.estimatedDurationSeconds, item.sortOrder, Number(item.cgRequired ?? item.format !== "LAINNYA"));
     for (const graphic of item.graphics || []) {
-      db.prepare("INSERT INTO graphic_items VALUES (?, ?, ?, ?, ?, ?, NULL)").run(graphic.id || randomUUID(), itemId, graphic.templateType, graphic.sortOrder, graphic.status || "DRAFT", JSON.stringify(graphic.draftFields));
+      const graphicId = (options?.regenerateIds || !graphic.id) ? randomUUID() : graphic.id;
+      db.prepare("INSERT INTO graphic_items VALUES (?, ?, ?, ?, ?, ?, NULL)").run(graphicId, itemId, graphic.templateType, graphic.sortOrder, graphic.status || "DRAFT", JSON.stringify(graphic.draftFields));
     }
   }
   return getRundown(id)!;
+});
+
+export const reorderRundownItems = db.transaction((rundownId: string, itemIds: string[]) => {
+  const now = new Date().toISOString();
+  for (let i = 0; i < itemIds.length; i++) {
+    db.prepare("UPDATE rundown_items SET sort_order = ? WHERE id = ? AND rundown_id = ?").run(i, itemIds[i], rundownId);
+  }
+  db.prepare("UPDATE rundowns SET updated_at = ? WHERE id = ?").run(now, rundownId);
+  return getRundown(rundownId);
 });
 
 export function updateRundown(id: string, patch: any) {
@@ -155,7 +166,10 @@ export const saveSettings = db.transaction((patch: any) => {
 export function logAction(action: string, status: string, message: string, graphicId?: string | null, requestId?: string) {
   db.prepare("INSERT INTO action_logs VALUES(?,?,?,?,?,?,?)").run(randomUUID(), action, status, message, graphicId || null, requestId || null, new Date().toISOString());
 }
-export function getActions(limit = 50) { return db.prepare("SELECT * FROM action_logs ORDER BY created_at DESC LIMIT ?").all(limit); }
+export function getActions(limit = 50) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 200));
+  return db.prepare("SELECT * FROM action_logs ORDER BY created_at DESC LIMIT ?").all(safeLimit);
+}
 export function saveOnAir(graphicId: string | null, inputGuid: string | null, overlayNumber: number, snapshot: Record<string,string> | null, status: string) {
   db.prepare("INSERT INTO on_air_state VALUES(1,?,?,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET graphic_id=excluded.graphic_id,input_guid=excluded.input_guid,overlay_number=excluded.overlay_number,snapshot=excluded.snapshot,status=excluded.status,updated_at=excluded.updated_at").run(graphicId, inputGuid, overlayNumber, snapshot ? JSON.stringify(snapshot) : null, status, new Date().toISOString());
 }

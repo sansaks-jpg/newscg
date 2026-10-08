@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { MasterOverlayState, TemplateType, TimezoneMode } from "@newscg/shared";
-import { broadcastMotion, defaultMasterOverlayState } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme } from "@newscg/shared";
 import { MonitorPlay } from "lucide-react";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { useLayerPresence } from "./useLayerPresence";
@@ -21,7 +21,7 @@ export function BroadcastGraphic({
   master = defaultMasterOverlayState,
   isExiting = false,
   isMini = false,
-  visualTemplate,
+  visualTemplate: _visualTemplate,
   contentKey = 0,
   exitAll = false,
   ghostPreview = false,
@@ -39,6 +39,11 @@ export function BroadcastGraphic({
   ghostFields?: GhostFields | null;
 }) {
   const cnn = true;
+  const colorTheme = getBroadcastColorTheme(master.colorTheme);
+  const graphicStyle = {
+    ...motionStyle,
+    ...Object.fromEntries(Object.entries(colorTheme.colors).map(([name, color]) => [`--cg-color-${name}`, color]))
+  } as CSSProperties;
   const logoLayer = useLayerPresence(master.showLogo, broadcastMotion.logoOutMs + 20);
   const liveLayer = useLayerPresence(master.showLiveBadge, broadcastMotion.liveOutMs + 20);
   const tickerLayer = useLayerPresence(master.showTicker, broadcastMotion.tickerOutMs + 20);
@@ -129,11 +134,11 @@ export function BroadcastGraphic({
     <>
       {/* 1. Location Tag di Pojok Kiri Atas (Aktif atau Bayangan Ghost) */}
       {locationLayer.present ? (
-        <div key={`location-${contentKey}`} style={motionStyle} className={`cg-location-tag ${cnn ? "cnn-template" : ""} ${isExiting || locationLayer.exiting ? "cg-exit" : ""} ${isMini ? "mini" : ""}`}>
+        <div key={`location-${contentKey}`} style={graphicStyle} data-color-theme={colorTheme.id} className={`cg-location-tag ${cnn ? "cnn-template" : ""} ${isExiting || locationLayer.exiting ? "cg-exit" : ""} ${isMini ? "mini" : ""}`}>
           <span>{effectiveFields.location || lastLocation}</span>
         </div>
       ) : ghostLocationText ? (
-        <div key="location-ghost" className={`cg-location-tag cg-ghost-element ${cnn ? "cnn-template" : ""} ${isMini ? "mini" : ""}`} title="Lokasi (Belum Aktif — Tekan L lalu TAKE / UPDATE)">
+        <div key="location-ghost" style={graphicStyle} data-color-theme={colorTheme.id} className={`cg-location-tag cg-ghost-element ${cnn ? "cnn-template" : ""} ${isMini ? "mini" : ""}`} title="Lokasi (Belum Aktif — Tekan L lalu TAKE / UPDATE)">
           <span className="cg-ghost-pill">[L]</span>
           <span>{ghostLocationText}</span>
         </div>
@@ -141,7 +146,8 @@ export function BroadcastGraphic({
 
       {/* 2. Lower Third Grafis Siaran */}
       <div
-        style={motionStyle}
+        style={graphicStyle}
+        data-color-theme={colorTheme.id}
         className={`cg-lower-third ${cnn ? "cnn-template" : ""} ${exitAll ? "cg-sequential-out" : ""} ${isBreaking ? "breaking" : ""} ${isReporter ? "reporter" : ""} ${isMini ? "mini" : ""} ${!tickerLayer.present ? "no-ticker" : ""}`}
       >
         {/* Layer Konten (Kicker & Main White Box) — Tampil jika ada materi ON AIR */}
@@ -256,7 +262,7 @@ export function BroadcastGraphic({
             )}
             {logoLayer.present && (
               <div className={`cg-logo-box standalone ${!tickerLayer.present ? "no-ticker" : ""} ${logoLayer.exiting ? "cg-layer-out" : "cg-layer-in"}`}>
-                <LogoRenderer master={master} cnn={cnn} />
+                <LogoRenderer master={master} cnn={colorTheme.id === "cnn"} />
               </div>
             )}
           </div>
@@ -297,8 +303,8 @@ function LogoRenderer({ master, cnn = false }: { master: MasterOverlayState; cnn
     <>
       {cnn && (!master.logoText || master.logoText === "CNN") ? (
         <img className="cg-brand-cnn" src="/branding/cnn.svg" alt="CNN" />
-      ) : <AutoSquishText className="cg-cnn-logo" text={master.logoText || "CNN"} /> }
-      <AutoSquishText className="cg-cnn-sub" text={master.logoSub || "Indonesia"} />
+      ) : <AutoSquishText className="cg-cnn-logo" text={master.logoText || (cnn ? "CNN" : "NEWS")} /> }
+      <AutoSquishText className="cg-cnn-sub" text={master.logoSub || (cnn ? "Indonesia" : "BERITA")} />
     </>
   );
 }
@@ -351,8 +357,9 @@ export function BroadcastPreviewBox({
   isExiting = false,
   exitAll = false,
   blackout = false,
-  visualTemplate,
+  visualTemplate: _visualTemplate,
   animationKey = 0,
+  studioReference = false,
   ghostPreview = false,
   ghostFields = null
 }: {
@@ -365,6 +372,7 @@ export function BroadcastPreviewBox({
   blackout?: boolean;
   visualTemplate?: string;
   animationKey?: number;
+  studioReference?: boolean;
   ghostPreview?: boolean;
   ghostFields?: GhostFields | null;
 }) {
@@ -416,8 +424,10 @@ export function BroadcastPreviewBox({
       >
         {/* Studio Ambient Stage Backdrop */}
         <div className="preview-studio-backdrop">
-          <div className="studio-ambient-light" />
-          <div className="studio-safe-title" title="Title Safe Area 80%" />
+          {studioReference ? <img className="preview-studio-reference" src="/templates/studio-reference.png" alt="Virtual set studio referensi" /> : <>
+            <div className="studio-ambient-light" />
+            <div className="studio-safe-title" title="Title Safe Area 80%" />
+          </>}
         </div>
 
         {/* 1920x1080 Stage identical to /output */}

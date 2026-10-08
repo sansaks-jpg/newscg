@@ -1,0 +1,64 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="TopicLayer" Dimensions="1540,62,0" Location="70,780,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1540" Height="62">
+        <Rectangle Name="TopicColor" Dimensions="760,62,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFCC0000" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Topic" Text="BREAKING NEWS" Dimensions="684,62,0" Location="38,0,0" FontFamily="Arial" FontSize="46" FontWeight="DemiBold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Layer Name="HeadlinePlate" Dimensions="1780,146,0" Location="70,842,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1780" Height="146">
+        <Rectangle Name="PanelColor" Dimensions="1780,146,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Headline" Text="JUDUL BERITA UTAMA" Dimensions="1474,70,0" Location="38,10,0" FontFamily="Arial Narrow" FontSize="64" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+        <TextBlock Name="Description" Text="Keterangan tambahan berita" Dimensions="1474,55,0" Location="38,81,0" FontFamily="Arial" FontSize="46" FontWeight="Regular" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Fly Object="TopicColor" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="TopicColor" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" />
+      <Fly Object="Topic" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" Direction="Bottom" />
+      <Fade Object="Topic" Duration="0.42" Delay="0.6" Interpolation="CubicEasingOut" />
+      <Reveal Object="HeadlinePlate" Duration="0.6" Delay="0.0" Interpolation="CubicEasingOut" Direction="Right" />
+      <Fade Object="HeadlinePlate" Duration="0.6" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fade Object="Headline" Duration="0.36" Delay="0.16" Interpolation="CubicEasingOut" />
+      <Fade Object="Description" Duration="0.3" Delay="0.24" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="TransitionOut">
+    <Storyboard.Animations>
+      <Fly Object="TopicColor" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="TopicColor" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fly Object="Topic" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" Direction="Bottom" />
+      <Fade Object="Topic" Duration="0.24" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Reveal Object="HeadlinePlate" Duration="0.36" Delay="0.42" Interpolation="CubicEasingIn" Direction="Right" />
+      <Fade Object="HeadlinePlate" Duration="0.36" Delay="0.42" Interpolation="CubicEasingIn" />
+      <Fade Object="Headline" Duration="0.18" Delay="0.24" Interpolation="CubicEasingIn" />
+      <Fade Object="Description" Duration="0.18" Delay="0.24" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>

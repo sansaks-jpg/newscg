@@ -1,0 +1,95 @@
+/* Color-only treatments. Geometry and choreography stay in the CNN/motion CSS. */
+.cnn-template[data-color-theme^="studio-"] .cg-main-box,
+.cnn-template[data-color-theme^="studio-"] .cg-logo-box {
+  background: var(--cg-color-panel);
+  color: var(--cg-color-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-main-box {
+  box-shadow: inset 0 -4px 0 var(--cg-color-accent);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-headline-row,
+.cnn-template[data-color-theme^="studio-"] .cg-headline-row-single,
+.cnn-template[data-color-theme^="studio-"] .cg-presenter-row,
+.cnn-template[data-color-theme^="studio-"] .cg-sot-headline-row,
+.cnn-template[data-color-theme^="studio-"] .cg-sot-name-row,
+.cnn-template[data-color-theme^="studio-"] .cg-paragraph-row {
+  color: var(--cg-color-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-subline-row,
+.cnn-template[data-color-theme^="studio-"] .cg-social-row,
+.cnn-template[data-color-theme^="studio-"] .cg-sot-role-row {
+  color: var(--cg-color-secondary);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-sot-divider {
+  background: var(--cg-color-accent);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-cnn-logo,
+.cnn-template[data-color-theme^="studio-"] .cg-cnn-sub {
+  color: var(--cg-color-brand);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-kicker-tab {
+  background: var(--cg-color-topic);
+  color: var(--cg-color-topic-text);
+}
+.cnn-template[data-color-theme^="studio-"].breaking .cg-kicker-tab {
+  background: var(--cg-color-breaking);
+  color: var(--cg-color-breaking-text);
+}
+.cnn-template[data-color-theme^="studio-"].cg-location-tag {
+  background: var(--cg-color-location);
+  color: var(--cg-color-location-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-standalone-live-badge,
+.cnn-template[data-color-theme^="studio-"] .cg-ticker-badge {
+  background: var(--cg-color-brand);
+  color: var(--cg-color-brand-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-ticker-bar {
+  background: var(--cg-color-ticker);
+  color: var(--cg-color-ticker-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-ticker-text {
+  color: var(--cg-color-ticker-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-ticker-clock {
+  background: var(--cg-color-clock);
+  color: var(--cg-color-clock-text);
+}
+.cnn-template[data-color-theme^="studio-"] .cg-ticker-bullet {
+  color: var(--cg-color-accent);
+}
+
+.broadcast-color-picker { border: 0; padding: 0; margin: 0 0 16px; min-width: 0; }
+.broadcast-color-picker legend { padding: 0; margin-bottom: 10px; color: #e5edf8; font-size: 12px; font-weight: 700; }
+.broadcast-color-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.broadcast-color-option { position: relative; display: grid; gap: 8px; padding: 10px; min-width: 0; border: 1px solid #354252; border-radius: 5px; background: #0e141d; cursor: pointer; }
+.broadcast-color-option.selected { border-color: #93b1cc; background: #18232e; box-shadow: 0 0 0 1px #93b1cc; }
+.broadcast-color-option:focus-within { outline: 2px solid #c5d5e3; outline-offset: 3px; }
+.broadcast-color-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.broadcast-color-sample { display: grid; grid-template-columns: 24% 1fr 22%; grid-template-rows: 32px 7px; overflow: hidden; border-radius: 3px; }
+.broadcast-color-sample > span { grid-column: 1 / 3; display: flex; align-items: center; padding: 0 9px; font: 700 11px Arial, sans-serif; }
+.broadcast-color-sample > b { display: grid; place-items: center; font: 900 13px Arial, sans-serif; }
+.broadcast-color-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #e5edf8; }
+.broadcast-color-title em { font-size: 9px; font-style: normal; font-weight: 500; color: #d7be98; }
+.broadcast-color-option small, .broadcast-color-help { font-size: 10px; color: #a6b4c6; line-height: 1.5; }
+.broadcast-color-help { display: block; margin-top: 9px; }
+.broadcast-color-select { display: flex; align-items: center; gap: 10px; color: #aab8cb; font-size: 11px; }
+.broadcast-color-select select { min-width: 180px; padding: 7px 9px; color: #edf2f7; background: #121c28; border: 1px solid #42516a; border-radius: 4px; }
+.production-color-theme { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 9px 12px; background: #101722; border: 1px solid #29374b; border-radius: 4px; }
+.production-color-theme > small { color: #9eafc5; font-size: 10px; }
+.settings-palette-preview { position: relative; aspect-ratio: 16 / 9; margin: 10px 0 16px; border: 1px solid #354252; }
+.settings-palette-note { display: block; margin: 8px 0; color: #a6b4c6; font-size: 11px; line-height: 1.5; }
+.template-demo .broadcast-color-options { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.template-demo-caption { margin: 8px 0 14px; color: #a6b4c6; font-size: 11px; line-height: 1.5; }
+.template-demo-logo-spec { margin-top: 22px; padding: 14px 16px; background: #111b26; border: 1px solid #354252; color: #c3cedb; font-size: 12px; line-height: 1.7; }
+.preview-studio-reference { position: absolute; width: 102.2223%; height: 105.9211%; max-width: none; left: -0.9877%; top: -2.6316%; object-fit: fill; }
+@media (max-width: 1000px) {
+  .template-demo .broadcast-color-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .template-demo-controls { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .template-demo { padding: 18px 14px; }
+  .template-demo header { align-items: flex-start; gap: 12px; }
+  .template-demo-controls { grid-template-columns: 1fr; }
+  .broadcast-color-select { flex-wrap: wrap; }
+}

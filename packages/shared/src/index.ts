@@ -14,10 +14,70 @@ export type OutputFrameRate = (typeof outputFrameRates)[number];
 export const layoutStyles = ["single", "sub"] as const;
 export type LayoutStyle = (typeof layoutStyles)[number];
 
-export const contentModes = ["headline", "paragraph", "presenter"] as const;
+export const contentModes = ["headline", "paragraph", "presenter", "sot", "location"] as const;
 export type ContentMode = (typeof contentModes)[number];
 
+export const broadcastColorThemeIds = ["cnn", "studio-navy", "studio-graphite", "studio-copper"] as const;
+export type BroadcastColorThemeId = (typeof broadcastColorThemeIds)[number];
+export const broadcastColorThemeSchema = z.enum(broadcastColorThemeIds);
+export type BroadcastColorTheme = {
+  id: BroadcastColorThemeId;
+  label: string;
+  description: string;
+  colors: Record<"panel" | "text" | "secondary" | "brand" | "brand-text" | "accent" |
+    "ticker" | "ticker-text" | "clock" | "clock-text" | "location" | "location-text" |
+    "topic" | "topic-text" | "breaking" | "breaking-text", string>;
+};
+
+// These are color treatments of the same CNN layout and broadcast choreography.
+export const broadcastColorThemes: Record<BroadcastColorThemeId, BroadcastColorTheme> = {
+  cnn: {
+    id: "cnn", label: "CNN · Bawaan", description: "Putih, merah, dan hitam seperti template awal.",
+    colors: {
+      panel: "#FFFFFF", text: "#080808", secondary: "#101010", brand: "#CC0000", "brand-text": "#FFFFFF",
+      accent: "#D71920", ticker: "#171717", "ticker-text": "#FFFFFF", clock: "#484848", "clock-text": "#FFFFFF",
+      location: "#171717", "location-text": "#FFFFFF", topic: "#282828", "topic-text": "#FFFFFF",
+      breaking: "#CC0000", "breaking-text": "#FFFFFF"
+    }
+  },
+  "studio-navy": {
+    id: "studio-navy", label: "Studio Navy", description: "Biru meja studio, putih gading, dan aksen tembaga tipis.",
+    colors: {
+      panel: "#F1F0EA", text: "#172738", secondary: "#3F4C59", brand: "#18364F", "brand-text": "#F3F4F0",
+      accent: "#B38D61", ticker: "#171F29", "ticker-text": "#F0F1ED", clock: "#314252", "clock-text": "#F3F4F0",
+      location: "#1D2B39", "location-text": "#F3F4F0", topic: "#253D52", "topic-text": "#F3F4F0",
+      breaking: "#813D40", "breaking-text": "#FBF6EF"
+    }
+  },
+  "studio-graphite": {
+    id: "studio-graphite", label: "Studio Graphite", description: "Abu arang dan perak kebiruan mengikuti dinding studio.",
+    colors: {
+      panel: "#E8EBED", text: "#222B34", secondary: "#44525D", brand: "#303C46", "brand-text": "#F3F4F0",
+      accent: "#8CA4BA", ticker: "#181D22", "ticker-text": "#F0F1ED", clock: "#3B4854", "clock-text": "#F3F4F0",
+      location: "#202932", "location-text": "#F3F4F0", topic: "#364652", "topic-text": "#F3F4F0",
+      breaking: "#813D40", "breaking-text": "#FBF6EF"
+    }
+  },
+  "studio-copper": {
+    id: "studio-copper", label: "Studio Copper", description: "Tembaga redup dan krem hangat mengikuti lampu studio.",
+    colors: {
+      panel: "#F2EDE5", text: "#242C34", secondary: "#51565A", brand: "#694E36", "brand-text": "#FBF6EF",
+      accent: "#BC9C71", ticker: "#202327", "ticker-text": "#F0F1ED", clock: "#424A51", "clock-text": "#FBF6EF",
+      location: "#282C30", "location-text": "#FBF6EF", topic: "#604C3B", "topic-text": "#FBF6EF",
+      breaking: "#813D40", "breaking-text": "#FBF6EF"
+    }
+  }
+};
+
+export function getBroadcastColorTheme(value?: string): BroadcastColorTheme {
+  const parsed = broadcastColorThemeSchema.safeParse(value);
+  return broadcastColorThemes[parsed.success ? parsed.data : "cnn"];
+}
+
+export const broadcastLogoUploadSpec = { width: 800, height: 500, padding: 40, maxBytes: 2 * 1024 * 1024 } as const;
+
 export type MasterOverlayState = {
+  colorTheme?: BroadcastColorThemeId;
   showLogo: boolean;
   showLiveBadge: boolean;
   showTicker: boolean;
@@ -35,6 +95,7 @@ export type MasterOverlayState = {
 };
 
 export const defaultMasterOverlayState: MasterOverlayState = {
+  colorTheme: "cnn",
   showLogo: false,
   showLiveBadge: false,
   showTicker: false,
@@ -49,6 +110,19 @@ export const defaultMasterOverlayState: MasterOverlayState = {
   timezone: "WIB",
   customTimezoneLabel: "WIB"
 };
+
+// Selecting a studio treatment replaces only the untouched CNN sample identity.
+// Custom station names and uploaded logos are preserved in the new draft.
+export function selectBroadcastColorTheme(master: MasterOverlayState, colorTheme: BroadcastColorThemeId): MasterOverlayState {
+  return {
+    ...master, colorTheme,
+    ...(colorTheme === "cnn" ? {} : {
+      brandText: master.brandText === defaultMasterOverlayState.brandText ? "NEWS UPDATE" : master.brandText,
+      logoText: master.logoText === defaultMasterOverlayState.logoText ? "NEWS" : master.logoText,
+      logoSub: master.logoSub === defaultMasterOverlayState.logoSub ? "BERITA" : master.logoSub
+    })
+  };
+}
 
 export type OverlayEvent =
   | { type: "SYNC"; onAir: boolean; graphic: GraphicItem | null; fields: Record<string, string> | null; master: MasterOverlayState; revision?: number }
@@ -87,6 +161,7 @@ export type OverlayPlaybackState = {
 };
 
 export const masterOverlayPatchSchema = z.object({
+  colorTheme: broadcastColorThemeSchema,
   showLogo: z.boolean(), showLiveBadge: z.boolean(), showTicker: z.boolean(),
   brandText: z.string().max(120), tickerText: z.string().max(10000),
   tickerSpeed: z.number().min(30).max(250), tickerRevision: z.number().int().nonnegative(),
@@ -212,6 +287,25 @@ export const storyInputSchema = rundownItemInputSchema.extend({
   graphics: z.array(graphicInputSchema.extend({ id: z.string().optional() })).default([])
 });
 
+export const rundownPatchSchema = z.object({
+  programName: z.string().trim().min(1).max(80).optional(),
+  title: z.string().trim().min(1).max(100).optional()
+}).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi");
+
+export const rundownItemPatchSchema = z.object({
+  slug: z.string().trim().min(1).max(30).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
+  format: z.enum(["PKG", "VO", "LIVE", "READER", "LAINNYA"]).optional(),
+  cgRequired: z.boolean().optional(),
+  estimatedDurationSeconds: z.number().int().min(0).max(21600).optional(),
+  sortOrder: z.number().int().nonnegative().optional()
+}).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi");
+
+export const settingsPatchSchema = z.record(
+  z.string().min(1).max(50),
+  z.any()
+).refine((data) => Object.keys(data).length > 0, "Minimal satu field pengaturan harus diisi");
+
 export type GraphicItem = {
   id: string; itemId: string; templateType: TemplateType; sortOrder: number; status: MaterialStatus;
   draftFields: Record<string, string>; lastPushedFields: Record<string, string> | null;
@@ -240,11 +334,14 @@ export type HeadlineVisibility = {
   showDetail: boolean;
 };
 
-export type LiveVariantAction =
-  | "clean-headline"
-  | "toggle-location"
-  | "toggle-kicker"
-  | "toggle-detail";
+export const liveVariantActions = ["clean-headline", "toggle-location", "toggle-kicker", "toggle-detail"] as const;
+export const liveVariantActionSchema = z.enum(liveVariantActions);
+export type LiveVariantAction = (typeof liveVariantActions)[number];
+
+
+
+
+
 
 export const headlineDefaultsSchema = z.object({
   headline: z.string().trim().max(120).default(""),

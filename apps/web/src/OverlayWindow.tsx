@@ -3,7 +3,7 @@ import { useOverlayPlayback } from "./useOverlayPlayback";
 import { BroadcastGraphic } from "./BroadcastGraphic";
 
 export default function OverlayWindow() {
-  const state = useOverlayPlayback();
+  const state = useOverlayPlayback({ role: "output" });
   const [scale, setScale] = useState(1);
 
   // Lock to exact 1920x1080 canvas and 16:9 ratio without distortion

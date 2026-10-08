@@ -21,20 +21,21 @@ import {
 import { mutate } from "./api";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
-import { tickerPresets } from "@newscg/shared";
+import { getBroadcastColorTheme, selectBroadcastColorTheme, tickerPresets } from "@newscg/shared";
+import { BroadcastColorThemePicker } from "./VisualTemplatePicker";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
 import "./simple-production.css";
 
 type Props = {
   rundown?: Rundown;
-  rundowns: Rundown[];
-  onRundown: (id: string) => void;
+
+
   reload: () => Promise<void>;
   toast: (s: string) => void;
   master: MasterOverlayState;
   live: LiveState;
   onUpdateMaster: (patch: Partial<MasterOverlayState>) => Promise<void>;
-  onSetup?: () => void;
+
 };
 
 type MiniDraft = {
@@ -52,8 +53,8 @@ type PreviewComposition = {
 
 export function SimpleProductionEditor({
   rundown,
-  rundowns,
-  onRundown,
+
+
   reload,
   toast,
   master,
@@ -158,7 +159,7 @@ export function SimpleProductionEditor({
     requestAnimationFrame(() => quickEditButtonRef.current?.focus());
   };
 
-  // Staged master overlay untuk keselamatan siaran (Hotkey 1 & 2 wajib tekan SPASI)
+  // Staged master overlay untuk keselamatan siaran (Hotkey 1 & 2 di-stage di preview; tekan M untuk kirim ke ON AIR)
   const [stagedMaster, setStagedMaster] = useState<MasterOverlayState>(master);
   const isUserStagingMasterRef = useRef(false);
 
@@ -173,9 +174,15 @@ export function SimpleProductionEditor({
     stagedMaster.showTicker !== master.showTicker ||
     stagedMaster.showLiveBadge !== master.showLiveBadge ||
     stagedMaster.tickerSpeed !== master.tickerSpeed ||
-    stagedMaster.tickerText !== master.tickerText;
+    stagedMaster.tickerText !== master.tickerText ||
+    getBroadcastColorTheme(stagedMaster.colorTheme).id !== getBroadcastColorTheme(master.colorTheme).id ||
+    stagedMaster.brandText !== master.brandText ||
+    stagedMaster.logoText !== master.logoText ||
+    stagedMaster.logoSub !== master.logoSub;
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveSeqRef = useRef<number>(0);
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const sotReturnRef = useRef<{ storyId: string; cueId: string; composition: PreviewComposition } | null>(null);
   const restoreCompositionRef = useRef<PreviewComposition | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -218,14 +225,17 @@ export function SimpleProductionEditor({
 
   // Fungsi penyimpanan autosave dengan debounce
   const flushSaveDraft = useCallback(
-    async (
+    (
       draftToSave: MiniDraft,
       compToSave: PreviewComposition,
       targetCue: GraphicItem | null = selectedCue
     ): Promise<boolean> => {
-      if (!targetCue) return false;
+      if (!targetCue) return Promise.resolve(false);
+      const currentSeq = ++saveSeqRef.current;
       setSaveStatus("saving");
-      try {
+      const task = saveQueueRef.current.then(async () => {
+        if (currentSeq < saveSeqRef.current) return true;
+        try {
         const patchFields: Record<string, string> = {
           ...(targetCue.draftFields || {}),
           location: draftToSave.location.trim(),
@@ -252,13 +262,21 @@ export function SimpleProductionEditor({
         await mutate(`/api/graphics/${targetCue.id}`, "PATCH", {
           draftFields: patchFields
         });
-        setSaveStatus("saved");
+        if (currentSeq === saveSeqRef.current) {
+          setSaveStatus("saved");
+        }
         return true;
       } catch (err: any) {
-        setSaveStatus("error");
+        if (currentSeq === saveSeqRef.current) {
+          setSaveStatus("error");
+        }
         toast(err.message || "Gagal menyimpan perubahan draft");
         return false;
       }
+    });
+
+    saveQueueRef.current = task.catch(() => false);
+    return task;
     },
     [selectedCue, toast]
   );
@@ -413,11 +431,14 @@ export function SimpleProductionEditor({
     commandLock.current = true;
     setBusy(true);
     try {
-      await onUpdateMaster({ showLogo: stagedMaster.showLogo, showTicker: stagedMaster.showTicker,
+      await onUpdateMaster(urgent ? {
+        tickerText: stagedMaster.tickerText, tickerSpeed: stagedMaster.tickerSpeed, tickerRevision: Date.now()
+      } : { showLogo: stagedMaster.showLogo, showTicker: stagedMaster.showTicker,
         showLiveBadge: stagedMaster.showLiveBadge, tickerSpeed: stagedMaster.tickerSpeed,
         tickerText: stagedMaster.tickerText,
-        ...(urgent ? { tickerRevision: Date.now() } : {}) });
-      isUserStagingMasterRef.current = false;
+        colorTheme: getBroadcastColorTheme(stagedMaster.colorTheme).id,
+        brandText: stagedMaster.brandText, logoText: stagedMaster.logoText, logoSub: stagedMaster.logoSub });
+      if (!urgent) isUserStagingMasterRef.current = false;
       await reload();
       toast(urgent ? "Ticker diterapkan segera" : "Master diterapkan; isi ticker baru masuk pada batas segmen");
     } catch (error: any) {
@@ -463,7 +484,7 @@ export function SimpleProductionEditor({
     }
   }, [reload, toast, sendLiveCommand]);
 
-  // Aksi Master 1: Toggle Logo di Preview (Safety: Tekan SPASI untuk kirim ke ON AIR)
+  // Aksi Master 1: Toggle Logo di Preview (Safety: Tekan M untuk kirim ke ON AIR)
   const toggleMasterLogo = useCallback(() => {
     isUserStagingMasterRef.current = true;
     setStagedMaster((prev) => {
@@ -477,7 +498,7 @@ export function SimpleProductionEditor({
     });
   }, [toast]);
 
-  // Aksi Master 2: Toggle Ticker + Live di Preview (Safety: Tekan SPASI untuk kirim ke ON AIR)
+  // Aksi Master 2: Toggle Ticker + Live di Preview (Safety: Tekan M untuk kirim ke ON AIR)
   const toggleMasterTickerLive = useCallback(() => {
     isUserStagingMasterRef.current = true;
     setStagedMaster((prev) => {
@@ -840,6 +861,13 @@ export function SimpleProductionEditor({
           </div>
         </div>
 
+        <div className="production-color-theme">
+          <BroadcastColorThemePicker compact value={stagedMaster.colorTheme} disabled={busy} onChange={(colorTheme) => {
+            isUserStagingMasterRef.current = true;
+            setStagedMaster((previous) => selectBroadcastColorTheme(previous, colorTheme));
+          }} />
+          <small>{isMasterChanged ? "Perubahan di Preview · terapkan dengan M" : `Siaran: ${getBroadcastColorTheme(master.colorTheme).label}`}</small>
+        </div>
         <details className="live-ticker-settings">
           <summary>Ticker & master · {master.showLogo ? "Logo aktif" : "Logo mati"} · {master.showTicker ? "Ticker aktif" : "Ticker mati"} · {master.showLiveBadge ? "Live aktif" : "Live mati"}</summary>
           <label>Isi ticker berikutnya

@@ -3,6 +3,7 @@ import type { GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rund
 import {
   ArrowDown,
   ArrowUp,
+  Download,
   Edit3,
   MapPin,
   MonitorPlay,
@@ -10,6 +11,7 @@ import {
   Search,
   SlidersHorizontal,
   Trash2,
+  Upload,
   UserRound,
   X
 } from "lucide-react";
@@ -75,9 +77,9 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
     try {
       items[index] = other;
       items[index + offset] = item;
-      for (const [sortOrder, row] of items.entries()) {
-        await mutate(`/api/items/${row.id}`, "PATCH", { sortOrder });
-      }
+      const itemIds = items.map((row) => row.id);
+      await mutate(`/api/rundowns/${rundown.id}/reorder`, "POST", { itemIds });
+
       await reload();
     } catch (e) {
       toast((e as Error).message);
@@ -123,6 +125,52 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
       toast(`Rundown "${rundown.title}" berhasil dihapus`);
     } catch (e: any) {
       toast(e.message || "Gagal menghapus rundown");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  async function exportCurrentRundown() {
+    if (!rundown) return;
+    try {
+      const data = await api<any>(`/api/rundowns/${rundown.id}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const safeTitle = `${rundown.programName}_${rundown.title}`.replace(/[/\\?%*:|"<>]/g, "-");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeTitle || rundown.id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast(`Rundown "${rundown.title}" berhasil diekspor`);
+    } catch (e: any) {
+      toast(e.message || "Gagal mengekspor rundown");
+    }
+  }
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = "";
+    setPending(true);
+    try {
+      const text = await file.text();
+      let json: any;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error("Berkas bukan format JSON yang valid");
+      }
+      const imported = await mutate<Rundown>("/api/rundowns/import", "POST", json);
+      await reload();
+      onRundown(imported.id);
+      toast(`Rundown "${imported.title}" berhasil diimpor`);
+    } catch (e: any) {
+      toast(e.message || "Gagal mengimpor rundown");
     } finally {
       setPending(false);
     }
@@ -199,6 +247,35 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             <Plus size={13} />
             <span>Rundown Baru</span>
           </button>
+
+          {rundown && (
+            <button
+              className="btn-prep-secondary"
+              disabled={pending}
+              onClick={exportCurrentRundown}
+              title="Ekspor rundown saat ini ke berkas JSON"
+            >
+              <Download size={13} />
+              <span>Ekspor</span>
+            </button>
+          )}
+
+          <button
+            className="btn-prep-secondary"
+            disabled={pending}
+            onClick={() => importFileInputRef.current?.click()}
+            title="Impor rundown dari berkas JSON"
+          >
+            <Upload size={13} />
+            <span>Impor</span>
+          </button>
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: "none" }}
+            onChange={handleImportFile}
+          />
 
           {rundown && (
             <button
@@ -297,7 +374,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           </div>
 
           <div className="prep-table-body">
-            {filteredItems.map((item, index) => {
+            {filteredItems.map((item) => {
               const ready = isReady(item);
               const realIndex = rundown.items.findIndex((i) => i.id === item.id);
 
@@ -966,7 +1043,7 @@ function StoryEditor({
                   </div>
 
                   <div className="cue-editor-body">
-                    <BroadcastTemplateInfo />
+                    <BroadcastTemplateInfo colorTheme={master?.colorTheme} />
                     {g.templateType === "SOT" ? (
                       <div className="cue-fields-grid">
                         <label className="field-full">

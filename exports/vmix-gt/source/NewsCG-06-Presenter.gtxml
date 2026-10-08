@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="HeadlinePlate" Dimensions="1780,146,0" Location="70,842,0" Locked="False" DataFlags="Hidden">
+    <Layer.Composition>
+      <Composition Width="1780" Height="146">
+        <Rectangle Name="PanelColor" Dimensions="1780,146,0" Location="0,0,0" DataFlags="NoEvents, ShowVisible">
+          <Rectangle.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </Rectangle.Fill>
+        </Rectangle>
+        <TextBlock Name="Name" Text="NAMA PEMBAWA BERITA" Dimensions="1474,68,0" Location="38,10,0" FontFamily="Arial" FontSize="62" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+        <TextBlock Name="SocialHandle" Text="@akun_instagram" Dimensions="1474,55,0" Location="38,80,0" FontFamily="Arial" FontSize="46" FontWeight="Regular" TextAlign="Left" VerticalAlign="Center" TextWordWrapping="NoWrap" DataFlags="NoEvents, ShowVisible" AutoSize="Shrink">
+          <TextBlock.Fill>
+            <Brush Color="#FF080808" />
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Reveal Object="HeadlinePlate" Duration="0.6" Delay="0.0" Interpolation="CubicEasingOut" Direction="Right" />
+      <Fade Object="HeadlinePlate" Duration="0.6" Delay="0.0" Interpolation="CubicEasingOut" />
+      <Fade Object="Name" Duration="0.36" Delay="0.16" Interpolation="CubicEasingOut" />
+      <Fade Object="SocialHandle" Duration="0.3" Delay="0.24" Interpolation="CubicEasingOut" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="TransitionOut">
+    <Storyboard.Animations>
+      <Reveal Object="HeadlinePlate" Duration="0.36" Delay="0.26" Interpolation="CubicEasingIn" Direction="Right" />
+      <Fade Object="HeadlinePlate" Duration="0.36" Delay="0.26" Interpolation="CubicEasingIn" />
+      <Fade Object="Name" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+      <Fade Object="SocialHandle" Duration="0.18" Delay="0.0" Interpolation="CubicEasingIn" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>

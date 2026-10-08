@@ -3,16 +3,17 @@ import type { OverlayEvent } from "@newscg/shared";
 import { createOverlayPlayback } from "./overlayPlayback";
 
 /** Program and browser output consume the same events and retain the same OUT frames. */
-export function useOverlayPlayback() {
+export function useOverlayPlayback(options?: { role?: "output" | "monitor" }) {
+  const role = options?.role || "output";
   const [playback] = useState(() => createOverlayPlayback((next) => setState(next)));
   const [state, setState] = useState(playback.initial);
   useEffect(() => {
-    const stream = new EventSource("/api/live/stream");
+    const stream = new EventSource(`/api/live/stream?role=${role}`);
     stream.onmessage = (event) => {
       try { playback.receive(JSON.parse(event.data) as OverlayEvent); }
       catch (error) { console.error("Gagal memproses event overlay:", error); }
     };
     return () => { stream.close(); playback.dispose(); };
-  }, [playback]);
+  }, [playback, role]);
   return state;
 }
