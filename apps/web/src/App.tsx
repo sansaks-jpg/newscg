@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  AlertTriangle,
   Clock3,
   Copy,
   ExternalLink,
@@ -9,8 +8,6 @@ import {
   Image as ImageIcon,
   LayoutList,
 
-  MapPin,
-  MonitorPlay,
   PencilLine,
   Save,
   Settings,
@@ -18,7 +15,6 @@ import {
   SlidersHorizontal,
   Trash2,
   Upload,
-  UserRound,
   X
 } from "lucide-react";
 import type {
@@ -28,10 +24,9 @@ import type {
   MasterOverlayState,
   OutputFrameRate,
   Rundown,
-  TemplateType,
   TimezoneMode
 } from "@newscg/shared";
-import { broadcastLogoUploadSpec, defaultHeadlineDefaults, defaultMasterOverlayState, masterOverlayPatchSchema, selectBroadcastColorTheme } from "@newscg/shared";
+import { broadcastLogoUploadSpec, defaultHeadlineDefaults, defaultMasterOverlayState, getGraphicFieldLimit, headlineDefaultsSchema, masterOverlayPatchSchema, selectBroadcastColorTheme } from "@newscg/shared";
 import { api, mutate } from "./api";
 import TemplatePreview from "./TemplatePreview";
 import OverlayWindow from "./OverlayWindow";
@@ -397,7 +392,7 @@ function BroadcastSetupModal({
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > broadcastLogoUploadSpec.maxBytes) {
-      setError("Ukuran file gambar melebihi batas 2MB");
+      setError(`Ukuran file gambar melebihi batas ${broadcastLogoUploadSpec.maxBytes / (1024 * 1024)} MB`);
       return;
     }
     setSaving(true);
@@ -605,9 +600,9 @@ function BroadcastSetupModal({
                     <Upload size={14} /> Pilih File Gambar Logo
                   </button>
                   <p style={{ margin: 0, fontSize: 11, color: "#8b9cb3", lineHeight: 1.5 }}>
-                    Ukuran box siaran: <b>155 × 98 px</b>.
+                    Rekomendasi file upload: <b>PNG transparan {broadcastLogoUploadSpec.width} × {broadcastLogoUploadSpec.height} px</b> atau SVG.
                     <br />
-                    Rekomendasi file upload: <b>310 × 196 piksel</b> (format <b>PNG Transparan</b> atau SVG).
+                    Sisakan sekitar {broadcastLogoUploadSpec.padding} px di tepi, maksimal {broadcastLogoUploadSpec.maxBytes / (1024 * 1024)} MB. Logo ditampilkan proporsional.
                   </p>
                 </div>
                  {draft.logoImage && (
@@ -677,23 +672,54 @@ function SettingsView({
   onSaved: () => Promise<void>;
   toast: (s: string) => void;
 }) {
-  const [form, setForm] = useState<any>(value);
+  const [form, setForm] = useState<AppSettings>(value);
   const [masterForm, setMasterForm] = useState<MasterOverlayState>(master);
   const [headlineDefaults, setHeadlineDefaults] = useState<HeadlineDefaults>(defaultHeadlineDefaults);
   const [savingHeadline, setSavingHeadline] = useState(false);
+  const [loadingHeadline, setLoadingHeadline] = useState(true);
+  const [headlineLoaded, setHeadlineLoaded] = useState(false);
+  const [headlineLoadError, setHeadlineLoadError] = useState("");
+  const [headlineLoadAttempt, setHeadlineLoadAttempt] = useState(0);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const editedHeadlineFields = useRef(new Set<keyof HeadlineDefaults>());
   const masterLogoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setForm(value), [value]);
   useEffect(() => setMasterForm(master), [master]);
   useEffect(() => {
+    let active = true;
+    setLoadingHeadline(true);
+    setHeadlineLoadError("");
     api<HeadlineDefaults>("/api/settings/headline-defaults")
-      .then((d) => {
-        if (d) setHeadlineDefaults(d);
+      .then((data) => {
+        const defaults = headlineDefaultsSchema.parse(data);
+        if (!active) return;
+        setHeadlineDefaults((current) => Object.fromEntries(
+          (Object.keys(defaults) as Array<keyof HeadlineDefaults>).map((field) => [
+            field, editedHeadlineFields.current.has(field) ? current[field] : defaults[field]
+          ])
+        ) as HeadlineDefaults);
+        setHeadlineLoaded(true);
       })
-      .catch(() => {});
-  }, []);
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setHeadlineLoaded(false);
+        setHeadlineLoadError(`Default headline belum dimuat: ${reason instanceof Error ? reason.message : "Permintaan gagal"}. Muat ulang sebelum menyimpan.`);
+      })
+      .finally(() => { if (active) setLoadingHeadline(false); });
+    return () => { active = false; };
+  }, [headlineLoadAttempt]);
+
+  const patchHeadlineDefault = (field: keyof HeadlineDefaults, text: string) => {
+    editedHeadlineFields.current.add(field);
+    setHeadlineDefaults((current) => ({ ...current, [field]: text }));
+  };
 
   async function save() {
+    if (!headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo) {
+      toast(headlineLoadError || "Tunggu sampai pengaturan dan logo selesai dimuat sebelum menyimpan semua.");
+      return;
+    }
     try {
       await mutate("/api/settings", "PATCH", form);
       await onUpdateMaster(masterForm);
@@ -706,6 +732,7 @@ function SettingsView({
   }
 
   async function saveMaster() {
+    if (uploadingLogo) return;
     try {
       await onUpdateMaster(masterForm);
       toast("Pengaturan default elemen master berhasil disimpan");
@@ -715,14 +742,25 @@ function SettingsView({
   }
 
   async function saveHeadlineDefaultsData(notify = true) {
+    if (!headlineLoaded || loadingHeadline || savingHeadline) {
+      const message = headlineLoadError || "Default headline masih dimuat. Tunggu sebelum menyimpan.";
+      if (notify) toast(message);
+      else throw new Error(message);
+      return;
+    }
     setSavingHeadline(true);
+    const submitted = headlineDefaults;
     try {
       const updated = await mutate<HeadlineDefaults>(
         "/api/settings/headline-defaults",
         "PATCH",
         headlineDefaults
       );
-      setHeadlineDefaults(updated);
+      setHeadlineDefaults((current) => Object.fromEntries(
+        (Object.keys(submitted) as Array<keyof HeadlineDefaults>).map((field) => [
+          field, current[field] === submitted[field] ? updated[field] : current[field]
+        ])
+      ) as HeadlineDefaults);
       if (notify) toast("Pengaturan default headline berita berhasil disimpan");
     } catch (e: any) {
       if (notify) toast(e.message || "Gagal menyimpan default headline");
@@ -734,11 +772,13 @@ function SettingsView({
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast("Ukuran file gambar melebihi batas 2MB");
+    e.target.value = "";
+    if (!file || uploadingLogo) return;
+    if (file.size > broadcastLogoUploadSpec.maxBytes) {
+      toast(`Ukuran file gambar melebihi batas ${broadcastLogoUploadSpec.maxBytes / (1024 * 1024)} MB`);
       return;
     }
+    setUploadingLogo(true);
     fetch("/api/uploads/logo", {
       method: "POST",
       headers: { "Content-Type": file.type || "image/png" },
@@ -752,13 +792,13 @@ function SettingsView({
         return res.json();
       })
       .then((data) => {
-        const updated = { ...masterForm, logoType: "image" as const, logoImage: data.url };
-        setMasterForm(updated);
+        setMasterForm((current) => ({ ...current, logoType: "image", logoImage: data.url }));
         toast("Gambar logo berhasil diunggah (klik Simpan Default Master untuk menerapkan)");
       })
       .catch((err: any) => {
         toast(err.message || "Gagal mengunggah logo");
-      });
+      })
+      .finally(() => setUploadingLogo(false));
     return;
 
 
@@ -778,7 +818,7 @@ function SettingsView({
         eyebrow="GRAPHICS & CONNECTION CONFIG"
         title="Settings"
         action={
-          <button className="primary-small" onClick={save}>
+          <button className="primary-small" onClick={save} disabled={!headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo}>
             <Save size={16} />
             Simpan Semua
           </button>
@@ -825,6 +865,7 @@ function SettingsView({
                 <button
                   type="button"
                   className={`mini-pill-btn ${masterForm.logoType === "text" ? "active" : ""}`}
+                  disabled={uploadingLogo}
                   onClick={() => {
                     const u = { ...masterForm, logoType: "text" as const };
                     setMasterForm(u);
@@ -836,6 +877,7 @@ function SettingsView({
                 <button
                   type="button"
                   className={`mini-pill-btn ${masterForm.logoType === "image" ? "active" : ""}`}
+                  disabled={uploadingLogo}
                   onClick={() => {
                     const u = { ...masterForm, logoType: "image" as const };
                     setMasterForm(u);
@@ -849,13 +891,14 @@ function SettingsView({
 
             <small className="settings-palette-note">
               Logo: <b>PNG transparan {broadcastLogoUploadSpec.width} × {broadcastLogoUploadSpec.height} px</b>,
-              ruang kosong sekitar {broadcastLogoUploadSpec.padding} px di tepi, maksimal 2 MB. SVG juga didukung. Logo ditampilkan proporsional.
+              ruang kosong sekitar {broadcastLogoUploadSpec.padding} px di tepi, maksimal {broadcastLogoUploadSpec.maxBytes / (1024 * 1024)} MB. SVG juga didukung. Logo ditampilkan proporsional.
             </small>
             {masterForm.logoType === "image" ? (
               <div>
                 <input
                   ref={masterLogoInputRef}
                   type="file"
+                  disabled={uploadingLogo}
                   accept="image/png,image/svg+xml,image/jpeg,image/webp"
                   style={{ display: "none" }}
                   onChange={handleLogoUpload}
@@ -891,14 +934,16 @@ function SettingsView({
                       <button
                         type="button"
                         className="primary-small"
+                        disabled={uploadingLogo}
                         onClick={() => masterLogoInputRef.current?.click()}
                       >
-                        <Upload size={13} /> {masterForm.logoImage ? "Ganti File Gambar" : "Pilih File Gambar Logo"}
+                        <Upload size={13} /> {uploadingLogo ? "Mengunggah…" : masterForm.logoImage ? "Ganti File Gambar" : "Pilih File Gambar Logo"}
                       </button>
                       {masterForm.logoImage && (
                         <button
                           type="button"
                           className="btn-text-danger"
+                          disabled={uploadingLogo}
                           style={{
                             background: "transparent",
                             border: "1px solid #5a242c",
@@ -1097,7 +1142,7 @@ function SettingsView({
               marginTop: 10
             }}
           >
-            <button className="primary-small" onClick={saveMaster}>
+            <button className="primary-small" onClick={saveMaster} disabled={uploadingLogo}>
               <Save size={13} /> Simpan Default Master
             </button>
             <span style={{ fontSize: 10, color: "#64748b" }}>
@@ -1115,6 +1160,11 @@ function SettingsView({
           <p>
             Nilai awal bawaan saat membuat berita baru pada tab Persiapan. Berita yang sudah dibuat sebelumnya tetap mempertahankan datanya masing-masing.
           </p>
+          {loadingHeadline && <p role="status">Memuat default headline…</p>}
+          {headlineLoadError && <div role="alert" className="modal-error-banner">
+            {headlineLoadError}
+            <button type="button" onClick={() => setHeadlineLoadAttempt((attempt) => attempt + 1)}>Muat ulang default</button>
+          </div>}
 
           <div className="form-grid" style={{ marginBottom: 12 }}>
             <label className="wide">
@@ -1122,9 +1172,9 @@ function SettingsView({
               <input
                 value={headlineDefaults.headline}
                 placeholder="Contoh: BERITA UTAMA HARI INI"
-                maxLength={120}
+                maxLength={getGraphicFieldLimit("HEADLINE", "headline")}
                 onChange={(e) =>
-                  setHeadlineDefaults({ ...headlineDefaults, headline: e.target.value })
+                  patchHeadlineDefault("headline", e.target.value)
                 }
               />
             </label>
@@ -1136,9 +1186,9 @@ function SettingsView({
               <input
                 value={headlineDefaults.location}
                 placeholder="Contoh: JAKARTA"
-                maxLength={60}
+                maxLength={getGraphicFieldLimit("HEADLINE", "location")}
                 onChange={(e) =>
-                  setHeadlineDefaults({ ...headlineDefaults, location: e.target.value })
+                  patchHeadlineDefault("location", e.target.value)
                 }
               />
             </label>
@@ -1147,9 +1197,9 @@ function SettingsView({
               <input
                 value={headlineDefaults.kicker}
                 placeholder="Contoh: BREAKING NEWS"
-                maxLength={60}
+                maxLength={getGraphicFieldLimit("HEADLINE", "kicker")}
                 onChange={(e) =>
-                  setHeadlineDefaults({ ...headlineDefaults, kicker: e.target.value })
+                  patchHeadlineDefault("kicker", e.target.value)
                 }
               />
             </label>
@@ -1161,9 +1211,9 @@ function SettingsView({
               <input
                 value={headlineDefaults.subline}
                 placeholder="Contoh: Keterangan tambahan berita..."
-                maxLength={160}
+                maxLength={getGraphicFieldLimit("HEADLINE", "subline")}
                 onChange={(e) =>
-                  setHeadlineDefaults({ ...headlineDefaults, subline: e.target.value })
+                  patchHeadlineDefault("subline", e.target.value)
                 }
               />
             </label>
@@ -1181,7 +1231,7 @@ function SettingsView({
             <button
               className="primary-small"
               onClick={() => void saveHeadlineDefaultsData()}
-              disabled={savingHeadline}
+              disabled={savingHeadline || loadingHeadline || !headlineLoaded}
             >
               <Save size={13} /> {savingHeadline ? "Menyimpan..." : "Simpan Default Headline"}
             </button>

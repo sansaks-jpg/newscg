@@ -74,7 +74,14 @@ export function getBroadcastColorTheme(value?: string): BroadcastColorTheme {
   return broadcastColorThemes[parsed.success ? parsed.data : "cnn"];
 }
 
-export const broadcastLogoUploadSpec = { width: 800, height: 500, padding: 40, maxBytes: 2 * 1024 * 1024 } as const;
+export const broadcastLogoMimeTypes = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"] as const;
+export const broadcastLogoMimeTypeSchema = z.enum(broadcastLogoMimeTypes);
+export type BroadcastLogoMimeType = (typeof broadcastLogoMimeTypes)[number];
+export type ValidatedLogoImage = { extension: "png" | "jpg" | "webp" | "svg"; width: number; height: number };
+export const broadcastLogoUploadSpec = {
+  width: 800, height: 500, padding: 40, maxBytes: 2 * 1024 * 1024,
+  maxDimension: 4096, maxPixels: 4096 * 4096, decodeTimeoutSeconds: 5
+} as const;
 
 export type MasterOverlayState = {
   colorTheme?: BroadcastColorThemeId;
@@ -160,72 +167,85 @@ export type OverlayPlaybackState = {
   animationKey: number;
 };
 
-export const masterOverlayPatchSchema = z.object({
-  colorTheme: broadcastColorThemeSchema,
+export const masterOverlaySchema = z.object({
+  colorTheme: broadcastColorThemeSchema.optional(),
   showLogo: z.boolean(), showLiveBadge: z.boolean(), showTicker: z.boolean(),
   brandText: z.string().max(120), tickerText: z.string().max(10000),
-  tickerSpeed: z.number().min(30).max(250), tickerRevision: z.number().int().nonnegative(),
+  tickerSpeed: z.number().min(30).max(250).optional(), tickerRevision: z.number().int().nonnegative().optional(),
   outputFps: z.union([z.literal(25), z.literal(30), z.literal(60)]),
   logoType: z.enum(["text", "image"]), logoImage: z.string().nullable(),
   logoText: z.string().max(120), logoSub: z.string().max(120),
   timezone: z.enum(timezoneModes), customTimezoneLabel: z.string().max(40)
-}).partial();
+});
+export const masterOverlayPatchSchema = masterOverlaySchema.partial();
+
+const headlineFieldLimits = { headline: 120, kicker: 60, subline: 160, location: 60, ticker: 160, brand: 40, socialHandle: 80 } as const;
+export const graphicFieldLimits = {
+  HEADLINE: headlineFieldLimits,
+  BREAKING: headlineFieldLimits,
+  REPORTER: { name: 60, role: 60, location: 50, ticker: 160, brand: 40, socialHandle: 80, headline: 120, subline: 160 },
+  SOT: { headline: 120, name: 80, role: 100, location: 60, ticker: 160, brand: 40 },
+  LOCATION: { location: 50 }
+} as const;
+export function getGraphicFieldLimit(templateType: TemplateType, field: string): number | undefined {
+  return (graphicFieldLimits[templateType] as Readonly<Record<string, number>>)[field];
+}
 
 export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
   HEADLINE: z.object({
-    headline: z.string().trim().min(1).max(120),
-    kicker: z.string().trim().max(60).optional().default(""),
-    subline: z.string().trim().max(160).optional().default(""),
-    location: z.string().trim().max(60).optional().default(""),
-    ticker: z.string().trim().max(160).optional().default(""),
-    brand: z.string().trim().max(40).optional().default("CNNINDONESIA.COM"),
+    headline: z.string().trim().min(1).max(graphicFieldLimits.HEADLINE.headline),
+    kicker: z.string().trim().max(graphicFieldLimits.HEADLINE.kicker).optional().default(""),
+    subline: z.string().trim().max(graphicFieldLimits.HEADLINE.subline).optional().default(""),
+    location: z.string().trim().max(graphicFieldLimits.HEADLINE.location).optional().default(""),
+    ticker: z.string().trim().max(graphicFieldLimits.HEADLINE.ticker).optional().default(""),
+    brand: z.string().trim().max(graphicFieldLimits.HEADLINE.brand).optional().default("CNNINDONESIA.COM"),
     visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")),
     layoutStyle: z.enum(layoutStyles).optional().default("sub"),
     contentMode: z.enum(contentModes).optional().default("headline"),
-    socialHandle: z.string().trim().max(80).optional().default(""),
+    socialHandle: z.string().trim().max(graphicFieldLimits.HEADLINE.socialHandle).optional().default(""),
     showKicker: z.string().optional().default("true"),
     showLocation: z.string().optional().default("true"),
     showDetail: z.string().optional().default("false")
   }).passthrough(),
   REPORTER: z.object({
-    name: z.string().trim().min(1).max(60),
-    role: z.string().trim().max(60).default("REPORTER"),
-    location: z.string().trim().max(50).optional().default(""),
-    ticker: z.string().trim().max(160).optional().default(""),
-    brand: z.string().trim().max(40).optional().default("CNNINDONESIA.COM"),
+    name: z.string().trim().min(1).max(graphicFieldLimits.REPORTER.name),
+    role: z.string().trim().max(graphicFieldLimits.REPORTER.role).default("REPORTER"),
+    location: z.string().trim().max(graphicFieldLimits.REPORTER.location).optional().default(""),
+    ticker: z.string().trim().max(graphicFieldLimits.REPORTER.ticker).optional().default(""),
+    brand: z.string().trim().max(graphicFieldLimits.REPORTER.brand).optional().default("CNNINDONESIA.COM"),
     visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")),
     layoutStyle: z.enum(layoutStyles).optional().default("sub"),
     contentMode: z.enum(contentModes).optional().default("presenter"),
-    socialHandle: z.string().trim().max(80).optional().default(""),
+    socialHandle: z.string().trim().max(graphicFieldLimits.REPORTER.socialHandle).optional().default(""),
     showKicker: z.string().optional().default("true"),
     showLocation: z.string().optional().default("false"),
     showDetail: z.string().optional().default("false"),
-    headline: z.string().trim().max(120).optional().default(""),
-    subline: z.string().trim().max(160).optional().default("")
+    headline: z.string().trim().max(graphicFieldLimits.REPORTER.headline).optional().default(""),
+    subline: z.string().trim().max(graphicFieldLimits.REPORTER.subline).optional().default("")
   }).passthrough(),
   SOT: z.object({
-    headline: z.string().trim().min(1).max(120),
-    name: z.string().trim().min(1).max(80),
-    role: z.string().trim().max(100).optional().default(""),
-    location: z.string().trim().max(60).optional().default(""),
-    ticker: z.string().trim().max(160).optional().default(""),
-    brand: z.string().trim().max(40).optional().default("CNNINDONESIA.COM"),
+    headline: z.string().trim().min(1).max(graphicFieldLimits.SOT.headline),
+    name: z.string().trim().min(1).max(graphicFieldLimits.SOT.name),
+    role: z.string().trim().max(graphicFieldLimits.SOT.role).optional().default(""),
+    location: z.string().trim().max(graphicFieldLimits.SOT.location).optional().default(""),
+    ticker: z.string().trim().max(graphicFieldLimits.SOT.ticker).optional().default(""),
+    brand: z.string().trim().max(graphicFieldLimits.SOT.brand).optional().default("CNNINDONESIA.COM"),
     visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")),
     contentMode: z.literal("sot").default("sot"),
     showLocation: z.string().optional().default("false")
   }).passthrough(),
-  LOCATION: z.object({ visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")), location: z.string().trim().min(1).max(50) }).passthrough(),
+  LOCATION: z.object({ visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")), location: z.string().trim().min(1).max(graphicFieldLimits.LOCATION.location) }).passthrough(),
   BREAKING: z.object({
-    headline: z.string().trim().min(1).max(120),
-    kicker: z.string().trim().max(60).optional().default("BREAKING NEWS"),
-    subline: z.string().trim().max(160).optional().default(""),
-    location: z.string().trim().max(60).optional().default(""),
-    ticker: z.string().trim().max(160).optional().default(""),
-    brand: z.string().trim().max(40).optional().default("CNNINDONESIA.COM"),
+    headline: z.string().trim().min(1).max(graphicFieldLimits.BREAKING.headline),
+    kicker: z.string().trim().max(graphicFieldLimits.BREAKING.kicker).optional().default("BREAKING NEWS"),
+    subline: z.string().trim().max(graphicFieldLimits.BREAKING.subline).optional().default(""),
+    location: z.string().trim().max(graphicFieldLimits.BREAKING.location).optional().default(""),
+    ticker: z.string().trim().max(graphicFieldLimits.BREAKING.ticker).optional().default(""),
+    brand: z.string().trim().max(graphicFieldLimits.BREAKING.brand).optional().default("CNNINDONESIA.COM"),
     visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")),
     layoutStyle: z.enum(layoutStyles).optional().default("sub"),
     contentMode: z.enum(contentModes).optional().default("headline"),
-    socialHandle: z.string().trim().max(80).optional().default(""),
+    socialHandle: z.string().trim().max(graphicFieldLimits.BREAKING.socialHandle).optional().default(""),
     showKicker: z.string().optional().default("true"),
     showLocation: z.string().optional().default("false"),
     showDetail: z.string().optional().default("false")
@@ -301,10 +321,15 @@ export const rundownItemPatchSchema = z.object({
   sortOrder: z.number().int().nonnegative().optional()
 }).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi");
 
-export const settingsPatchSchema = z.record(
-  z.string().min(1).max(50),
-  z.any()
-).refine((data) => Object.keys(data).length > 0, "Minimal satu field pengaturan harus diisi");
+export const appSettingsSchema = z.strictObject({ outputMode: z.literal("web") });
+export const defaultAppSettings = { outputMode: "web" } as const;
+export const settingsPatchSchema = appSettingsSchema.partial()
+  .refine((data) => data.outputMode !== undefined, "Minimal satu field pengaturan harus diisi");
+export const liveStageInputSchema = z.object({ mode: z.enum(["empty", "logo", "full"]) });
+export const actionLogLimitSchema = z.preprocess(
+  (value) => typeof value === "string" || typeof value === "number" || value === undefined ? value : NaN,
+  z.coerce.number().int().min(1).max(200).default(50)
+);
 
 export type GraphicItem = {
   id: string; itemId: string; templateType: TemplateType; sortOrder: number; status: MaterialStatus;
@@ -316,7 +341,7 @@ export type RundownItem = {
 };
 export type Rundown = { id: string; programName: string; title: string; updatedAt: string; items: RundownItem[] };
 export type OverlayState = { overlayNumber: number; inputGuid: string | null };
-export type AppSettings = Record<string, any>;
+export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type LiveState = {
   connection: ConnectionStatus;
   commandStatus: CommandStatus;
@@ -349,6 +374,12 @@ export const headlineDefaultsSchema = z.object({
   kicker: z.string().trim().max(60).default(""),
   subline: z.string().trim().max(160).default("")
 });
+export const headlineDefaultsPatchSchema = z.object({
+  headline: headlineDefaultsSchema.shape.headline.removeDefault(),
+  location: headlineDefaultsSchema.shape.location.removeDefault(),
+  kicker: headlineDefaultsSchema.shape.kicker.removeDefault(),
+  subline: headlineDefaultsSchema.shape.subline.removeDefault()
+}).partial();
 export type HeadlineDefaults = z.infer<typeof headlineDefaultsSchema>;
 
 export const defaultHeadlineDefaults: HeadlineDefaults = {

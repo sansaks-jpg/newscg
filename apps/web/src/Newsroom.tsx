@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
+import { getGraphicFieldLimit, headlineDefaultsSchema, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -65,7 +66,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
   };
   const [pending, setPending] = useState(false);
   const [search, setSearch] = useState("");
-  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Rundown | null>(null);
 
   async function move(item: RundownItem, offset: number) {
     if (!rundown || pending) return;
@@ -200,7 +201,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             {rundown && (
               <button
                 className="prep-rename-btn"
-                onClick={() => setShowRenameModal(true)}
+                onClick={() => setRenameTarget(rundown)}
                 title="Ubah nama program & edisi"
               >
                 <Edit3 size={12} />
@@ -491,13 +492,13 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
       )}
 
       {/* Modal Rename Rundown */}
-      {showRenameModal && rundown && (
+      {renameTarget && (
         <RenameRundownModal
-          rundown={rundown}
-          onClose={() => setShowRenameModal(false)}
+          rundown={renameTarget}
+          onClose={() => setRenameTarget(null)}
           onSaved={async () => {
             await reload();
-            setShowRenameModal(false);
+            setRenameTarget(null);
             toast("Nama rundown berhasil diperbarui");
           }}
           toast={toast}
@@ -536,17 +537,45 @@ function RenameRundownModal({
 }) {
   const [name, setName] = useState(rundown.programName);
   const [title, setTitle] = useState(rundown.title);
+  const [targetId] = useState(rundown.id);
   const [saving, setSaving] = useState(false);
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const openerRef = useRef(document.activeElement as HTMLElement | null);
+  useEffect(() => {
+    dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+    return () => openerRef.current?.focus();
+  }, []);
+  const onDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (event.key === "Escape" && !saving) {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled])'
+    ) || []);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  };
 
   return (
     <div className="nr-modal-backdrop">
       <form
+        ref={dialogRef}
         className="modal-box rename-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ubah identitas rundown"
+        onKeyDown={onDialogKeyDown}
         onSubmit={async (e) => {
           e.preventDefault();
           setSaving(true);
           try {
-            await mutate(`/api/rundowns/${rundown.id}`, "PATCH", {
+            await mutate(`/api/rundowns/${targetId}`, "PATCH", {
               programName: name,
               title
             });
@@ -560,7 +589,7 @@ function RenameRundownModal({
       >
         <div className="modal-header">
           <h3>Ubah Identitas Rundown</h3>
-          <button type="button" className="btn-close-modal" onClick={onClose}>
+          <button type="button" className="btn-close-modal" disabled={saving} onClick={onClose} aria-label="Tutup dialog ubah rundown">
             <X size={14} />
           </button>
         </div>
@@ -569,7 +598,7 @@ function RenameRundownModal({
             <span>Nama Program Siaran</span>
             <input
               required
-              maxLength={80}
+              maxLength={rundownInputSchema.shape.programName.maxLength ?? undefined}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Contoh: Seputar Berita Utama"
@@ -579,7 +608,7 @@ function RenameRundownModal({
             <span>Edisi / Tanggal</span>
             <input
               required
-              maxLength={100}
+              maxLength={rundownInputSchema.shape.title.maxLength ?? undefined}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: Edisi Petang · 19 September 2026"
@@ -654,6 +683,12 @@ function StoryEditor({
   });
   const [previewIndex, setPreviewIndex] = useState(0);
   const [error, setError] = useState("");
+  const [defaultsLoading, setDefaultsLoading] = useState(!item);
+  const [defaultsLoadError, setDefaultsLoadError] = useState("");
+  const [defaultsLoadAttempt, setDefaultsLoadAttempt] = useState(0);
+  const titleEdited = useRef(false);
+  const defaultSeedActive = useRef(!item);
+  const editedSeedFields = useRef(new Set<string>());
   const [saving, setSaving] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
   const onDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
@@ -672,23 +707,28 @@ function StoryEditor({
   };
 
   useEffect(() => {
-    if (!item) {
-      api<HeadlineDefaults>("/api/settings/headline-defaults")
-        .then((def) => {
-          if (def) {
+    if (item) return;
+    let active = true;
+    setDefaultsLoading(true);
+    setDefaultsLoadError("");
+    api<HeadlineDefaults>("/api/settings/headline-defaults")
+        .then((data) => {
+          const def = headlineDefaultsSchema.parse(data);
+          if (active) {
             setGraphics((gs) => {
-              if (gs.length > 0 && gs[0]?.templateType === "HEADLINE" && !gs[0].draftFields.headline) {
+              if (defaultSeedActive.current && gs[0]?.templateType === "HEADLINE") {
                 return gs.map((g, idx) =>
                   idx === 0
                     ? {
                         ...g,
                         draftFields: {
                           ...g.draftFields,
-                          headline: def.headline || g.draftFields.headline || "",
-                          location: def.location || g.draftFields.location || "",
-                          kicker: def.kicker || g.draftFields.kicker || "",
-                          subline: def.subline || g.draftFields.subline || "",
-                          showKicker: def.kicker ? "true" : "false"
+                          ...Object.fromEntries(Object.entries(def).map(([key, value]) => [
+                            key, editedSeedFields.current.has(key) ? g.draftFields[key] || "" : value || g.draftFields[key] || ""
+                          ])),
+                          showKicker: editedSeedFields.current.has("kicker")
+                            ? g.draftFields.showKicker ?? "false"
+                            : def.kicker ? "true" : g.draftFields.showKicker ?? "false"
                         }
                       }
                     : g
@@ -696,16 +736,19 @@ function StoryEditor({
               }
               return gs;
             });
-            if (def.headline && !title) {
-              setTitle(def.headline);
-            }
+            setTitle((current) => titleEdited.current || current ? current : def.headline);
           }
         })
-        .catch(() => {});
-    }
-  }, [item]);
+        .catch((reason: unknown) => {
+          if (active) setDefaultsLoadError(`Default materi belum dimuat: ${reason instanceof Error ? reason.message : "Permintaan gagal"}. Anda dapat mengisi berita secara manual atau mencoba lagi.`);
+        })
+        .finally(() => { if (active) setDefaultsLoading(false); });
+    return () => { active = false; };
+  }, [item, defaultsLoadAttempt]);
 
   function handleTitleChange(newTitle: string) {
+    titleEdited.current = true;
+    editedSeedFields.current.add("headline");
     setTitle(newTitle);
     setGraphics((gs) => {
       if (gs.length > 0 && gs[0] && (gs[0].templateType === "HEADLINE" || gs[0].templateType === "BREAKING")) {
@@ -761,6 +804,7 @@ function StoryEditor({
       );
       if (!confirmed) return;
     }
+    defaultSeedActive.current = false;
     const headline = title.trim() || "HEADLINE BERITA";
     const baseLocation = graphics.find((g) => g.draftFields.location)?.draftFields.location || "";
     const baseSubline = graphics.find((g) => g.draftFields.subline)?.draftFields.subline || "";
@@ -813,6 +857,7 @@ function StoryEditor({
   }
 
   function field(index: number, key: string, value: string) {
+    if (index === 0) editedSeedFields.current.add(key);
     setPreviewIndex(index);
     setGraphics((gs) =>
       gs.map((g, i) => (i === index ? { ...g, draftFields: { ...g.draftFields, [key]: value } } : g))
@@ -883,6 +928,11 @@ function StoryEditor({
         </div>
 
         <div className="story-editor-scroll-area">
+          {defaultsLoading && <p role="status">Memuat default materi…</p>}
+          {defaultsLoadError && <div className="modal-error-banner" role="alert">
+            {defaultsLoadError}
+            <button type="button" onClick={() => setDefaultsLoadAttempt((attempt) => attempt + 1)}>Muat ulang default</button>
+          </div>}
           {/* Metadata Berita */}
           <div className="editor-card story-meta-card">
             <h3 className="section-title">Informasi Segmen Berita</h3>
@@ -892,7 +942,7 @@ function StoryEditor({
                 <input
                   autoFocus
                   required
-                  maxLength={120}
+                  maxLength={rundownItemInputSchema.shape.title.maxLength ?? undefined}
                   value={title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="Masukkan judul berita utama..."
@@ -903,7 +953,7 @@ function StoryEditor({
                 <span>Kode Slug</span>
                 <input
                   required
-                  maxLength={30}
+                  maxLength={rundownItemInputSchema.shape.slug.maxLength ?? undefined}
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="NEWS-01"
@@ -1034,7 +1084,10 @@ function StoryEditor({
                       <button
                         type="button"
                         className="btn-remove-cue"
-                        onClick={() => setGraphics((gs) => gs.filter((_, i) => i !== index))}
+                        onClick={() => {
+                          if (index === 0) defaultSeedActive.current = false;
+                          setGraphics((gs) => gs.filter((_, i) => i !== index));
+                        }}
                         title="Hapus materi CG ini"
                       >
                         <Trash2 size={13} />
@@ -1048,7 +1101,7 @@ function StoryEditor({
                       <div className="cue-fields-grid">
                         <label className="field-full">
                           <span>Headline Berita (Wajib)</span>
-                          <input required maxLength={120} value={g.draftFields.headline || ""}
+                          <input required maxLength={getGraphicFieldLimit(g.templateType, "headline")} value={g.draftFields.headline || ""}
                             onChange={(e) => field(index, "headline", e.target.value)}
                             placeholder="Judul berita di baris atas LT SOT" />
                         </label>
@@ -1056,7 +1109,7 @@ function StoryEditor({
                           <span>Nama Narasumber (Wajib)</span>
                           <input
                             required
-                            maxLength={80}
+                            maxLength={getGraphicFieldLimit(g.templateType, "name")}
                             value={g.draftFields.name || ""}
                             onChange={(e) => field(index, "name", e.target.value)}
                             placeholder="Contoh: RISKI DWIANTO"
@@ -1065,7 +1118,7 @@ function StoryEditor({
                         <label>
                           <span>Jabatan / Keterangan (Opsional)</span>
                           <input
-                            maxLength={100}
+                            maxLength={getGraphicFieldLimit(g.templateType, "role")}
                             value={g.draftFields.role || ""}
                             onChange={(e) => field(index, "role", e.target.value)}
                             placeholder="Contoh: Kasie Ops Basarnas Banten"
@@ -1078,7 +1131,7 @@ function StoryEditor({
                           <span>Nama Lengkap Narasumber / Presenter</span>
                           <input
                             required
-                            maxLength={60}
+                            maxLength={getGraphicFieldLimit(g.templateType, "name")}
                             value={g.draftFields.name || ""}
                             onChange={(e) => field(index, "name", e.target.value)}
                             placeholder="Contoh: Dr. Ir. Budi Santoso, M.Sc"
@@ -1087,7 +1140,7 @@ function StoryEditor({
                         <label>
                           <span>Jabatan / Institusi / Media Sosial</span>
                           <input
-                            maxLength={60}
+                            maxLength={getGraphicFieldLimit(g.templateType, "role")}
                             value={g.draftFields.role || ""}
                             onChange={(e) => field(index, "role", e.target.value)}
                             placeholder="Contoh: Pakar Klimatologi BMKG"
@@ -1100,7 +1153,7 @@ function StoryEditor({
                           <span>Nama Lokasi Liputan</span>
                           <input
                             required
-                            maxLength={50}
+                            maxLength={getGraphicFieldLimit(g.templateType, "location")}
                             value={g.draftFields.location || ""}
                             onChange={(e) => field(index, "location", e.target.value)}
                             placeholder="Contoh: JAKARTA PUSAT"
@@ -1113,7 +1166,7 @@ function StoryEditor({
                           <span>Headline Utama (Wajib) <strong style={{ color: "#ef4444" }}>*</strong></span>
                           <input
                             required
-                            maxLength={120}
+                            maxLength={getGraphicFieldLimit(g.templateType, "headline")}
                             value={g.draftFields.headline || ""}
                             onChange={(e) => field(index, "headline", e.target.value)}
                             placeholder="Judul headline utama yang wajib diisi..."
@@ -1122,7 +1175,7 @@ function StoryEditor({
                         <label>
                           <span>Sub Topik di Atas / Kicker (Opsional)</span>
                           <input
-                            maxLength={60}
+                            maxLength={getGraphicFieldLimit(g.templateType, "kicker")}
                             value={g.draftFields.kicker || ""}
                             onChange={(e) => field(index, "kicker", e.target.value)}
                             placeholder="Contoh: BREAKING NEWS (kosongkan jika tidak ada)"
@@ -1131,7 +1184,7 @@ function StoryEditor({
                         <label>
                           <span>Detail Headline / Keterangan (Opsional)</span>
                           <input
-                            maxLength={140}
+                            maxLength={getGraphicFieldLimit(g.templateType, "subline")}
                             value={g.draftFields.subline || ""}
                             onChange={(e) => field(index, "subline", e.target.value)}
                             placeholder="Keterangan tambahan (kosongkan jika tidak ada)"
@@ -1140,7 +1193,7 @@ function StoryEditor({
                         <label className="field-full">
                           <span>Lokasi Liputan (Opsional)</span>
                           <input
-                            maxLength={50}
+                            maxLength={getGraphicFieldLimit(g.templateType, "location")}
                             value={g.draftFields.location || ""}
                             onChange={(e) => field(index, "location", e.target.value)}
                             placeholder="Contoh: JAKARTA PUSAT (kosongkan jika tidak ada)"

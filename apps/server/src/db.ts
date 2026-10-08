@@ -4,7 +4,8 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem } from "@newscg/shared";
-import { defaultHeadlineDefaults, defaultMasterOverlayState } from "@newscg/shared";
+import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlayPatchSchema, masterOverlaySchema, settingsPatchSchema } from "@newscg/shared";
+import type { ZodType } from "zod";
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dbPath = resolve(serverRoot, process.env.DATABASE_PATH || "./data/newscg.db");
@@ -149,17 +150,70 @@ export const saveStory = db.transaction((rundownId: string, itemId: string | nul
 export function markGraphicPushed(id: string, fields: Record<string, string>) { db.prepare("UPDATE graphic_items SET last_pushed_fields=? WHERE id=?").run(JSON.stringify(fields), id); }
 function touch(id: string) { db.prepare("UPDATE rundowns SET updated_at=? WHERE id=?").run(new Date().toISOString(), id); }
 
-const settingDefaults: Record<string, any> = { outputMode: "web" };
+const settingsWarnings = new Set<string>();
+function warnStoredSettings(key: string, problem: string) {
+  const warningKey = `${key}:${problem}`;
+  if (settingsWarnings.has(warningKey)) return;
+  settingsWarnings.add(warningKey);
+  console.warn(`Pengaturan tersimpan '${key}' tidak valid (${problem}). Nilai aman digunakan; data asli tetap disimpan.`);
+}
+function readStoredSettingsObject(key: string): Record<string, unknown> {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  if (!row) return {};
+  try {
+    const value: unknown = JSON.parse(row.value);
+    if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+    warnStoredSettings(key, "isi harus berupa objek");
+  } catch {
+    warnStoredSettings(key, "JSON rusak");
+  }
+  return {};
+}
+function readValidatedSettingsFields(key: string, shape: Record<string, ZodType>) {
+  const stored = readStoredSettingsObject(key);
+  return Object.fromEntries(Object.entries(shape).flatMap(([field, schema]) => {
+    if (!Object.hasOwn(stored, field)) return [];
+    const parsed = schema.safeParse(stored[field]);
+    if (!parsed.success) {
+      warnStoredSettings(key, `field ${field}`);
+      return [];
+    }
+    return [[field, parsed.data]];
+  }));
+}
+function writeSettingsObject(key: string, patch: Record<string, unknown>) {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  let stored: Record<string, unknown> = {};
+  if (row) {
+    try {
+      const value: unknown = JSON.parse(row.value);
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Bukan objek");
+      stored = value as Record<string, unknown>;
+    } catch {
+      const backupKey = `recovery:${key}:${randomUUID()}`;
+      db.prepare("INSERT INTO settings(key,value) VALUES(?,?)").run(backupKey, JSON.stringify({ sourceKey: key, rawValue: row.value, createdAt: new Date().toISOString() }));
+      console.warn(`Cadangan pengaturan rusak '${key}' disimpan sebelum perubahan diterapkan.`);
+    }
+  }
+  db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify({ ...stored, ...patch }));
+}
 export function getSettingsInternal() {
-  const rows = Object.fromEntries((db.prepare("SELECT key,value FROM settings").all() as any[]).map(r => [r.key, JSON.parse(r.value)]));
-  return { ...settingDefaults, ...rows };
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'outputMode'").get() as { value: string } | undefined;
+  if (!row) return { ...defaultAppSettings };
+  try {
+    const parsed = appSettingsSchema.safeParse({ outputMode: JSON.parse(row.value) });
+    if (parsed.success) return parsed.data;
+    warnStoredSettings("outputMode", "nilai tidak didukung");
+  } catch {
+    warnStoredSettings("outputMode", "JSON rusak");
+  }
+  return { ...defaultAppSettings };
 }
 export function getSettings(): AppSettings { return getSettingsInternal(); }
-export const saveSettings = db.transaction((patch: any) => {
-  for (const [key, val] of Object.entries(patch)) {
-    if (val !== undefined) {
-      db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(val));
-    }
+export const saveSettings = db.transaction((patch: unknown) => {
+  const parsed = settingsPatchSchema.parse(patch);
+  for (const [key, value] of Object.entries(parsed)) {
+    db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(value));
   }
   return getSettings();
 });
@@ -167,7 +221,7 @@ export function logAction(action: string, status: string, message: string, graph
   db.prepare("INSERT INTO action_logs VALUES(?,?,?,?,?,?,?)").run(randomUUID(), action, status, message, graphicId || null, requestId || null, new Date().toISOString());
 }
 export function getActions(limit = 50) {
-  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 200));
+  const safeLimit = Math.trunc(Math.max(1, Math.min(Number.isFinite(Number(limit)) ? Number(limit) : 50, 200)));
   return db.prepare("SELECT * FROM action_logs ORDER BY created_at DESC LIMIT ?").all(safeLimit);
 }
 export function saveOnAir(graphicId: string | null, inputGuid: string | null, overlayNumber: number, snapshot: Record<string,string> | null, status: string) {
@@ -176,32 +230,26 @@ export function saveOnAir(graphicId: string | null, inputGuid: string | null, ov
 export function getOnAir() { const row = db.prepare("SELECT * FROM on_air_state WHERE singleton=1").get() as any; return row ? { graphicId: row.graphic_id, inputGuid: row.input_guid, overlayNumber: row.overlay_number, snapshot: json(row.snapshot), status: row.status, updatedAt: row.updated_at } : null; }
 
 export function getMasterOverlay(): MasterOverlayState {
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'master_overlay'").get() as any;
-  if (!row) return defaultMasterOverlayState;
-  const parsed = json(row.value) as any;
-  return { ...defaultMasterOverlayState, ...(parsed || {}) };
+  return masterOverlaySchema.parse({ ...defaultMasterOverlayState, ...readValidatedSettingsFields("master_overlay", masterOverlaySchema.shape) });
 }
 
-export function saveMasterOverlay(patch: Partial<MasterOverlayState>): MasterOverlayState {
-  const current = getMasterOverlay();
-  const updated = { ...current, ...patch };
-  db.prepare("INSERT INTO settings(key, value) VALUES('master_overlay', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(updated));
+export const saveMasterOverlay = db.transaction((patch: Partial<MasterOverlayState>): MasterOverlayState => {
+  const parsed = masterOverlayPatchSchema.parse(patch);
+  const updated = masterOverlaySchema.parse({ ...getMasterOverlay(), ...parsed });
+  writeSettingsObject("master_overlay", parsed);
   return updated;
-}
+});
 
 export function getHeadlineDefaults(): HeadlineDefaults {
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'headline_defaults'").get() as any;
-  if (!row) return defaultHeadlineDefaults;
-  const parsed = json(row.value) as any;
-  return { ...defaultHeadlineDefaults, ...(parsed || {}) };
+  return headlineDefaultsSchema.parse({ ...defaultHeadlineDefaults, ...readValidatedSettingsFields("headline_defaults", headlineDefaultsSchema.shape) });
 }
 
-export function saveHeadlineDefaults(patch: Partial<HeadlineDefaults>): HeadlineDefaults {
-  const current = getHeadlineDefaults();
-  const updated = { ...current, ...patch };
-  db.prepare("INSERT INTO settings(key, value) VALUES('headline_defaults', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(updated));
+export const saveHeadlineDefaults = db.transaction((patch: Partial<HeadlineDefaults>): HeadlineDefaults => {
+  const parsed = headlineDefaultsPatchSchema.parse(patch);
+  const updated = headlineDefaultsSchema.parse({ ...getHeadlineDefaults(), ...parsed });
+  writeSettingsObject("headline_defaults", parsed);
   return updated;
-}
+});
 
 export function seedIfEmpty() {
   if ((db.prepare("SELECT COUNT(*) count FROM rundowns").get() as any).count) return;

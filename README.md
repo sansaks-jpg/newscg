@@ -49,6 +49,8 @@ Logo upload yang disarankan: **PNG transparan 800 × 500 px**, ruang kosong seki
 
 ## 🏗️ Arsitektur Proyek
 
+Panduan untuk agen AI yang menerima rundown berita dari user tersedia di [docs/AI_RUNDOWN_GUIDE.md](docs/AI_RUNDOWN_GUIDE.md). Materi dimasukkan melalui API sebagai DRAFT, lalu dibaca kembali tanpa menjalankan perintah live.
+
 NewsCG dibangun dengan struktur monorepo menggunakan **npm workspaces**:
 
 ```
@@ -71,7 +73,7 @@ newscg/
 ## 🚀 Panduan Memulai
 
 ### Prasyarat
-- **Node.js**: Versi 20.x atau lebih baru
+- **Node.js**: Versi 20.19.x atau 22.12.0 ke atas (sesuai build Vite dan validasi gambar Sharp).
 - **npm**: Versi 9.x atau lebih baru
 
 ### 1. Instalasi Dependensi

@@ -115,3 +115,11 @@ npm run build
 - Latar belakang canvas output overlay wajib transparan murni (`background: transparent`).
 - Seluruh elemen lower third wajib berada di dalam batas **Title Safe Area** siaran (standar EBU R95 / SMPTE).
 - Komponen `AutoSquishText` harus digunakan untuk judul dan nama yang dinamis agar teks tidak meluap keluar batas saat karakter terlalu panjang.
+
+---
+
+## 7. Memasukkan Rundown Kiriman User
+
+- Ikuti [docs/AI_RUNDOWN_GUIDE.md](docs/AI_RUNDOWN_GUIDE.md) ketika user mengirim rundown berita untuk dimasukkan ke proyek.
+- Pertahankan urutan dan fakta sumber, validasi dengan schema shared, tulis melalui API, lalu baca kembali hasilnya.
+- Materi baru disimpan sebagai **DRAFT**. Impor rundown tidak memberi izin mengubah master atau menjalankan perintah ON AIR.
