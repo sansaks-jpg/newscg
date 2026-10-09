@@ -19,7 +19,7 @@ const master = { ...defaultMasterOverlayState, showLogo: false, showTicker: fals
 
 function cue(id: string, templateType: TemplateType = "HEADLINE", fields: Record<string, string> = {}): GraphicItem {
   return {
-    id, itemId: id.startsWith("B") ? "B" : "A", templateType, sortOrder: 0, status: "READY", lastPushedFields: null,
+    id, itemId: id.startsWith("B") ? "B" : "A", templateType, sortOrder: 0, lastPushedFields: null,
     draftFields: { headline: `ORIGINAL ${id}`, location: "JAKARTA", kicker: "TOPIK", subline: "DETAIL",
       showLocation: "false", showKicker: "false", showDetail: "false", layoutStyle: "single", ...fields }
   };
@@ -214,6 +214,40 @@ describe("production draft persistence", () => {
     await click(host.querySelector<HTMLButtonElement>(".quick-edit-close")!);
     await click(host.querySelector<HTMLButtonElement>(".primary-actions-deck button")!);
     expect(stored.get("A1")?.draftFields.headline).toBe("UNSAVED RETRY");
+  });
+});
+
+describe("production without material approval", () => {
+  it.each(["take", "update"] as const)("waits for a pending save before %s without an approval status", async (command) => {
+    if (command === "update") live = { ...live, onAirGraphicId: "A1", onAirSnapshot: { ...stored.get("A1")!.draftFields } };
+    let release!: () => void;
+    fetchMock.mockImplementationOnce((url, options) => new Promise<Response>((done) => {
+      release = () => done(storeGraphic(String(url), options));
+    }));
+    await mount(); await openEditor(); await change(input(), "SAVE BEFORE LIVE");
+    expect(host.textContent).not.toMatch(/DRAFT|PERLU DICEK|Setujui/);
+    const primary = host.querySelector<HTMLButtonElement>(".primary-actions-deck button")!;
+    expect(primary.disabled).toBe(false);
+    await click(primary);
+    expect(graphicRequests()).toHaveLength(1);
+    expect(liveRequests()).toHaveLength(0);
+    expect(primary.disabled).toBe(true);
+    await act(async () => release());
+    expect(stored.get("A1")!.draftFields.headline).toBe("SAVE BEFORE LIVE");
+    expect(liveRequests().map(([url]) => url)).toEqual([`/api/live/${command}`]);
+    expect(JSON.parse(graphicRequests()[0]![1]!.body as string)).not.toHaveProperty("status");
+  });
+
+  it.each(["take", "update"] as const)("blocks %s when saving material fails", async (command) => {
+    if (command === "update") live = { ...live, onAirGraphicId: "A1", onAirSnapshot: { ...stored.get("A1")!.draftFields } };
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Penyimpanan gagal" }), { status: 500 }));
+    await mount(); await openEditor(); await change(input(), "STILL UNSAVED");
+    await click(host.querySelector<HTMLButtonElement>(".primary-actions-deck button")!);
+    expect(liveRequests()).toHaveLength(0);
+    expect(stored.get("A1")!.draftFields.headline).toBe("ORIGINAL A1");
+    expect(input().value).toBe("STILL UNSAVED");
+    expect(toast).toHaveBeenCalledWith("Penyimpanan gagal");
+    expect(host.querySelector(".save-indicator")?.textContent).toContain("Gagal menyimpan");
   });
 });
 

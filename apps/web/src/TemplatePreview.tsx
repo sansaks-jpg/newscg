@@ -26,7 +26,7 @@ function demoFields(example: (typeof examples)[keyof typeof examples]): Record<s
 }
 
 function demoGraphic(example: (typeof examples)[keyof typeof examples], id: string): GraphicItem {
-  return { id, itemId: "demo", templateType: example.type, sortOrder: 0, status: "READY",
+  return { id, itemId: "demo", templateType: example.type, sortOrder: 0,
     draftFields: demoFields(example), lastPushedFields: null };
 }
 

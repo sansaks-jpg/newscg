@@ -112,7 +112,6 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
     try {
       if (!graphic) throw new Error("Grafis tidak ditemukan");
       if (!getItem(graphic.itemId)?.cgRequired) throw new Error("TAKE diblokir: item rundown ditandai tanpa CG.");
-      if (graphic.status !== "READY") throw new Error("TAKE diblokir: materi CG masih DRAFT. Setujui di Rundown & CG.");
       const previous = getOnAir();
       const previousGraphic = previous?.graphicId ? getGraphic(previous.graphicId) : null;
       const switchDetail = Boolean(previousGraphic && previousGraphic.id !== graphic.id &&
@@ -177,7 +176,6 @@ export function updateLive(
       if (!graphic || !current || (current.graphicId !== graphicId && !switchDetail)) {
         throw new Error("UPDATE diblokir: grafis ini tidak terverifikasi ON AIR");
       }
-      if (graphic.status !== "READY") throw new Error("UPDATE diblokir: materi CG masih DRAFT. Setujui di Rundown & CG.");
       live = { ...live, commandStatus: "pending", error: null };
 
       const existingSnapshot = (current.snapshot as Record<string, string>) || {};

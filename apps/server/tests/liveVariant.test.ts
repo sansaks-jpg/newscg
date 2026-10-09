@@ -27,7 +27,6 @@ describe("Live variant & headline defaults API (branch simple)", () => {
           id: "CG-TEST-201",
           templateType: "HEADLINE",
           sortOrder: 1,
-          status: "READY",
           draftFields: {
             kicker: "TENGGELAMNYA KM VIRGO TRANSPORT 8",
             headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA",
@@ -123,22 +122,61 @@ describe("Live variant & headline defaults API (branch simple)", () => {
     expect(dbModule.getOnAir()?.snapshot?.showLocation).toBe("true");
   });
 
-  it("rejects a draft cue without replacing the current program", async () => {
+  it("takes new material without approval and keeps edits isolated until UPDATE", async () => {
     const rundown = dbModule.getRundowns()[0]!;
+    const previousProgram = dbModule.getOnAir();
     const item = dbModule.createItem(rundown.id, {
-      slug: "DRAFT-GATE", title: "Materi belum disetujui", format: "VO",
+      slug: "NEW-MATERIAL", title: "Materi baru", format: "VO",
       cgRequired: true, estimatedDurationSeconds: 30, sortOrder: rundown.items.length
     })!;
     const graphic = dbModule.createGraphic(item.id, {
-      templateType: "HEADLINE", sortOrder: 0, status: "DRAFT",
-      draftFields: { headline: "MATERI BELUM DISETUJUI", visualTemplate: "cnn" }
+      templateType: "HEADLINE", sortOrder: 0,
+      draftFields: { headline: "MATERI BARU", visualTemplate: "cnn" }
     })!;
-    const previousProgram = dbModule.getOnAir()?.graphicId;
+    expect(graphic).not.toHaveProperty("status");
+    liveModule.prepare(graphic.id);
+    expect(dbModule.getOnAir()).toEqual(previousProgram);
 
-    const result = await liveModule.take(graphic.id, "key-draft-gate");
+    const events: import("@newscg/shared").OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber((event) => events.push(event));
+    try {
+      const result = await liveModule.take(graphic.id, "key-new-material-take");
+      expect(result.commandStatus).toBe("confirmed");
+      expect(dbModule.getOnAir()?.snapshot?.headline).toBe("MATERI BARU");
+      expect(events.at(-1)?.type).toBe("TAKE");
+
+      const programBeforeEdit = dbModule.getOnAir();
+      const eventCount = events.length;
+      dbModule.updateGraphic(graphic.id, { draftFields: { headline: "MATERI DIREVISI" } });
+      expect(dbModule.getGraphic(graphic.id)?.draftFields.headline).toBe("MATERI DIREVISI");
+      expect(dbModule.getGraphic(graphic.id)?.lastPushedFields?.headline).toBe("MATERI BARU");
+      expect(dbModule.getOnAir()).toEqual(programBeforeEdit);
+      expect(events).toHaveLength(eventCount);
+
+      const update = await liveModule.updateLive(graphic.id, "key-new-material-update");
+      expect(update.commandStatus).toBe("confirmed");
+      expect(dbModule.getOnAir()?.snapshot?.headline).toBe("MATERI DIREVISI");
+      expect(events.at(-1)?.type).toBe("UPDATE");
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("still rejects TAKE for an item marked without CG and preserves Program", async () => {
+    const rundown = dbModule.getRundowns()[0]!;
+    const item = dbModule.createItem(rundown.id, {
+      slug: "WITHOUT-CG", title: "Berita tanpa CG", format: "VO",
+      cgRequired: false, estimatedDurationSeconds: 30, sortOrder: rundown.items.length
+    })!;
+    const graphic = dbModule.createGraphic(item.id, {
+      templateType: "HEADLINE", sortOrder: 0, draftFields: { headline: "TANPA CG" }
+    });
+    const previousProgram = dbModule.getOnAir();
+
+    const result = await liveModule.take(graphic.id, "key-without-cg");
     expect(result.commandStatus).toBe("failed");
-    expect(result.error).toContain("masih DRAFT");
-    expect(dbModule.getOnAir()?.graphicId).toBe(previousProgram);
+    expect(result.error).toContain("tanpa CG");
+    expect(dbModule.getOnAir()).toEqual(previousProgram);
   });
 
   it("rejects unknown variant action", async () => {

@@ -107,7 +107,6 @@ describe("operator live workflow", () => {
       itemId: "I-1",
       templateType: "HEADLINE",
       sortOrder: 0,
-      status: "READY",
       draftFields: {
         headline: "JUDUL LAMA",
         subline: "Keterangan",

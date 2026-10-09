@@ -49,7 +49,9 @@ Logo upload yang disarankan: **PNG transparan 800 × 500 px**, ruang kosong seki
 
 ## 🏗️ Arsitektur Proyek
 
-Panduan untuk agen AI yang menerima rundown berita dari user tersedia di [docs/AI_RUNDOWN_GUIDE.md](docs/AI_RUNDOWN_GUIDE.md). Materi dimasukkan melalui API sebagai DRAFT, lalu dibaca kembali tanpa menjalankan perintah live.
+Panduan untuk agen AI yang menerima rundown berita dari user tersedia di [docs/AI_RUNDOWN_GUIDE.md](docs/AI_RUNDOWN_GUIDE.md). Materi dimasukkan melalui API, lalu dibaca kembali tanpa menjalankan perintah live. Status persetujuan Draft/Ready/Perlu dicek sudah dihapus.
+
+AI agent dapat menemukan seluruh operasi melalui `GET /api/agent`, membaca OpenAPI di `GET /api/agent/openapi.json`, dan mengambil panduan lengkap di `GET /api/agent/guide.md`. Lihat [docs/AI_AGENT_API.md](docs/AI_AGENT_API.md) untuk contoh tambah, edit, hapus, urut ulang, upload logo, dan kontrol siaran.
 
 NewsCG dibangun dengan struktur monorepo menggunakan **npm workspaces**:
 
@@ -168,8 +170,8 @@ NewsCG menyediakan REST API yang siap dihubungkan ke switcher siaran, Stream Dec
 | `/api/live/clear` | POST | Menarik keluar grafis lower third (animasi keluar) |
 | `/api/live/clear-all` | POST | Menghilangkan seluruh layer (`immediate: true/false`) |
 | `/api/live/prepare` | POST | Menyiapkan cue standby tanpa mengubah status live |
-| `/api/live/variant` | POST | Men-toggle elemen live (`toggle-location`, `toggle-topic`, `toggle-detail`, `clean-headline`) |
-| `/api/live/stage` | POST | Menyetel preset master staging (`empty`, `logo`, `full`) |
+| `/api/live/variant` | POST | Men-toggle elemen live (`toggle-location`, `toggle-kicker`, `toggle-detail`, `clean-headline`) |
+| `/api/live/stage` | POST | Langsung menerapkan preset master (`empty`, `logo`, `full`) dan membersihkan lower third |
 | `/api/live/master` | PATCH | Mengonfigurasi master overlay (logo, jam digital, ticker) |
 | `/api/rundowns/:id/export` | GET | Mengunduh berkas JSON backup rundown siaran |
 | `/api/rundowns/import` | POST | Mengimpor berkas JSON rundown baru |

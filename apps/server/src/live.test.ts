@@ -26,7 +26,6 @@ beforeAll(async () => {
         id: "CG-201",
         templateType: "HEADLINE",
         sortOrder: 1,
-        status: "READY",
         draftFields: {
           kicker: "TENGGELAMNYA KM VIRGO TRANSPORT 8",
           headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA",
@@ -40,7 +39,6 @@ beforeAll(async () => {
         id: "CG-301",
         templateType: "REPORTER",
         sortOrder: 2,
-        status: "READY",
         draftFields: {
           name: "SANDI ARDIANSYAH",
           role: "REPORTER",
@@ -48,7 +46,7 @@ beforeAll(async () => {
         }
       });
       dbModule.createGraphic(item.id, {
-        id: "CG-SOT-1", templateType: "SOT", sortOrder: 3, status: "READY",
+        id: "CG-SOT-1", templateType: "SOT", sortOrder: 3,
         draftFields: { headline: "KELUARGA BINGUNG DATA MANIFES TAK SAMA", name: "Riski Dwianto", role: "Basarnas", contentMode: "sot" }
       });
     }

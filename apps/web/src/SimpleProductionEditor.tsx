@@ -318,7 +318,7 @@ export function SimpleProductionEditor({
           try {
             await reload();
           } catch (error) {
-            toast(`Draft tersimpan, tetapi rundown belum diperbarui: ${(error as Error).message}`);
+            toast(`Perubahan tersimpan, tetapi rundown belum diperbarui: ${(error as Error).message}`);
           }
           return true;
         } catch (err: any) {
@@ -329,7 +329,7 @@ export function SimpleProductionEditor({
           if (currentSeq === saveSeqByCueRef.current[targetCue.id] && currentCueIdRef.current === targetCue.id) {
             setSaveStatus("error");
           }
-          toast(err.message || "Gagal menyimpan perubahan draft");
+          toast(err.message || "Gagal menyimpan perubahan materi");
           return false;
         }
       });
@@ -468,10 +468,6 @@ export function SimpleProductionEditor({
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
       if (!await flushSaveDraft(miniDraft, composition)) return;
-      if (selectedCue.status !== "READY") {
-        toast("Cue masih DRAFT. Setujui materi di Rundown & CG sebelum ditayangkan.");
-        return;
-      }
       await sendLiveCommand(`/api/live/${action}`, { graphicId: selectedCue.id, syncComposition: true });
       await reload();
       toast(action === "take" ? "TAKE diterima server NewsCG" : "UPDATE diterima server NewsCG");
@@ -800,7 +796,6 @@ export function SimpleProductionEditor({
           {items.map((it, idx) => {
             const isSelected = it.id === selectedItem?.id;
             const onAir = isItemOnAir(it);
-            const isReady = it.cgRequired && it.graphics.length > 0 && it.graphics.every((g) => g.status === "READY");
 
             return (
               <div
@@ -820,9 +815,8 @@ export function SimpleProductionEditor({
                     {onAir && <span className="badge-onair pulse">ON AIR</span>}
                     {isSelected && <span className="badge-selected">PREVIEW</span>}
                     {!onAir && idx === nextStoryIndex && <span className="badge-selected">BERIKUTNYA</span>}
-                      <span className={`badge-status ${isReady ? "ready" : "draft"}`}>{it.format}</span>
-                      {!it.cgRequired && <span className="badge-status">TANPA CG</span>}
-                      {it.cgRequired && !isReady && <span className="badge-status draft">PERLU DICEK</span>}
+                      <span className="badge-metadata">{it.format}</span>
+                      {!it.cgRequired && <span className="badge-metadata">TANPA CG</span>}
                   </div>
                 </div>
 
@@ -1013,7 +1007,7 @@ export function SimpleProductionEditor({
         </div>
 
         <div className="primary-actions-deck" aria-label="Perintah siaran">
-          <button type="button" className={`action-btn ${canUpdate ? "btn-update" : "btn-take"}`} disabled={busy || !selectedCue || selectedCue.status !== "READY"} onClick={executePrimary} title={selectedCue?.status === "DRAFT" ? "Materi masih DRAFT. Setujui di Rundown & CG." : undefined}>
+          <button type="button" className={`action-btn ${canUpdate ? "btn-update" : "btn-take"}`} disabled={busy || !selectedCue} onClick={executePrimary}>
             <span className="btn-inner">{canUpdate ? <RefreshCw size={16} /> : <Play size={16} />}<span className="btn-title">{canUpdate ? "UPDATE" : "TAKE"}</span></span><kbd>SPACE / ENTER</kbd>
           </button>
           <button type="button" className="action-btn btn-clear" disabled={busy || !live.onAirGraphicId} onClick={executeClear}>
@@ -1021,7 +1015,7 @@ export function SimpleProductionEditor({
           </button>
         </div>
         <div className="live-change-summary" role="status">
-          {busy ? "Mengirim perintah…" : selectedCue ? (selectedCue.status !== "READY" ? "Cue masih DRAFT — setujui di Rundown & CG sebelum ditayangkan." : canUpdate ? "Cue siap — tekan Spasi untuk memperbarui Program." : "Cue siap di Preview — tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown."}
+          {busy ? "Mengirim perintah…" : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown."}
           {isMasterChanged && " Perubahan master belum diterapkan (M)."}
           {isSelectedOnAir && <small>{pendingChanges.length ? `Belum diterapkan: ${pendingChanges.join(", ")}.` : "Isi Preview sama dengan snapshot Program."}</small>}
           <small>{live.overlayClientsCount} klien output terhubung · Program ini adalah monitor internal NewsCG, bukan pembacaan switcher.</small>

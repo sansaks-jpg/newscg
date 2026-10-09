@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
+import type { EditableGraphic, GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import { getGraphicFieldLimit, headlineDefaultsSchema, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
@@ -35,12 +35,6 @@ const graphicLabel = (g: GraphicItem) =>
     : `${g.draftFields.showLocation === "true" ? "Headline + Lokasi" : "Headline"}${
         g.draftFields.subline && g.draftFields.layoutStyle !== "single" ? " + Detail" : ""
       }`;
-
-const isReady = (item: RundownItem) =>
-  item.cgRequired &&
-  item.estimatedDurationSeconds > 0 &&
-  item.graphics.length > 0 &&
-  item.graphics.every((g) => g.status === "READY");
 
 type Props = {
   rundown?: Rundown;
@@ -184,10 +178,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
       i.slug.toLowerCase().includes(search.toLowerCase())
   );
   const totalDuration = items.reduce((s, i) => s + i.estimatedDurationSeconds, 0);
-  const requiredItems = items.filter((item) => item.cgRequired);
-  const readyCount = requiredItems.filter(isReady).length;
-  const draftCount = requiredItems.length - readyCount;
-  const noCgCount = items.length - requiredItems.length;
+  const noCgCount = items.filter((item) => !item.cgRequired).length;
 
   return (
     <section className="prep-container">
@@ -332,14 +323,6 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             <b>{duration(totalDuration)}</b>
           </div>
           <div className="metric-box">
-            <small>SIAP TAYANG</small>
-            <b className="text-ready">{readyCount} Berita</b>
-          </div>
-          <div className="metric-box">
-            <small>PERLU DICEK</small>
-            <b className={draftCount > 0 ? "text-warn" : ""}>{draftCount} Berita</b>
-          </div>
-          <div className="metric-box">
             <small>TANPA CG</small>
             <b>{noCgCount} Item</b>
           </div>
@@ -370,13 +353,11 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             <div className="col-main">BERITA & SLUG</div>
             <div className="col-dur">DURASI</div>
             <div className="col-cues">MATERI CG (CUE)</div>
-            <div className="col-stat">STATUS</div>
             <div className="col-act">AKSI</div>
           </div>
 
           <div className="prep-table-body">
             {filteredItems.map((item) => {
-              const ready = isReady(item);
               const realIndex = rundown.items.findIndex((i) => i.id === item.id);
 
               return (
@@ -421,10 +402,8 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
                       {item.graphics.map((g) => (
                         <span
                           key={g.id}
-                          className={`cg-chip cg-${g.templateType.toLowerCase()} ${
-                            g.status === "READY" ? "ready" : "draft"
-                          }`}
-                          title={`${graphicLabel(g)} (${g.status})`}
+                          className={`cg-chip cg-${g.templateType.toLowerCase()}`}
+                          title={graphicLabel(g)}
                         >
                           {g.templateType === "SOT" || g.templateType === "REPORTER" ? (
                             <>
@@ -448,12 +427,6 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
                         <span className="cg-chip-empty">{item.cgRequired ? "Belum ada CG" : "CG tidak diperlukan"}</span>
                       )}
                     </div>
-                  </div>
-
-                  <div className="col-stat">
-                    <span className={`status-pill ${!item.cgRequired ? "" : ready ? "is-ready" : "is-warn"}`}>
-                      {!item.cgRequired ? "Tanpa CG" : ready ? "✓ Siap CG" : "⚠ Perlu Dicek"}
-                    </span>
                   </div>
 
                   <div className="col-act">
@@ -631,14 +604,6 @@ function RenameRundownModal({
 // =====================================================================
 // MODAL EDITOR MATERI BERITA & GRAFIS
 // =====================================================================
-type DraftGraphic = {
-  id?: string;
-  templateType: TemplateType;
-  status: "DRAFT" | "READY";
-  draftFields: Record<string, string>;
-  sortOrder: number;
-};
-
 function StoryEditor({
   item,
   rundown,
@@ -657,15 +622,15 @@ function StoryEditor({
   const [format, setFormat] = useState(item?.format || "PKG");
   const [cgRequired, setCgRequired] = useState(item?.cgRequired ?? true);
   const [seconds, setSeconds] = useState(item?.estimatedDurationSeconds || 60);
-  const [graphics, setGraphics] = useState<DraftGraphic[]>(() => {
+  const [graphics, setGraphics] = useState<EditableGraphic[]>(() => {
     if (item) {
-      return item.graphics.map((g) => ({ ...g, draftFields: { ...g.draftFields } }));
+      return item.graphics.map((g) => ({ id: g.id, templateType: g.templateType,
+        sortOrder: g.sortOrder, draftFields: { ...g.draftFields } }));
     }
     // Default otomatis untuk Berita Baru: langsung tampilkan 1 cue HEADLINE siap isi
     return [
       {
         templateType: "HEADLINE",
-        status: "DRAFT",
         sortOrder: 0,
         draftFields: {
           headline: "",
@@ -772,7 +737,6 @@ function StoryEditor({
         ...gs,
         {
           templateType: type,
-          status: "DRAFT",
           sortOrder: newIndex,
             draftFields:
             type === "REPORTER"
@@ -812,7 +776,6 @@ function StoryEditor({
     setGraphics([
       {
         templateType: "HEADLINE",
-        status: "DRAFT",
         sortOrder: 0,
         draftFields: {
           headline,
@@ -826,7 +789,6 @@ function StoryEditor({
       },
       {
         templateType: "HEADLINE",
-        status: "DRAFT",
         sortOrder: 1,
         draftFields: {
           headline,
@@ -840,7 +802,6 @@ function StoryEditor({
       },
       {
         templateType: "HEADLINE",
-        status: "DRAFT",
         sortOrder: 2,
         draftFields: {
           headline,
@@ -1063,24 +1024,6 @@ function StoryEditor({
                     </div>
 
                     <div className="cue-header-right">
-                      <select
-                        aria-label={`Status grafis ${index + 1}`}
-                        value={g.status}
-                        onChange={(e) =>
-                          setGraphics((gs) =>
-                            gs.map((x, i) =>
-                              i === index
-                                ? { ...x, status: e.target.value as "READY" | "DRAFT" }
-                                : x
-                            )
-                          )
-                        }
-                        className={`status-select ${g.status === "READY" ? "ready" : "draft"}`}
-                      >
-                        <option value="DRAFT">DRAFT (Perlu Dicek)</option>
-                        <option value="READY">SIAP TAYANG</option>
-                      </select>
-
                       <button
                         type="button"
                         className="btn-remove-cue"
@@ -1219,7 +1162,7 @@ function StoryEditor({
               <div className="preview-header-left">
                 <span className="dot-led green pulse" />
                 <div>
-                    <h3 className="section-title">PRATINJAU DRAFT CG</h3>
+                    <h3 className="section-title">PRATINJAU CG</h3>
                   <span className="preview-subtitle">
                     Perubahan form terlihat di sini sebelum disimpan; output siaran tidak berubah.
                   </span>
@@ -1249,7 +1192,7 @@ function StoryEditor({
               <BroadcastPreviewBox
                 graphic={
                   currentPreviewCue
-                    ? { id: "draft-preview", templateType: currentPreviewCue.templateType }
+                    ? { id: "editor-preview", templateType: currentPreviewCue.templateType }
                     : null
                 }
                 fields={effectivePreviewFields}
@@ -1258,7 +1201,7 @@ function StoryEditor({
               />
             </div>
             <div className="story-preview-caption">
-              <span>Pratinjau lokal materi CG. Setujui cue sebelum TAKE.</span>
+              <span>Simpan materi CG, lalu gunakan TAKE di Kontrol Siaran untuk menayangkan.</span>
             </div>
           </div>
         </div>

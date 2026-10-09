@@ -220,4 +220,19 @@ describe("settings/default editor safety", () => {
     expect(host.querySelector(".rename-modal")).toBeNull();
     expect(document.activeElement).toBe(opener);
   });
+
+  it("saves news and CG without an approval selector or status payload", async () => {
+    await openStory();
+    const dialog = host.querySelector<HTMLFormElement>(".story-editor-modal")!;
+    expect(host.textContent).not.toMatch(/PERLU DICEK|SIAP TAYANG|PRATINJAU DRAFT/);
+    expect(dialog.querySelector('.status-select, [aria-label^="Status grafis"]')).toBeNull();
+    await change(field("Judul Berita"), "MATERI TANPA PERSETUJUAN STATUS");
+    await act(async () => dialog.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    const saved = bodyOf("/api/rundowns/rundown-a/story", "PUT");
+    expect(saved.title).toBe("MATERI TANPA PERSETUJUAN STATUS");
+    expect(saved.graphics).toHaveLength(1);
+    expect(saved.graphics[0]).not.toHaveProperty("status");
+    expect(saved.graphics[0].draftFields.headline).toBe(saved.title);
+    expect(requests("/api/live/take", "POST")).toHaveLength(0);
+  });
 });

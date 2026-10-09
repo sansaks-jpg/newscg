@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS rundown_items (
 );
 CREATE TABLE IF NOT EXISTS graphic_items (
   id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES rundown_items(id) ON DELETE CASCADE,
-  template_type TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'DRAFT',
+  template_type TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
   draft_fields TEXT NOT NULL, last_pushed_fields TEXT
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -47,6 +47,14 @@ if (!itemColumns.some((column) => column.name === "cg_required")) {
   db.exec("ALTER TABLE rundown_items ADD COLUMN cg_required INTEGER NOT NULL DEFAULT 1");
   db.exec("UPDATE rundown_items SET cg_required = 0 WHERE format = 'LAINNYA' AND NOT EXISTS (SELECT 1 FROM graphic_items WHERE item_id = rundown_items.id)");
 }
+
+db.transaction(() => {
+  const graphicColumns = db.prepare("PRAGMA table_info(graphic_items)").all() as Array<{ name: string }>;
+  if (graphicColumns.some((column) => column.name === "status")) {
+    db.exec("ALTER TABLE graphic_items DROP COLUMN status");
+  }
+  db.prepare("INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (2, datetime('now'))").run();
+})();
 
 const json = <T>(value: string | null): T | null => value ? JSON.parse(value) as T : null;
 
@@ -70,7 +78,7 @@ export function getItem(id: string): RundownItem | null {
   return row ? readItemRow(row) : null;
 }
 function readGraphicRow(row: any): GraphicItem {
-  return { id: row.id, itemId: row.item_id, templateType: row.template_type, sortOrder: row.sort_order, status: row.status, draftFields: json(row.draft_fields) || {}, lastPushedFields: json(row.last_pushed_fields) };
+  return { id: row.id, itemId: row.item_id, templateType: row.template_type, sortOrder: row.sort_order, draftFields: json(row.draft_fields) || {}, lastPushedFields: json(row.last_pushed_fields) };
 }
 export function getGraphic(id: string): GraphicItem | null {
   const row = db.prepare("SELECT * FROM graphic_items WHERE id = ?").get(id) as any;
@@ -86,7 +94,7 @@ export const createRundown = db.transaction((input: { id?: string; programName: 
     db.prepare("INSERT INTO rundown_items(id,rundown_id,slug,title,format,estimated_duration_seconds,sort_order,cg_required) VALUES (?,?,?,?,?,?,?,?)").run(itemId, id, item.slug, item.title, item.format, item.estimatedDurationSeconds, item.sortOrder, Number(item.cgRequired ?? item.format !== "LAINNYA"));
     for (const graphic of item.graphics || []) {
       const graphicId = (options?.regenerateIds || !graphic.id) ? randomUUID() : graphic.id;
-      db.prepare("INSERT INTO graphic_items VALUES (?, ?, ?, ?, ?, ?, NULL)").run(graphicId, itemId, graphic.templateType, graphic.sortOrder, graphic.status || "DRAFT", JSON.stringify(graphic.draftFields));
+      db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?, ?, ?, ?, ?, NULL)").run(graphicId, itemId, graphic.templateType, graphic.sortOrder, JSON.stringify(graphic.draftFields));
     }
   }
   return getRundown(id)!;
@@ -123,13 +131,13 @@ export function deleteItem(id: string) {
 }
 export function createGraphic(itemId: string, input: any) {
   const id = input.id || randomUUID();
-  db.prepare("INSERT INTO graphic_items VALUES (?, ?, ?, ?, ?, ?, NULL)").run(id, itemId, input.templateType, input.sortOrder, input.status, JSON.stringify(input.draftFields));
+  db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?, ?, ?, ?, ?, NULL)").run(id, itemId, input.templateType, input.sortOrder, JSON.stringify(input.draftFields));
   return getGraphic(id)!;
 }
 export function updateGraphic(id: string, patch: any) {
   const current = getGraphic(id); if (!current) return null;
   const mergedFields = patch.draftFields !== undefined ? { ...current.draftFields, ...patch.draftFields } : current.draftFields;
-  db.prepare("UPDATE graphic_items SET template_type=?,sort_order=?,status=?,draft_fields=? WHERE id=?").run(patch.templateType ?? current.templateType, patch.sortOrder ?? current.sortOrder, patch.status ?? current.status, JSON.stringify(mergedFields), id);
+  db.prepare("UPDATE graphic_items SET template_type=?,sort_order=?,draft_fields=? WHERE id=?").run(patch.templateType ?? current.templateType, patch.sortOrder ?? current.sortOrder, JSON.stringify(mergedFields), id);
   return getGraphic(id);
 }
 export function deleteGraphic(id: string) { return db.prepare("DELETE FROM graphic_items WHERE id=?").run(id).changes > 0; }
@@ -142,6 +150,10 @@ export const saveStory = db.transaction((rundownId: string, itemId: string | nul
   if (new Set(ids).size !== ids.length || ids.some((id: string) => !current?.graphics.some(g => g.id === id))) throw new Error("ID grafis tidak valid untuk berita ini");
   const onAirId = getOnAir()?.graphicId;
   if (current?.graphics.some(g => g.id === onAirId && !ids.includes(g.id))) throw new Error("CG sedang tayang. Sembunyikan sebelum menghapus.");
+  const programGraphic = current?.graphics.find(g => g.id === onAirId);
+  if (programGraphic && input.graphics.some((g: any) => g.id === programGraphic.id && g.templateType !== programGraphic.templateType)) {
+    throw new Error("Tipe CG yang sedang ON AIR tidak dapat diganti. Buat cue baru atau CLEAR dengan instruksi operator terlebih dahulu.");
+  }
   const item = current ? updateItem(current.id, input)! : createItem(rundownId, input)!;
   for (const g of current?.graphics || []) if (!ids.includes(g.id)) deleteGraphic(g.id);
   for (const g of input.graphics) g.id ? updateGraphic(g.id, g) : createGraphic(item.id, g);

@@ -507,7 +507,7 @@ function BroadcastSetupModal({
               {/* Pratinjau Interaktif Ticker */}
               <div style={{ marginTop: 14 }}>
                 <span className="master-label" style={{ display: "block", marginBottom: 6, color: "#38bdf8" }}>
-                   PRATINJAU DRAFT TICKER (BADGE FIT & ANIMASI):
+                   PRATINJAU TICKER (BADGE FIT & ANIMASI):
                 </span>
                 <div
                   className="cg-ticker-bar cnn-template"

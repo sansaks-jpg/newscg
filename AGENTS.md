@@ -122,4 +122,5 @@ npm run build
 
 - Ikuti [docs/AI_RUNDOWN_GUIDE.md](docs/AI_RUNDOWN_GUIDE.md) ketika user mengirim rundown berita untuk dimasukkan ke proyek.
 - Pertahankan urutan dan fakta sumber, validasi dengan schema shared, tulis melalui API, lalu baca kembali hasilnya.
-- Materi baru disimpan sebagai **DRAFT**. Impor rundown tidak memberi izin mengubah master atau menjalankan perintah ON AIR.
+- Materi baru tersimpan sebagai bahan edit, tanpa status persetujuan Draft/Ready/Perlu dicek. Impor rundown tidak memberi izin mengubah master atau menjalankan perintah ON AIR.
+- Untuk interaksi HTTP langsung, mulai dari `GET /api/agent` dan ikuti [docs/AI_AGENT_API.md](docs/AI_AGENT_API.md). Gunakan schema/request yang dipublikasikan dan lakukan readback setelah mutasi.

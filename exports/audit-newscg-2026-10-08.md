@@ -8,6 +8,8 @@ Tidak ada source aplikasi yang diubah dalam audit ini. Tidak ada perintah TAKE/U
 
 ## Cara membaca hasil
 
+**Pembaruan 9 Oktober 2026:** laporan di bawah merupakan snapshot audit awal. Batch 1 sudah memperbaiki penyimpanan edit, upload logo, pengaturan/default, dan sejumlah input produksi. Sesuai permintaan user, workflow status DRAFT/READY/Perlu dicek kini dihapus; isolasi materi tersimpan dan snapshot Program tetap ada. API agent tersedia melalui `GET /api/agent`, dengan [panduan lengkap](../docs/AI_AGENT_API.md). Validasi reorder (B05) dan versi impor (B06) diperbaiki serta diuji lewat HTTP terisolasi. B01 dimitigasi melalui penolakan perubahan tipe cue Program di PATCH/PUT; penyimpanan metadata template bersama snapshot belum dibuat. Pengikatan idempotency key ke payload (B02), validasi mode konten alternatif (B04), dan ACK/frame output masih memerlukan batch berikutnya; dokumentasi API menjelaskan batas tersebut.
+
 - **P1:** masalah data/operator/siaran yang perlu didahulukan.
 - **P2:** ketidakkonsistenan fitur, validasi, atau perilaku yang perlu dibereskan berikutnya.
 - **P3:** cleanup, dokumentasi, atau peningkatan penggunaan.

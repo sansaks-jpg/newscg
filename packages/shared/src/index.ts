@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const templateTypes = ["HEADLINE", "REPORTER", "SOT", "LOCATION", "BREAKING"] as const;
 export type TemplateType = (typeof templateTypes)[number];
-export type MaterialStatus = "DRAFT" | "READY";
 export type CommandStatus = "idle" | "queued" | "pending" | "confirmed" | "failed" | "unknown";
 export type ConnectionStatus = "CONNECTED" | "STANDALONE";
 
@@ -255,7 +254,6 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
 export const graphicInputSchema = z.object({
   templateType: z.enum(templateTypes),
   sortOrder: z.number().int().nonnegative().default(0),
-  status: z.enum(["DRAFT", "READY"]).default("DRAFT"),
   draftFields: z.record(z.string(), z.string())
 }).superRefine((value, ctx) => {
   const parsed = fieldSchemas[value.templateType].safeParse(value.draftFields);
@@ -265,7 +263,6 @@ export const graphicInputSchema = z.object({
 export const graphicPatchSchema = z.object({
   templateType: z.enum(templateTypes).optional(),
   sortOrder: z.number().int().nonnegative().optional(),
-  status: z.enum(["DRAFT", "READY"]).optional(),
   draftFields: z.record(z.string(), z.string()).optional()
 });
 
@@ -310,7 +307,7 @@ export const storyInputSchema = rundownItemInputSchema.extend({
 export const rundownPatchSchema = z.object({
   programName: z.string().trim().min(1).max(80).optional(),
   title: z.string().trim().min(1).max(100).optional()
-}).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi");
+}).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi").meta({ minProperties: 1 });
 
 export const rundownItemPatchSchema = z.object({
   slug: z.string().trim().min(1).max(30).optional(),
@@ -319,12 +316,12 @@ export const rundownItemPatchSchema = z.object({
   cgRequired: z.boolean().optional(),
   estimatedDurationSeconds: z.number().int().min(0).max(21600).optional(),
   sortOrder: z.number().int().nonnegative().optional()
-}).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi");
+}).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi").meta({ minProperties: 1 });
 
 export const appSettingsSchema = z.strictObject({ outputMode: z.literal("web") });
 export const defaultAppSettings = { outputMode: "web" } as const;
 export const settingsPatchSchema = appSettingsSchema.partial()
-  .refine((data) => data.outputMode !== undefined, "Minimal satu field pengaturan harus diisi");
+  .refine((data) => data.outputMode !== undefined, "Minimal satu field pengaturan harus diisi").meta({ minProperties: 1 });
 export const liveStageInputSchema = z.object({ mode: z.enum(["empty", "logo", "full"]) });
 export const actionLogLimitSchema = z.preprocess(
   (value) => typeof value === "string" || typeof value === "number" || value === undefined ? value : NaN,
@@ -332,9 +329,10 @@ export const actionLogLimitSchema = z.preprocess(
 );
 
 export type GraphicItem = {
-  id: string; itemId: string; templateType: TemplateType; sortOrder: number; status: MaterialStatus;
+  id: string; itemId: string; templateType: TemplateType; sortOrder: number;
   draftFields: Record<string, string>; lastPushedFields: Record<string, string> | null;
 };
+export type EditableGraphic = Pick<GraphicItem, "templateType" | "draftFields" | "sortOrder"> & { id?: string };
 export type RundownItem = {
   id: string; rundownId: string; slug: string; title: string; format: string;
   cgRequired: boolean; estimatedDurationSeconds: number; sortOrder: number; graphics: GraphicItem[];
@@ -379,7 +377,7 @@ export const headlineDefaultsPatchSchema = z.object({
   location: headlineDefaultsSchema.shape.location.removeDefault(),
   kicker: headlineDefaultsSchema.shape.kicker.removeDefault(),
   subline: headlineDefaultsSchema.shape.subline.removeDefault()
-}).partial();
+}).partial().refine((data) => Object.keys(data).length > 0, "Minimal satu field default harus diisi").meta({ minProperties: 1 });
 export type HeadlineDefaults = z.infer<typeof headlineDefaultsSchema>;
 
 export const defaultHeadlineDefaults: HeadlineDefaults = {
@@ -406,3 +404,78 @@ export type LiveShortcut =
   | "detail"
   | "previous"
   | "next";
+
+// HTTP contracts shared by the routes and the agent API specification.
+export const apiIdSchema = z.string().trim().min(1);
+const idempotencyBodyShape = { idempotencyKey: z.string().trim().min(1).max(200).optional() };
+export const livePrepareInputSchema = z.object({ graphicId: apiIdSchema });
+export const liveTakeInputSchema = livePrepareInputSchema.extend({
+  ...idempotencyBodyShape, presentation: z.literal("clean").optional()
+});
+export const liveUpdateInputSchema = livePrepareInputSchema.extend({
+  ...idempotencyBodyShape, syncComposition: z.boolean().optional()
+});
+export const liveVariantInputSchema = livePrepareInputSchema.extend({
+  ...idempotencyBodyShape, action: liveVariantActionSchema
+});
+export const liveClearInputSchema = z.object(idempotencyBodyShape);
+export const liveClearAllInputSchema = liveClearInputSchema.extend({ immediate: z.boolean().default(true) });
+export const storySaveInputSchema = storyInputSchema.extend({ itemId: apiIdSchema.nullable().optional() });
+export const rundownReorderInputSchema = z.object({ itemIds: z.array(apiIdSchema).min(1).meta({ uniqueItems: true }) })
+  .refine(({ itemIds }) => new Set(itemIds).size === itemIds.length, "ID berita tidak boleh berulang");
+export const rundownImportInputSchema = z.union([
+  rundownInputSchema.extend({ schemaVersion: z.literal(1).optional() }),
+  z.object({ schemaVersion: z.literal(1).optional(), exportedAt: z.string().optional(), rundown: rundownInputSchema })
+]);
+
+export const graphicRecordSchema = z.object({
+  id: apiIdSchema, itemId: apiIdSchema,
+  templateType: graphicInputSchema.shape.templateType,
+  sortOrder: graphicInputSchema.shape.sortOrder.removeDefault(),
+  draftFields: graphicInputSchema.shape.draftFields,
+  lastPushedFields: z.record(z.string(), z.string()).nullable()
+});
+export const rundownItemRecordSchema = rundownItemInputSchema.extend({
+  id: apiIdSchema, rundownId: apiIdSchema, cgRequired: z.boolean(), graphics: z.array(graphicRecordSchema)
+});
+export const rundownRecordSchema = rundownInputSchema.omit({ items: true }).extend({
+  id: apiIdSchema, updatedAt: z.string(), items: z.array(rundownItemRecordSchema)
+});
+export const rundownExportSchema = z.object({ schemaVersion: z.literal(1), exportedAt: z.string(), rundown: rundownRecordSchema });
+export const liveStateSchema = z.object({
+  connection: z.enum(["CONNECTED", "STANDALONE"]),
+  commandStatus: z.enum(["idle", "queued", "pending", "confirmed", "failed", "unknown"]),
+  selectedGraphicId: apiIdSchema.nullable(), onAirGraphicId: apiIdSchema.nullable(),
+  actualOverlayInputGuid: z.string().nullable(), onAirSnapshot: z.record(z.string(), z.string()).nullable(),
+  lastActionAt: z.string().nullable(), error: z.string().nullable(), overlayClientsCount: z.number().int().nonnegative()
+});
+export const liveCommandResultSchema = z.object({
+  commandStatus: liveStateSchema.shape.commandStatus, state: liveStateSchema,
+  requestId: z.string().optional(), actualOverlayInputGuid: z.string().nullable().optional(),
+  timestamp: z.string().optional(), error: z.string().nullable().optional(), master: masterOverlaySchema.optional()
+});
+export const apiErrorSchema = z.object({ error: z.string(), details: z.array(z.record(z.string(), z.unknown())).optional() });
+export const apiHealthSchema = z.object({ ok: z.literal(true), service: z.literal("NewsCG"), time: z.string() });
+export const logoUploadResultSchema = z.object({ url: z.string(), width: z.number().int().positive(), height: z.number().int().positive() });
+export const actionLogsSchema = z.array(z.object({
+  id: z.string(), action: z.string(), status: z.string(), message: z.string(),
+  graphic_id: z.string().nullable(), request_id: z.string().nullable(), created_at: z.string()
+}));
+
+export const agentApiEffects = ["read", "edit", "delete", "prepare", "on-air"] as const;
+export type AgentApiEffect = (typeof agentApiEffects)[number];
+export type AgentApiOperation = {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  operationId: string;
+  summary: string;
+  description?: string;
+  effect: AgentApiEffect;
+  requestSchema?: string;
+  requestExample?: unknown;
+  responseSchema?: string;
+  responseContentType?: "text/markdown" | "text/event-stream";
+  successStatus?: number;
+  idempotency?: boolean;
+  bodyRequired?: boolean;
+};
