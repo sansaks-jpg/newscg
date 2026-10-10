@@ -133,6 +133,21 @@ describe("agent discovery and shared API contract", () => {
 });
 
 describe("agent material editing through real HTTP", () => {
+  it("converts the legacy side label into editable topic fields while leaving Program isolated", async () => {
+    const { item } = await createMaterial();
+    const created = await request(`/api/items/${item.id}/graphics`, "POST", { templateType: "HEADLINE", draftFields: {
+      headline: "HIGHLIGHT LAMA", headlinePresentation: "bulletin", headlineLabel: "HEADLINE", showKicker: "false"
+    } });
+    expect(created.status).toBe(201);
+    const result = await request(`/api/graphics/${created.body.id}`, "PATCH", { draftFields: { headline: "HIGHLIGHT REVISI" } });
+    expect(result.status).toBe(200);
+    expect(result.body.draftFields).toMatchObject({ kicker: "HIGHLIGHT", showKicker: "true" });
+    expect(result.body.draftFields).not.toHaveProperty("headlineLabel");
+    const hidden = await request(`/api/graphics/${created.body.id}`, "PATCH", { draftFields: { kicker: "", showKicker: "false" } });
+    expect(hidden.body.draftFields).toMatchObject({ kicker: "", showKicker: "false" });
+    expect((await request(`/api/graphics/${created.body.id}`)).body).toEqual(hidden.body);
+    expect(liveModule.getLiveState().onAirGraphicId).toBeNull();
+  });
   it("discovers, creates, edits and reorders opening headlines without changing Program until UPDATE", async () => {
     const discovery = (await request("/api/agent")).body;
     const preset = discovery.graphicPresets.find((value: any) => value.id === "headline-bulletin");
@@ -150,11 +165,12 @@ describe("agent material editing through real HTTP", () => {
     const unsubscribe = liveModule.addOverlaySubscriber(event => events.push(event), "monitor");
     try {
       const patch = await request(`/api/graphics/${graphic.id}`, "PATCH", {
-        draftFields: { headline: "HEADLINE PEMBUKA REVISI", headlineLabel: "BERITA UTAMA" }
+        draftFields: { headline: "HEADLINE PEMBUKA REVISI", kicker: "BERITA UTAMA" }
       });
       expect(patch.status).toBe(200);
-      expect(patch.body.draftFields).toMatchObject({ ...preset.draftFields, headline: "HEADLINE PEMBUKA REVISI", headlineLabel: "BERITA UTAMA" });
-      for (const draftFields of [{ headlineLabel: "" }, { headlineLabel: "X".repeat(25) }, { headlinePresentation: "invalid" }]) {
+      expect(patch.body.draftFields).toMatchObject({ ...preset.draftFields, headline: "HEADLINE PEMBUKA REVISI", kicker: "BERITA UTAMA" });
+      expect(patch.body.draftFields).not.toHaveProperty("headlineLabel");
+      for (const draftFields of [{ kicker: "X".repeat(61) }, { headlinePresentation: "invalid" }]) {
         expect((await request(`/api/graphics/${graphic.id}`, "PATCH", { draftFields })).status).toBe(400);
       }
       expect((await request(`/api/graphics/${graphic.id}`)).body).toEqual(patch.body);
@@ -169,7 +185,7 @@ describe("agent material editing through real HTTP", () => {
       expect(events).toHaveLength(1); // SYNC only; editing emits no output commands.
       const updated = await request("/api/live/update", "POST", { graphicId: graphic.id, syncComposition: false }, { "Idempotency-Key": randomUUID() });
       expect(updated.body.commandStatus).toBe("confirmed");
-      expect(updated.body.state.onAirSnapshot).toMatchObject({ headline: "HEADLINE PEMBUKA REVISI", headlineLabel: "BERITA UTAMA", headlinePresentation: "bulletin" });
+      expect(updated.body.state.onAirSnapshot).toMatchObject({ headline: "HEADLINE PEMBUKA REVISI", kicker: "BERITA UTAMA", headlinePresentation: "bulletin" });
       expect(events.at(-1)?.type).toBe("UPDATE");
     } finally { unsubscribe(); }
   });

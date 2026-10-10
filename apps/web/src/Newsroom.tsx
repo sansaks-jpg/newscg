@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditableGraphic, GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
-import { getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
+import { getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, normalizeHeadlineTopicFields, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -625,7 +625,7 @@ function StoryEditor({
   const [graphics, setGraphics] = useState<EditableGraphic[]>(() => {
     if (item) {
       return item.graphics.map((g) => ({ id: g.id, templateType: g.templateType,
-        sortOrder: g.sortOrder, draftFields: { ...g.draftFields } }));
+        sortOrder: g.sortOrder, draftFields: { ...normalizeHeadlineTopicFields(g.templateType, g.draftFields) } }));
     }
     // Default otomatis untuk Berita Baru: langsung tampilkan 1 cue HEADLINE siap isi
     return [
@@ -989,7 +989,7 @@ function StoryEditor({
                   + Tambah Headline
                 </button>
                 <button type="button" onClick={() => add("HEADLINE", true)}>
-                  + Headline Pembuka
+                  + Highlight Berita
                 </button>
                 <button type="button" onClick={() => add("BREAKING")}>
                   + Breaking News
@@ -1030,7 +1030,7 @@ function StoryEditor({
                           : g.templateType === "BREAKING"
                           ? "BREAKING NEWS"
                           : g.draftFields.headlinePresentation === "bulletin"
-                          ? "HEADLINE PEMBUKA"
+                          ? "HIGHLIGHT BERITA"
                           : "LOWER THIRD HEADLINE"}
                       </b>
                     </div>
@@ -1132,15 +1132,9 @@ function StoryEditor({
                                 } : cue));
                               }}>
                               <option value="story">Judul berita biasa</option>
-                              <option value="bulletin">Headline pembuka / ringkasan</option>
+                              <option value="bulletin">Highlight / ringkasan berita</option>
                             </select>
                           </label>
-                          {g.draftFields.headlinePresentation === "bulletin" && <label>
-                            <span>Label Headline Pembuka</span>
-                            <input required maxLength={getGraphicFieldLimit("HEADLINE", "headlineLabel")}
-                              value={g.draftFields.headlineLabel ?? "HEADLINE"}
-                              onChange={(e) => field(index, "headlineLabel", e.target.value)} />
-                          </label>}
                         </>}
                         <label className="field-full">
                           <span>Headline Utama (Wajib) <strong style={{ color: "#ef4444" }}>*</strong></span>
@@ -1217,7 +1211,7 @@ function StoryEditor({
                         className={`preview-pill-btn ${previewIndex === i ? "active" : ""}`}
                         onClick={() => setPreviewIndex(i)}
                       >
-                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : g.templateType === "BREAKING" ? "Breaking" : g.draftFields.headlinePresentation === "bulletin" ? "Headline Pembuka" : "Headline"}
+                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : g.templateType === "BREAKING" ? "Breaking" : g.draftFields.headlinePresentation === "bulletin" ? "Highlight" : "Headline"}
                       </button>
                     ))}
                   </div>

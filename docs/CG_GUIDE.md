@@ -1,6 +1,6 @@
-# CG berita dan headline pembuka
+# CG berita dan highlight
 
-Headline pembuka tersedia di **Rundown & CG → Tambah/Edit Berita → + Headline Pembuka**. Panel label berwarna di kiri bertuliskan HEADLINE dan judul besar di kanan; warna mengikuti master CNN atau studio. Satu cue menampilkan satu judul. Tambahkan beberapa cue sesuai urutan untuk ringkasan awal bulletin, pilih di Produksi, kemudian TAKE. Pergantian judul dikendalikan operator; tidak ada rotasi atau penayangan otomatis.
+Highlight tersedia di **Rundown & CG → Tambah/Edit Berita → + Highlight Berita**. Label HIGHLIGHT memakai tab topik di atas judul, sehingga judul mendapat ruang penuh tanpa panel label samping. Warna mengikuti master CNN atau studio. Satu cue menampilkan satu judul. Tambahkan beberapa cue sesuai urutan untuk ringkasan awal bulletin, pilih di Produksi, kemudian TAKE. Pergantian judul dikendalikan operator; tidak ada rotasi atau penayangan otomatis.
 
 ## Jenis grafis berita dan referensi CNN
 
@@ -11,7 +11,7 @@ Pada paket CNN Juni 2023, informasi dipisahkan menjadi headline, tab topik/progr
 | Jenis CG | Fungsi editorial | Dukungan NewsCG |
 |---|---|---|
 | Headline / story strap | Judul pokok berita di bawah gambar | `HEADLINE`, judul tunggal atau dengan detail |
-| Headline pembuka / recap | Judul-judul pilihan saat awal/ringkasan bulletin | `HEADLINE` dengan `headlinePresentation: "bulletin"`; satu judul per cue |
+| Highlight / recap | Judul-judul pilihan saat awal/ringkasan bulletin | `HEADLINE` dengan `headlinePresentation: "bulletin"`, `kicker: "HIGHLIGHT"`; satu judul per cue |
 | Kicker / topic strap | Konteks topik di atas judul | `kicker` + `showKicker` |
 | Breaking / developing flag | Menandai urgensi/perkembangan berita | `BREAKING`; teks flag bisa diedit. Developing dapat memakai kicker HEADLINE |
 | Name strap / identifier | Nama presenter, reporter, atau tamu | `REPORTER`; nama + jabatan/akun |
@@ -31,7 +31,7 @@ Baris yang belum tersedia merupakan peta kebutuhan produksi, bukan fitur yang te
 
 Untuk liputan khusus, pembuat paket CNN Election, BIGSTAR, mendokumentasikan lower thirds/locators, peta, struktur data, dan toolkit animasi. Ini membuktikan bahwa kebutuhan paket berita dapat meluas ke grafis data serta paket acara, di luar teks overlay harian. [BIGSTAR — CNN Election Package](https://bgstr.com/work/project/cnn-election-package/).
 
-## Field dan cara mengoperasikan headline pembuka
+## Field dan cara mengoperasikan highlight
 
 Template tetap `HEADLINE`, sehingga rundown lama dan alur TAKE/UPDATE/CLEAR tetap kompatibel. Kontrak berada di `packages/shared/src/index.ts`:
 
@@ -39,12 +39,15 @@ Template tetap `HEADLINE`, sehingga rundown lama dan alur TAKE/UPDATE/CLEAR teta
 |---|---|
 | `headline` | Wajib, 1–120 karakter |
 | `headlinePresentation` | `story` (bawaan untuk materi lama) atau `bulletin` |
-| `headlineLabel` | 1–24 karakter; bawaan `HEADLINE` |
-| `contentMode` | Gunakan `headline` untuk headline pembuka |
+| `kicker` | Label tab topik, maksimal 60 karakter; preset `HIGHLIGHT` |
+| `showKicker` | Preset `"true"`; tombol T mengatur tampil/sembunyi topik sebelum TAKE/UPDATE |
+| `contentMode` | Gunakan `headline` untuk highlight |
 | `layoutStyle` | Preset `single`; `sub` jika memang memerlukan detail |
-| `showLocation`, `showKicker`, `showDetail` | Preset `"false"`; nilai flag berupa string |
+| `showLocation`, `showDetail` | Preset `"false"`; nilai flag berupa string |
 
-Jenis Headline dan label dapat disunting di editor berita. Judul juga dapat disunting lewat Edit Cepat di Produksi. Label menggunakan AutoSquishText seperti judul; teks dipotong dalam batas panel saat animasi. Master logo/ticker tetap mandiri. Output tetap `/output`, canvas transparan 1920 × 1080. Mengubah teks melalui UPDATE mempertahankan panel yang sama tanpa mengulang IN; CLEAR memainkan OUT dan mempertahankan master.
+Jenis Headline dapat dipilih di editor berita. Label disunting lewat Sub Topik/Kicker; label dan judul juga tersedia di Edit Cepat Produksi. Topik memakai AutoSquishText dan animasi topik yang sama: judul selesai masuk sebelum topik masuk; topik keluar sebelum panel judul. Master logo/ticker tetap mandiri. Output tetap `/output`, canvas transparan 1920 × 1080. Mengubah teks melalui UPDATE mempertahankan panel yang sama tanpa mengulang IN; CLEAR memainkan OUT dan mempertahankan master.
+
+`headlineLabel` (1–24 karakter) hanya diterima untuk kompatibilitas preset samping lama. Pada cue `bulletin`, label lama dipindahkan ke `kicker` bila topik belum terisi; label contoh `HEADLINE` menjadi `HIGHLIGHT`. Editor dan PATCH menormalisasi ke field topik tanpa mengubah data secara in-place. Semua materi baru menggunakan `kicker`/`showKicker`.
 
 ## Edit melalui agent
 
@@ -57,11 +60,11 @@ Mulai `GET /api/agent`. `graphicPresets` menyediakan preset `headline-bulletin`;
   "draftFields": {
     "headline": "JUDUL BERITA DARI SUMBER",
     "headlinePresentation": "bulletin",
-    "headlineLabel": "HEADLINE",
+    "kicker": "HIGHLIGHT",
     "contentMode": "headline",
     "layoutStyle": "single",
     "showLocation": "false",
-    "showKicker": "false",
+    "showKicker": "true",
     "showDetail": "false"
   }
 }
@@ -73,7 +76,7 @@ Kirim ke `POST /api/items/{itemId}/graphics`, lalu `GET /api/graphics/{graphicId
 PATCH /api/graphics/{graphicId}
 Content-Type: application/json
 
-{"draftFields":{"headline":"JUDUL REVISI DARI SUMBER","headlineLabel":"BERITA UTAMA"}}
+{"draftFields":{"headline":"JUDUL REVISI DARI SUMBER","kicker":"HIGHLIGHT","showKicker":"true"}}
 ```
 
 PATCH menggabungkan field sehingga field lain tetap tersimpan. Baca kembali CG, berita, dan rundown. Judul item berita dan teks headline merupakan dua field berbeda: jika user meminta keduanya berubah, lakukan juga `PATCH /api/items/{itemId}` dengan `title`.

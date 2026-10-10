@@ -97,13 +97,6 @@
   animation: news-location-out var(--cg-locationOutMs, 320ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 
-[data-broadcast-motion] .cnn-template .cg-headline-label > .cg-copy-motion {
-  animation: news-text-in var(--cg-textInMs, 360ms) cubic-bezier(.22,.75,.18,1) var(--cg-textInDelayMs, 160ms) 1 both;
-}
-[data-broadcast-motion] .cnn-template .cg-exit .cg-headline-label > .cg-copy-motion {
-  animation: news-text-out var(--cg-textOutMs, 180ms) cubic-bezier(.55,0,.8,.35) var(--cg-textOutDelayMs, 0ms) 1 both !important;
-}
-
 /* Persistent broadcast layers also retain their own complete IN/OUT motion. */
 [data-broadcast-motion] .cnn-template .cg-logo-box.standalone.cg-layer-in {
   animation: news-logo-in var(--cg-logoInMs, 500ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;

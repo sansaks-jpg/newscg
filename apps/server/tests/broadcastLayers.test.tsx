@@ -54,36 +54,49 @@ afterEach(async () => {
 });
 
 describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", Component: ProgramMonitor }])("broadcast layer lifecycle ($name)", ({ Component }) => {
-  it("renders an opening headline, updates both texts in place and retains the label through OUT", async () => {
+  it("renders HIGHLIGHT above the full-width headline and uses staged topic IN/OUT", async () => {
     await act(async () => root.render(createElement(Component)));
     const bulletin = { ...headlineBulletinPreset, headline: "HEADLINE PEMBUKA" };
     await send({ type: "TAKE", graphic, fields: bulletin, master });
-    const panel = element(".cg-main-box.cg-headline-bulletin");
-    const label = element(".cg-headline-label");
+    const panel = element(".cg-main-box");
+    const label = element(".cg-kicker-tab");
     const title = element(".cg-headline-row-single");
     const ticker = element(".cg-ticker-track");
     expect(panel).not.toBeNull();
-    expect(label?.textContent).toBe("HEADLINE");
+    expect(label?.textContent).toBe("HIGHLIGHT");
     expect(title?.textContent).toBe(bulletin.headline);
     expect(element(".cg-location-tag")).toBeNull();
-    expect(element(".cg-kicker-tab")).toBeNull();
+    expect(element(".cg-headline-label")).toBeNull();
     expect(element(".cg-subline-row")).toBeNull();
-    expect(getComputedStyle(label!).overflow).toBe("hidden");
-    expect(getComputedStyle(label!.firstElementChild!).animation).toContain("news-text-in");
-    await send({ type: "UPDATE", graphicId: graphic.id, fields: { ...bulletin, headline: "JUDUL REVISI", headlineLabel: "BERITA UTAMA" }, master });
+    expect(getComputedStyle(label!).animation).toContain("news-topic-in");
+    expect(getComputedStyle(label!).animation).toContain(`${broadcastMotion.topicInDelayMs}ms`);
+    await send({ type: "UPDATE", graphicId: graphic.id, fields: { ...bulletin, headline: "JUDUL REVISI", kicker: "BERITA UTAMA" }, master });
     expect(element(".cg-main-box")).toBe(panel);
-    expect(element(".cg-headline-label")).toBe(label);
+    expect(element(".cg-kicker-tab")).toBe(label);
     expect(element(".cg-headline-row-single")).toBe(title);
     expect(title?.textContent).toBe("JUDUL REVISI");
     expect(label?.textContent).toBe("BERITA UTAMA");
     expect(element(".cg-ticker-track")).toBe(ticker);
     await send({ type: "CLEAR", master });
-    expect(getComputedStyle(label!.firstElementChild!).animation).toContain("news-text-out");
-    await advance(broadcastMotion.retainMs - 1);
-    expect(element(".cg-headline-label")).toBe(label);
-    await advance(1);
-    expect(element(".cg-headline-label")).toBeNull();
+    expect(getComputedStyle(label!).animation).toContain("news-topic-out");
+    await advance(broadcastMotion.topicOutMs + 20);
+    expect(element(".cg-kicker-tab")).toBeNull();
+    expect(element(".cg-main-box")).toBe(panel);
+    await advance(broadcastMotion.retainMs - broadcastMotion.topicOutMs - 20);
+    expect(element(".cg-main-box")).toBeNull();
     expect(element(".cg-ticker-track")).toBe(ticker);
+  });
+
+  it("renders legacy side-label cues as topics and allows the topic to be hidden after normalization", async () => {
+    await act(async () => root.render(createElement(Component)));
+    await send({ type: "TAKE", graphic, fields: { headline: "JUDUL LAMA", headlinePresentation: "bulletin",
+      headlineLabel: "HEADLINE", layoutStyle: "single", showKicker: "false" }, master });
+    expect(element(".cg-headline-label")).toBeNull();
+    expect(element(".cg-kicker-tab")?.textContent).toBe("HIGHLIGHT");
+    await send({ type: "UPDATE", graphicId: graphic.id, fields: { headline: "JUDUL LAMA", headlinePresentation: "bulletin",
+      kicker: "HIGHLIGHT", showKicker: "false", layoutStyle: "single" }, master });
+    await advance(broadcastMotion.topicOutMs + 20);
+    expect(element(".cg-kicker-tab")).toBeNull();
   });
 
   it.each(["studio-navy", "studio-graphite", "studio-copper"] as const)("applies %s to every layer without replaying the headline or ticker", async (colorTheme) => {

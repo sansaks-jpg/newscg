@@ -177,9 +177,9 @@ export const agentApiDiscovery = {
   conventions: { contentType: "application/json; charset=utf-8", idSource: "Gunakan ID dari respons API; encode setiap segmen ID di URL.", fieldValues: "draftFields berisi string, termasuk flag true/false sebagai string.", getIsReadOnly: true, deleteSuccessStatus: 204, jsonBodyMaxBytes: 2 * 1024 * 1024 },
   safety: { materialApprovalRequired: false, materialEditsChangeProgram: false, liveEffectsRequireExplicitInstruction: true, observationStream: "/api/live/stream?role=monitor", serverConfirmationProvesRenderedFrame: false, mutationRetry: "Pembuatan/impor belum idempotent. Setelah timeout, lakukan readback sebelum retry. Perintah live memakai Idempotency-Key; key unik per aksi, cache 60 detik sampai proses restart." },
   templates: templateTypes.map(templateType => ({ templateType, fieldsSchema: `#/components/schemas/${templateType}Fields`, fieldLimits: graphicFieldLimits[templateType] })),
-  graphicPresets: [{ id: "headline-bulletin", label: "Headline Pembuka", templateType: "HEADLINE", draftFields: headlineBulletinPreset,
+  graphicPresets: [{ id: "headline-bulletin", label: "Highlight Berita", templateType: "HEADLINE", draftFields: headlineBulletinPreset,
     requiredFields: ["headline"], createPath: "/api/items/{id}/graphics", editPath: "/api/graphics/{id}",
-    description: "Satu judul per cue dengan label HEADLINE. Susun beberapa cue melalui sortOrder; pergantian dilakukan operator." }],
+    description: "Satu judul per cue dengan HIGHLIGHT pada tab topik di atas judul (kicker). Susun beberapa cue melalui sortOrder; pergantian dilakukan operator." }],
   colorThemes: broadcastColorThemeIds.map(id => ({ id, label: broadcastColorThemes[id].label })),
   logo: { ...broadcastLogoUploadSpec, mimeTypes: broadcastLogoMimeTypes, recommendedFormat: "PNG transparan", uploadPath: "/api/uploads/logo", appliesToLiveAutomatically: false },
   operations: agentApiOperations

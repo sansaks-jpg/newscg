@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem } from "@newscg/shared";
-import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlayPatchSchema, masterOverlaySchema, settingsPatchSchema } from "@newscg/shared";
+import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlayPatchSchema, masterOverlaySchema, normalizeHeadlineTopicFields, settingsPatchSchema } from "@newscg/shared";
 import type { ZodType } from "zod";
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -136,7 +136,9 @@ export function createGraphic(itemId: string, input: any) {
 }
 export function updateGraphic(id: string, patch: any) {
   const current = getGraphic(id); if (!current) return null;
-  const mergedFields = patch.draftFields !== undefined ? { ...current.draftFields, ...patch.draftFields } : current.draftFields;
+  const currentFields = normalizeHeadlineTopicFields(current.templateType, current.draftFields);
+  const mergedFields = normalizeHeadlineTopicFields(patch.templateType ?? current.templateType,
+    patch.draftFields !== undefined ? { ...currentFields, ...patch.draftFields } : currentFields);
   db.prepare("UPDATE graphic_items SET template_type=?,sort_order=?,draft_fields=? WHERE id=?").run(patch.templateType ?? current.templateType, patch.sortOrder ?? current.sortOrder, JSON.stringify(mergedFields), id);
   return getGraphic(id);
 }

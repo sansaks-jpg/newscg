@@ -29,15 +29,6 @@
 .cnn-template.cg-lower-third { min-height: 208px; padding-bottom: 62px; justify-content: flex-end; }
 .cnn-template .cg-main-box { height: 146px; border: 0; border-radius: 16px 0 0 0; background: #fff; clip-path: none; animation: cnn-panel-in var(--panel-in, 520ms) cubic-bezier(.16,1,.3,1) both; }
 .cnn-template .cg-text-area { padding: 10px 28px 10px 38px; gap: 2px; }
-.cnn-template .cg-main-box.cg-headline-bulletin { border-radius: 0; }
-.cnn-template .cg-headline-bulletin .cg-text-area { min-width: 0; }
-.cnn-template .cg-headline-label {
-  flex: 0 0 260px; display: flex; align-items: center; padding: 0 24px;
-  overflow: hidden; background: var(--cg-color-brand, #CC0000);
-  color: var(--cg-color-brand-text, #FFFFFF); font-size: 34px; font-weight: 800;
-  letter-spacing: 1px; text-transform: uppercase;
-}
-.cnn-template .cg-headline-label > .cg-copy-motion { width: 100%; min-width: 0; }
 .cnn-template .cg-headline-row,
 .cnn-template .cg-headline-row-single,
 .cnn-template .cg-presenter-row { font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: 64px; font-weight: 800; line-height: 1.08; letter-spacing: -1px; color: #080808; }

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { MasterOverlayState, TemplateType, TimezoneMode } from "@newscg/shared";
-import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, normalizeHeadlineTopicFields } from "@newscg/shared";
 import { MonitorPlay } from "lucide-react";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { useLayerPresence } from "./useLayerPresence";
@@ -53,8 +53,7 @@ export function BroadcastGraphic({
   const isSot = type === "SOT";
   const isLocationOnly = type === "LOCATION";
 
-  const effectiveFields = fields || {};
-  const isHeadlineBulletin = type === "HEADLINE" && effectiveFields.headlinePresentation === "bulletin";
+  const effectiveFields = normalizeHeadlineTopicFields(type, fields || {});
   const hasContent = !isLocationOnly && Boolean(type && fields && (fields.headline || fields.name || fields.location || fields.text));
 
   // Location tag di pojok kiri atas (otomatis tampil dinamis jika field lokasi diisi)
@@ -167,10 +166,7 @@ export function BroadcastGraphic({
             ) : null}
 
             {/* Kotak Utama Putih */}
-            <div className={`cg-main-box ${isHeadlineBulletin ? "cg-headline-bulletin" : ""} ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
-              {isHeadlineBulletin && <div className="cg-headline-label">
-                <div className="cg-copy-motion"><AutoSquishText text={effectiveFields.headlineLabel || "HEADLINE"} minScale={0.5} /></div>
-              </div>}
+            <div className={`cg-main-box ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
               <div className={`cg-text-area ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
                 {/* Varian A: Paragraf / Keterangan Tunggal (Gambar 3 - Sentence Case Wardah Style) */}
                 {contentMode === "paragraph" ? (

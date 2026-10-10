@@ -15,7 +15,7 @@ Sistem ini beroperasi 100% berbasis web-native yang siap di-embed langsung ke be
 - **Perlindungan Idempotency & Antrean Aksi**: Dilengkapi proteksi klik ganda (*double-click protection*) dan antrean serial (*action queue*) untuk mencegah konflik status siaran.
 - **Templat Grafis Standar Siaran TV**:
   - **HEADLINE**: Kicker tab, judul utama, subline/lead, lokasi, running ticker, dan branding. Mendukung varian komposisi dinamis (toggle lokasi, toggle topik, toggle detail, dan clean headline).
-  - **HEADLINE PEMBUKA**: Label HEADLINE di kiri dan satu judul besar per cue, tersedia lewat **+ Headline Pembuka**. Label/judul dapat diedit, susun beberapa cue untuk ringkasan awal bulletin. Tetap menggunakan template HEADLINE dengan `headlinePresentation: "bulletin"`.
+  - **HIGHLIGHT BERITA**: Label HIGHLIGHT pada tab topik di atas judul, tersedia lewat **+ Highlight Berita**. Label memakai field `kicker` dan kontrol topik T; satu judul besar per cue tanpa panel samping. Susun beberapa cue untuk ringkasan awal bulletin. Tetap menggunakan template HEADLINE dengan `headlinePresentation: "bulletin"`.
   - **REPORTER**: Nama presenter/reporter, jabatan/role, lokasi, dan social media handle.
   - **SOT**: Headline berita, nama narasumber, dan jabatan/institusi.
   - **LOCATION**: Tag lokasi pojok kiri atas (*location bug*).

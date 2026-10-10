@@ -238,19 +238,19 @@ describe("settings/default editor safety", () => {
 
   it("adds an editable opening headline and saves its shared preset without any live command", async () => {
     await openStory();
-    await click("+ Headline Pembuka");
+    await click("+ Highlight Berita");
     const card = host.querySelectorAll<HTMLElement>(".cue-editor-card")[1]!;
-    expect(card.textContent).toContain("HEADLINE PEMBUKA");
+    expect(card.textContent).toContain("HIGHLIGHT BERITA");
     expect(card.querySelector("select")?.value).toBe("bulletin");
-    const label = card.querySelector<HTMLInputElement>('input[maxlength="24"]')!;
-    expect(label.value).toBe("HEADLINE");
+    const label = card.querySelector<HTMLInputElement>('input[maxlength="60"]')!;
+    expect(label.value).toBe("HIGHLIGHT");
     await change(label, "BERITA UTAMA");
     await act(async () => host.querySelector<HTMLFormElement>(".story-editor-modal")!
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     const saved = bodyOf("/api/rundowns/rundown-a/story", "PUT");
     expect(saved.graphics[1]).toMatchObject({ templateType: "HEADLINE", sortOrder: 1, draftFields: {
-      headline: "DEFAULT SERVER", headlinePresentation: "bulletin", headlineLabel: "BERITA UTAMA",
-      layoutStyle: "single", showLocation: "false", showKicker: "false", showDetail: "false"
+      headline: "DEFAULT SERVER", headlinePresentation: "bulletin", kicker: "BERITA UTAMA",
+      layoutStyle: "single", showLocation: "false", showKicker: "true", showDetail: "false"
     } });
     expect(fetchMock.mock.calls.filter(([path, options]) => String(path).startsWith("/api/live/") && options?.method)).toHaveLength(0);
   });

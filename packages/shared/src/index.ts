@@ -21,10 +21,21 @@ export type HeadlinePresentation = (typeof headlinePresentations)[number];
 export const headlinePresentationSchema = z.enum(headlinePresentations);
 // One headline per cue; operators advance explicitly through the opening rundown.
 export const headlineBulletinPreset = {
-  headlinePresentation: "bulletin", headlineLabel: "HEADLINE", contentMode: "headline",
-  layoutStyle: "single", showLocation: "false", showKicker: "false", showDetail: "false",
+  headlinePresentation: "bulletin", kicker: "HIGHLIGHT", contentMode: "headline",
+  layoutStyle: "single", showLocation: "false", showKicker: "true", showDetail: "false",
   visualTemplate: "cnn"
 } as const;
+
+// Compatibility with the first side-label preset; all new editing uses kicker.
+export function normalizeHeadlineTopicFields(type: TemplateType | null | undefined, fields: Record<string, string>): Record<string, string> {
+  if (type !== "HEADLINE" || fields.headlinePresentation !== "bulletin" || !fields.headlineLabel) return fields;
+  const { headlineLabel, ...topicFields } = fields;
+  const hasTopic = Boolean(fields.kicker?.trim());
+  return { ...topicFields,
+    kicker: hasTopic ? fields.kicker! : headlineLabel === "HEADLINE" ? "HIGHLIGHT" : headlineLabel,
+    showKicker: hasTopic ? fields.showKicker ?? "true" : "true"
+  };
+}
 
 export const broadcastColorThemeIds = ["cnn", "studio-navy", "studio-graphite", "studio-copper"] as const;
 export type BroadcastColorThemeId = (typeof broadcastColorThemeIds)[number];
@@ -204,7 +215,8 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
   HEADLINE: z.object({
     headline: z.string().trim().min(1).max(graphicFieldLimits.HEADLINE.headline),
     headlinePresentation: headlinePresentationSchema.optional().default("story"),
-    headlineLabel: z.string().trim().min(1).max(graphicFieldLimits.HEADLINE.headlineLabel).optional().default("HEADLINE"),
+    headlineLabel: z.string().trim().min(1).max(graphicFieldLimits.HEADLINE.headlineLabel).optional()
+      .meta({ deprecated: true, description: "Label samping lama; gunakan kicker dan showKicker untuk tab topik." }),
     kicker: z.string().trim().max(graphicFieldLimits.HEADLINE.kicker).optional().default(""),
     subline: z.string().trim().max(graphicFieldLimits.HEADLINE.subline).optional().default(""),
     location: z.string().trim().max(graphicFieldLimits.HEADLINE.location).optional().default(""),
@@ -284,12 +296,13 @@ export function validateGraphicPatch(
 ): { success: true; data: Record<string, string> } | { success: false; error: z.ZodError } {
   const targetTemplateType = (patch.templateType || current.templateType) as TemplateType;
   const schema = fieldSchemas[targetTemplateType];
+  const currentFields = normalizeHeadlineTopicFields(current.templateType, current.draftFields);
   const mergedFields = patch.draftFields
-    ? { ...current.draftFields, ...patch.draftFields }
-    : current.draftFields;
+    ? { ...currentFields, ...patch.draftFields }
+    : currentFields;
   const result = schema.safeParse(mergedFields);
   if (result.success) {
-    return { success: true, data: result.data as Record<string, string> };
+    return { success: true, data: normalizeHeadlineTopicFields(targetTemplateType, result.data as Record<string, string>) };
   }
   return { success: false, error: result.error };
 }

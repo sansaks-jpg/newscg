@@ -41,7 +41,7 @@ Jika durasi PKG dalam kiriman sudah mencakup SOT, jangan menambahkan durasi SOT 
 | Template | Kapan dibuat | Data minimum |
 |---|---|---|
 | `HEADLINE` | Judul/topik berita utama | `headline`, maksimal 120 karakter. |
-| `HEADLINE` + `headlinePresentation: "bulletin"` | Headline pembuka/ringkasan yang diminta user | `headline`; `headlineLabel` 1–24 karakter, bawaan `HEADLINE`. Satu judul per cue. |
+| `HEADLINE` + `headlinePresentation: "bulletin"` | Highlight/ringkasan yang diminta user | `headline`; `kicker: "HIGHLIGHT"`, `showKicker: "true"` untuk label topik di atas. Satu judul per cue. |
 | `REPORTER` | Identitas presenter/reporter | `name` maksimal 60; `role` maksimal 60; lokasi jika tersedia maksimal 50. |
 | `SOT` | Identitas narasumber dalam berita | `headline` maksimal 120; `name` maksimal 80; `role` jika tersedia maksimal 100. |
 | `LOCATION` | Tag lokasi mandiri yang memang diminta | `location`, 1–50 karakter. Jangan membuatnya jika lokasi belum diketahui. |

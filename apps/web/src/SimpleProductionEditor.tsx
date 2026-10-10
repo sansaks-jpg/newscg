@@ -21,7 +21,7 @@ import {
 import { mutate } from "./api";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
-import { getBroadcastColorTheme, getGraphicFieldLimit, selectBroadcastColorTheme, tickerPresets } from "@newscg/shared";
+import { getBroadcastColorTheme, getGraphicFieldLimit, normalizeHeadlineTopicFields, selectBroadcastColorTheme, tickerPresets } from "@newscg/shared";
 import { BroadcastColorThemePicker } from "./VisualTemplatePicker";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
 import "./simple-production.css";
@@ -64,9 +64,10 @@ export function SimpleProductionEditor({
   const [localCueFields, setLocalCueFields] = useState<Record<string, Record<string, string>>>({});
   const localCueFieldsRef = useRef(localCueFields);
   const items = useMemo(() => (rundown?.items || []).map((item) => {
-    const graphics = item.graphics.map((graphic) => localCueFields[graphic.id]
-      ? { ...graphic, draftFields: localCueFields[graphic.id]! }
-      : graphic);
+    const graphics = item.graphics.map((graphic) => {
+      const fields = normalizeHeadlineTopicFields(graphic.templateType, localCueFields[graphic.id] || graphic.draftFields);
+      return fields === graphic.draftFields ? graphic : { ...graphic, draftFields: fields };
+    });
     return graphics.some((graphic, index) => graphic !== item.graphics[index]) ? { ...item, graphics } : item;
   }), [rundown, localCueFields]);
 
@@ -838,7 +839,7 @@ export function SimpleProductionEditor({
                           selectCue(it.id, g.id);
                         }}
                       >
-                        #{gIdx + 1} {g.templateType}
+                        #{gIdx + 1} {g.draftFields.headlinePresentation === "bulletin" ? "HIGHLIGHT" : g.templateType}
                       </button>
                     ))}
                   </div>
