@@ -17,6 +17,11 @@ API saat ini tidak memakai API key/token dan ditujukan untuk komputer lokal atau
 | `GET /api/agent/openapi.json` | Spesifikasi OpenAPI 3.1, parameter, request/response, dan contoh. |
 | `GET /api/agent/guide.md` | Dokumen ini sebagai `text/markdown`. |
 | `GET /api/agent/rundown-guide.md` | Panduan memasukkan rundown dari kiriman user. |
+| `GET /api/agent/cg-guide.md` | Jenis CG, referensi CNN, preset headline pembuka, dan cara edit. |
+
+Discovery juga menyediakan `graphicPresets`. Preset `headline-bulletin` memakai template `HEADLINE` dengan `headlinePresentation: "bulletin"` dan label `HEADLINE`. Tambahkan `headline` dari sumber sebelum POST. Field `headlineLabel` dapat diedit (1–24 karakter). Lihat [CG_GUIDE.md](CG_GUIDE.md) untuk contoh lengkap dan urutan headline pembuka.
+
+Untuk revisi headline, mulai `GET /api/graphics/{graphicId}`, lalu `PATCH /api/graphics/{graphicId}` dengan `{"draftFields":{"headline":"JUDUL REVISI"}}`, kemudian GET kembali. Untuk judul edisi/program gunakan PATCH rundown; untuk judul berita gunakan PATCH item. Ketiganya data terpisah, sehingga mengganti headline tidak otomatis mengganti judul berita/edisi. Jika user meminta semuanya berubah, PATCH tiap entitas dan baca kembali. Seluruh perubahan materi tersebut tetap menunggu UPDATE/TAKE eksplisit untuk diterapkan ke Program.
 
 ```powershell
 $newsCgApiBase = 'http://localhost:3001'

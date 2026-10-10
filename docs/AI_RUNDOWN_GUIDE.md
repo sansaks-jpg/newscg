@@ -41,12 +41,15 @@ Jika durasi PKG dalam kiriman sudah mencakup SOT, jangan menambahkan durasi SOT 
 | Template | Kapan dibuat | Data minimum |
 |---|---|---|
 | `HEADLINE` | Judul/topik berita utama | `headline`, maksimal 120 karakter. |
+| `HEADLINE` + `headlinePresentation: "bulletin"` | Headline pembuka/ringkasan yang diminta user | `headline`; `headlineLabel` 1–24 karakter, bawaan `HEADLINE`. Satu judul per cue. |
 | `REPORTER` | Identitas presenter/reporter | `name` maksimal 60; `role` maksimal 60; lokasi jika tersedia maksimal 50. |
 | `SOT` | Identitas narasumber dalam berita | `headline` maksimal 120; `name` maksimal 80; `role` jika tersedia maksimal 100. |
 | `LOCATION` | Tag lokasi mandiri yang memang diminta | `location`, 1–50 karakter. Jangan membuatnya jika lokasi belum diketahui. |
 | `BREAKING` | User/sumber secara eksplisit menyebut breaking news | `headline`; jangan menetapkan status breaking dari dugaan AI. |
 
 Untuk HEADLINE/BREAKING, field opsional utama adalah `kicker` (60), `subline` (160), dan `location` (60). Ambil batas aktual dari shared; tabel ini harus diperbarui jika kontrak berubah.
+
+Untuk headline pembuka gunakan preset `headline-bulletin` dari `GET /api/agent` (lihat [CG_GUIDE.md](CG_GUIDE.md)). Susun judul menurut urutan sumber dengan `sortOrder`. Jangan menambahkan segmen pembuka atau menduplikasi durasi berita bila tidak diminta. Rundown/CG yang sudah ada dapat direvisi melalui PATCH: baca dahulu ID/data, PATCH hanya field yang diminta, lalu GET untuk memastikan isi dan urutan. PUT story mengganti daftar CG; pertahankan semua cue beserta ID yang masih diperlukan. Edit rundown dan headline tidak menjalankan perintah live.
 
 Satu baris SOT di rundown biasanya menjadi cue tambahan pada berita induknya, bukan berita baru yang menduplikasi headline/durasi. Jika user jelas meminta SOT sebagai segmen tersendiri, pertahankan struktur tersebut dan gunakan format item yang sesuai kontrak.
 

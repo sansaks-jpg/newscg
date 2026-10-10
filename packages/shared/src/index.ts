@@ -16,6 +16,16 @@ export type LayoutStyle = (typeof layoutStyles)[number];
 export const contentModes = ["headline", "paragraph", "presenter", "sot", "location"] as const;
 export type ContentMode = (typeof contentModes)[number];
 
+export const headlinePresentations = ["story", "bulletin"] as const;
+export type HeadlinePresentation = (typeof headlinePresentations)[number];
+export const headlinePresentationSchema = z.enum(headlinePresentations);
+// One headline per cue; operators advance explicitly through the opening rundown.
+export const headlineBulletinPreset = {
+  headlinePresentation: "bulletin", headlineLabel: "HEADLINE", contentMode: "headline",
+  layoutStyle: "single", showLocation: "false", showKicker: "false", showDetail: "false",
+  visualTemplate: "cnn"
+} as const;
+
 export const broadcastColorThemeIds = ["cnn", "studio-navy", "studio-graphite", "studio-copper"] as const;
 export type BroadcastColorThemeId = (typeof broadcastColorThemeIds)[number];
 export const broadcastColorThemeSchema = z.enum(broadcastColorThemeIds);
@@ -180,7 +190,7 @@ export const masterOverlayPatchSchema = masterOverlaySchema.partial();
 
 const headlineFieldLimits = { headline: 120, kicker: 60, subline: 160, location: 60, ticker: 160, brand: 40, socialHandle: 80 } as const;
 export const graphicFieldLimits = {
-  HEADLINE: headlineFieldLimits,
+  HEADLINE: { ...headlineFieldLimits, headlineLabel: 24 },
   BREAKING: headlineFieldLimits,
   REPORTER: { name: 60, role: 60, location: 50, ticker: 160, brand: 40, socialHandle: 80, headline: 120, subline: 160 },
   SOT: { headline: 120, name: 80, role: 100, location: 60, ticker: 160, brand: 40 },
@@ -193,6 +203,8 @@ export function getGraphicFieldLimit(templateType: TemplateType, field: string):
 export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
   HEADLINE: z.object({
     headline: z.string().trim().min(1).max(graphicFieldLimits.HEADLINE.headline),
+    headlinePresentation: headlinePresentationSchema.optional().default("story"),
+    headlineLabel: z.string().trim().min(1).max(graphicFieldLimits.HEADLINE.headlineLabel).optional().default("HEADLINE"),
     kicker: z.string().trim().max(graphicFieldLimits.HEADLINE.kicker).optional().default(""),
     subline: z.string().trim().max(graphicFieldLimits.HEADLINE.subline).optional().default(""),
     location: z.string().trim().max(graphicFieldLimits.HEADLINE.location).optional().default(""),

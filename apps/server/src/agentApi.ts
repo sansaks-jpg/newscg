@@ -3,7 +3,7 @@ import {
   actionLogsSchema, apiErrorSchema, apiHealthSchema, appSettingsSchema,
   broadcastColorThemeIds, broadcastColorThemes, broadcastLogoMimeTypes, broadcastLogoUploadSpec,
   fieldSchemas, graphicFieldLimits, graphicInputSchema, graphicPatchSchema, graphicRecordSchema,
-  headlineDefaultsPatchSchema, headlineDefaultsSchema, liveClearAllInputSchema, liveClearInputSchema,
+  headlineBulletinPreset, headlineDefaultsPatchSchema, headlineDefaultsSchema, liveClearAllInputSchema, liveClearInputSchema,
   liveCommandResultSchema, livePrepareInputSchema, liveStageInputSchema, liveStateSchema,
   liveTakeInputSchema, liveUpdateInputSchema, liveVariantInputSchema, logoUploadResultSchema,
   masterOverlayPatchSchema, masterOverlaySchema, rundownExportSchema, rundownImportInputSchema,
@@ -19,6 +19,7 @@ export const agentApiOperations: readonly AgentApiOperation[] = [
   { method: "GET", path: "/api/agent/openapi.json", operationId: "getOpenApi", summary: "Baca spesifikasi OpenAPI", effect: "read", responseSchema: "OpenApiDocument" },
   { method: "GET", path: "/api/agent/guide.md", operationId: "getAgentGuide", summary: "Baca panduan seluruh API", effect: "read", responseContentType: "text/markdown" },
   { method: "GET", path: "/api/agent/rundown-guide.md", operationId: "getRundownGuide", summary: "Baca panduan rundown kiriman user", effect: "read", responseContentType: "text/markdown" },
+  { method: "GET", path: "/api/agent/cg-guide.md", operationId: "getCgGuide", summary: "Baca jenis CG, riset CNN, dan headline pembuka", effect: "read", responseContentType: "text/markdown" },
   { method: "GET", path: "/api/health", operationId: "getHealth", summary: "Periksa layanan", effect: "read", responseSchema: "Health" },
   { method: "GET", path: "/api/rundowns", operationId: "listRundowns", summary: "Daftar rundown beserta berita dan CG", effect: "read", responseSchema: "RundownList" },
   { method: "POST", path: "/api/rundowns", operationId: "createRundown", summary: "Buat rundown", effect: "edit", requestSchema: "RundownInput", responseSchema: "Rundown", successStatus: 201, requestExample: { programName: "NEWS LIVE", title: "Edisi sore", items: [] } },
@@ -171,11 +172,14 @@ export const agentOpenApi = {
 
 export const agentApiDiscovery = {
   service: "NewsCG", apiVersion: "1",
-  links: { openapi: "/api/agent/openapi.json", guide: "/api/agent/guide.md", rundownGuide: "/api/agent/rundown-guide.md", health: "/api/health" },
+  links: { openapi: "/api/agent/openapi.json", guide: "/api/agent/guide.md", rundownGuide: "/api/agent/rundown-guide.md", cgGuide: "/api/agent/cg-guide.md", health: "/api/health" },
   authentication: { type: "none", access: "local-or-controlled-lan" },
   conventions: { contentType: "application/json; charset=utf-8", idSource: "Gunakan ID dari respons API; encode setiap segmen ID di URL.", fieldValues: "draftFields berisi string, termasuk flag true/false sebagai string.", getIsReadOnly: true, deleteSuccessStatus: 204, jsonBodyMaxBytes: 2 * 1024 * 1024 },
   safety: { materialApprovalRequired: false, materialEditsChangeProgram: false, liveEffectsRequireExplicitInstruction: true, observationStream: "/api/live/stream?role=monitor", serverConfirmationProvesRenderedFrame: false, mutationRetry: "Pembuatan/impor belum idempotent. Setelah timeout, lakukan readback sebelum retry. Perintah live memakai Idempotency-Key; key unik per aksi, cache 60 detik sampai proses restart." },
   templates: templateTypes.map(templateType => ({ templateType, fieldsSchema: `#/components/schemas/${templateType}Fields`, fieldLimits: graphicFieldLimits[templateType] })),
+  graphicPresets: [{ id: "headline-bulletin", label: "Headline Pembuka", templateType: "HEADLINE", draftFields: headlineBulletinPreset,
+    requiredFields: ["headline"], createPath: "/api/items/{id}/graphics", editPath: "/api/graphics/{id}",
+    description: "Satu judul per cue dengan label HEADLINE. Susun beberapa cue melalui sortOrder; pergantian dilakukan operator." }],
   colorThemes: broadcastColorThemeIds.map(id => ({ id, label: broadcastColorThemes[id].label })),
   logo: { ...broadcastLogoUploadSpec, mimeTypes: broadcastLogoMimeTypes, recommendedFormat: "PNG transparan", uploadPath: "/api/uploads/logo", appliesToLiveAutomatically: false },
   operations: agentApiOperations

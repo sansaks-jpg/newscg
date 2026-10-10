@@ -5,7 +5,7 @@ import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import {
-  broadcastLogoUploadSpec, graphicFieldLimits, graphicRecordSchema,
+  broadcastLogoUploadSpec, graphicFieldLimits, graphicRecordSchema, headlineBulletinPreset,
   liveCommandResultSchema, rundownRecordSchema, templateTypes
 } from "@newscg/shared";
 import type { OverlayEvent } from "@newscg/shared";
@@ -79,11 +79,11 @@ describe("agent discovery and shared API contract", () => {
     expect(result.body.logo).toMatchObject(broadcastLogoUploadSpec);
     const spec = await request(result.body.links.openapi);
     expect(spec.body.openapi).toBe("3.1.0");
-    for (const name of ["guide", "rundownGuide"]) {
+    for (const [name, filename] of [["guide", "AI_AGENT_API.md"], ["rundownGuide", "AI_RUNDOWN_GUIDE.md"], ["cgGuide", "CG_GUIDE.md"]]) {
       const response = await fetch(`${baseUrl}${result.body.links[name]}`);
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("text/markdown");
-      expect(await response.text()).toBe(await readFile(new URL(`../../../docs/${name === "guide" ? "AI_AGENT_API.md" : "AI_RUNDOWN_GUIDE.md"}`, import.meta.url), "utf8"));
+      expect(await response.text()).toBe(await readFile(new URL(`../../../docs/${filename}`, import.meta.url), "utf8"));
     }
     expect(dbModule.getRundown(rundown.id)).toEqual(rundown);
     expect(liveModule.getLiveState()).toEqual(beforeState);
@@ -123,6 +123,7 @@ describe("agent discovery and shared API contract", () => {
       expect(schemas[`${type}Fields`].properties.visualTemplate.anyOf[0].const).toBe("cnn");
     }
     expect(schemas.GraphicPatch.required).toBeUndefined();
+    expect(schemas.HEADLINEFields.properties.headlinePresentation).toMatchObject({ enum: ["story", "bulletin"], default: "story" });
     expect(schemas.GraphicPatch.properties.draftFields.additionalProperties).toEqual({ type: "string" });
     expect(JSON.stringify(schemas.GraphicInput)).not.toContain('"status"');
     expect(schemas.RundownInput.properties.items.items.properties.graphics.items.oneOf).toHaveLength(templateTypes.length);
@@ -132,6 +133,47 @@ describe("agent discovery and shared API contract", () => {
 });
 
 describe("agent material editing through real HTTP", () => {
+  it("discovers, creates, edits and reorders opening headlines without changing Program until UPDATE", async () => {
+    const discovery = (await request("/api/agent")).body;
+    const preset = discovery.graphicPresets.find((value: any) => value.id === "headline-bulletin");
+    expect(preset.draftFields).toEqual(headlineBulletinPreset);
+    const { rundown, item } = await createMaterial();
+    const created = await request(`/api/items/${item.id}/graphics`, "POST", {
+      templateType: preset.templateType, sortOrder: 1, draftFields: { ...preset.draftFields, headline: "HEADLINE PEMBUKA PERTAMA" }
+    });
+    expect(created.status).toBe(201);
+    const graphic = created.body;
+    expect((await request(`/api/graphics/${graphic.id}`)).body).toEqual(graphic);
+    await request("/api/live/take", "POST", { graphicId: graphic.id }, { "Idempotency-Key": randomUUID() });
+    const before = (await request("/api/live/state")).body;
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber(event => events.push(event), "monitor");
+    try {
+      const patch = await request(`/api/graphics/${graphic.id}`, "PATCH", {
+        draftFields: { headline: "HEADLINE PEMBUKA REVISI", headlineLabel: "BERITA UTAMA" }
+      });
+      expect(patch.status).toBe(200);
+      expect(patch.body.draftFields).toMatchObject({ ...preset.draftFields, headline: "HEADLINE PEMBUKA REVISI", headlineLabel: "BERITA UTAMA" });
+      for (const draftFields of [{ headlineLabel: "" }, { headlineLabel: "X".repeat(25) }, { headlinePresentation: "invalid" }]) {
+        expect((await request(`/api/graphics/${graphic.id}`, "PATCH", { draftFields })).status).toBe(400);
+      }
+      expect((await request(`/api/graphics/${graphic.id}`)).body).toEqual(patch.body);
+      expect((await request(`/api/rundowns/${rundown.id}`, "PATCH", { title: "RUNDOWN REVISI" })).status).toBe(200);
+      const next = (await request(`/api/rundowns/${rundown.id}/items`, "POST", { slug: "OPEN-02", title: "Headline kedua", format: "READER" })).body;
+      await request(`/api/rundowns/${rundown.id}/reorder`, "POST", { itemIds: [next.id, item.id] });
+      const saved = (await request(`/api/rundowns/${rundown.id}`)).body;
+      expect(saved.title).toBe("RUNDOWN REVISI");
+      expect(saved.items.map((story: any) => story.id)).toEqual([next.id, item.id]);
+      expect(saved.items[1].graphics[1]).toEqual(patch.body);
+      expect((await request("/api/live/state")).body.onAirSnapshot).toEqual(before.onAirSnapshot);
+      expect(events).toHaveLength(1); // SYNC only; editing emits no output commands.
+      const updated = await request("/api/live/update", "POST", { graphicId: graphic.id, syncComposition: false }, { "Idempotency-Key": randomUUID() });
+      expect(updated.body.commandStatus).toBe("confirmed");
+      expect(updated.body.state.onAirSnapshot).toMatchObject({ headline: "HEADLINE PEMBUKA REVISI", headlineLabel: "BERITA UTAMA", headlinePresentation: "bulletin" });
+      expect(events.at(-1)?.type).toBe("UPDATE");
+    } finally { unsubscribe(); }
+  });
+
   it("creates and edits rundown, news and CG, then reads each entity back", async () => {
     const rundown = (await request("/api/rundowns", "POST", { programName: "NEWS", title: "Edisi API", items: [] })).body;
     const itemResult = await request(`/api/rundowns/${rundown.id}/items`, "POST", { slug: "NEWS-01", title: "Judul berita", format: "PKG", cgRequired: true, estimatedDurationSeconds: 120, sortOrder: 0 });

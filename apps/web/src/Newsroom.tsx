@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditableGraphic, GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
-import { getGraphicFieldLimit, headlineDefaultsSchema, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
+import { getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -728,11 +728,11 @@ function StoryEditor({
     });
   }
 
-  function add(type: TemplateType) {
+  function add(type: TemplateType, bulletin = false) {
     const base = graphics.find((g) => g.templateType === "HEADLINE")?.draftFields;
+    setPreviewIndex(graphics.length);
     setGraphics((gs) => {
       const newIndex = gs.length;
-      setPreviewIndex(newIndex);
       return [
         ...gs,
         {
@@ -754,7 +754,9 @@ function StoryEditor({
                   layoutStyle: "sub",
                   showLocation: "true",
                   showKicker: "false",
-                  visualTemplate: "cnn"
+                  visualTemplate: "cnn",
+                  ...(type === "BREAKING" ? { kicker: "BREAKING NEWS", showKicker: "true" } : {}),
+                  ...(bulletin ? headlineBulletinPreset : {})
                 }
         }
       ];
@@ -986,6 +988,12 @@ function StoryEditor({
                 <button type="button" onClick={() => add("HEADLINE")}>
                   + Tambah Headline
                 </button>
+                <button type="button" onClick={() => add("HEADLINE", true)}>
+                  + Headline Pembuka
+                </button>
+                <button type="button" onClick={() => add("BREAKING")}>
+                  + Breaking News
+                </button>
                 <button type="button" onClick={() => add("REPORTER")}>
                   + Tambah Narasumber
                 </button>
@@ -1019,6 +1027,10 @@ function StoryEditor({
                           ? "CG NAMA / REPORTER"
                           : g.templateType === "LOCATION"
                           ? "CG LOKASI"
+                          : g.templateType === "BREAKING"
+                          ? "BREAKING NEWS"
+                          : g.draftFields.headlinePresentation === "bulletin"
+                          ? "HEADLINE PEMBUKA"
                           : "LOWER THIRD HEADLINE"}
                       </b>
                     </div>
@@ -1105,6 +1117,31 @@ function StoryEditor({
                       </div>
                     ) : (
                       <div className="cue-fields-grid">
+                        {g.templateType === "HEADLINE" && <>
+                          <label>
+                            <span>Jenis Headline</span>
+                            <select value={g.draftFields.headlinePresentation || "story"}
+                              onChange={(e) => {
+                                const presentation = headlinePresentationSchema.parse(e.target.value);
+                                if (index === 0) defaultSeedActive.current = false;
+                                setPreviewIndex(index);
+                                setGraphics((gs) => gs.map((cue, i) => i === index ? {
+                                  ...cue, draftFields: { ...cue.draftFields,
+                                    ...(presentation === "bulletin" ? headlineBulletinPreset : {}),
+                                    headlinePresentation: presentation }
+                                } : cue));
+                              }}>
+                              <option value="story">Judul berita biasa</option>
+                              <option value="bulletin">Headline pembuka / ringkasan</option>
+                            </select>
+                          </label>
+                          {g.draftFields.headlinePresentation === "bulletin" && <label>
+                            <span>Label Headline Pembuka</span>
+                            <input required maxLength={getGraphicFieldLimit("HEADLINE", "headlineLabel")}
+                              value={g.draftFields.headlineLabel ?? "HEADLINE"}
+                              onChange={(e) => field(index, "headlineLabel", e.target.value)} />
+                          </label>}
+                        </>}
                         <label className="field-full">
                           <span>Headline Utama (Wajib) <strong style={{ color: "#ef4444" }}>*</strong></span>
                           <input
@@ -1180,7 +1217,7 @@ function StoryEditor({
                         className={`preview-pill-btn ${previewIndex === i ? "active" : ""}`}
                         onClick={() => setPreviewIndex(i)}
                       >
-                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : "Headline"}
+                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : g.templateType === "BREAKING" ? "Breaking" : g.draftFields.headlinePresentation === "bulletin" ? "Headline Pembuka" : "Headline"}
                       </button>
                     ))}
                   </div>

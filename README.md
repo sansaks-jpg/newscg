@@ -15,7 +15,9 @@ Sistem ini beroperasi 100% berbasis web-native yang siap di-embed langsung ke be
 - **Perlindungan Idempotency & Antrean Aksi**: Dilengkapi proteksi klik ganda (*double-click protection*) dan antrean serial (*action queue*) untuk mencegah konflik status siaran.
 - **Templat Grafis Standar Siaran TV**:
   - **HEADLINE**: Kicker tab, judul utama, subline/lead, lokasi, running ticker, dan branding. Mendukung varian komposisi dinamis (toggle lokasi, toggle topik, toggle detail, dan clean headline).
+  - **HEADLINE PEMBUKA**: Label HEADLINE di kiri dan satu judul besar per cue, tersedia lewat **+ Headline Pembuka**. Label/judul dapat diedit, susun beberapa cue untuk ringkasan awal bulletin. Tetap menggunakan template HEADLINE dengan `headlinePresentation: "bulletin"`.
   - **REPORTER**: Nama presenter/reporter, jabatan/role, lokasi, dan social media handle.
+  - **SOT**: Headline berita, nama narasumber, dan jabatan/institusi.
   - **LOCATION**: Tag lokasi pojok kiri atas (*location bug*).
   - **BREAKING NEWS**: Grafis berita kilat dengan aksen visual darurat berkontras tinggi.
 - **Master Broadcast Layer Controls**:
@@ -52,6 +54,8 @@ Logo upload yang disarankan: **PNG transparan 800 × 500 px**, ruang kosong seki
 Panduan untuk agen AI yang menerima rundown berita dari user tersedia di [docs/AI_RUNDOWN_GUIDE.md](docs/AI_RUNDOWN_GUIDE.md). Materi dimasukkan melalui API, lalu dibaca kembali tanpa menjalankan perintah live. Status persetujuan Draft/Ready/Perlu dicek sudah dihapus.
 
 AI agent dapat menemukan seluruh operasi melalui `GET /api/agent`, membaca OpenAPI di `GET /api/agent/openapi.json`, dan mengambil panduan lengkap di `GET /api/agent/guide.md`. Lihat [docs/AI_AGENT_API.md](docs/AI_AGENT_API.md) untuk contoh tambah, edit, hapus, urut ulang, upload logo, dan kontrol siaran.
+
+Daftar jenis CG berita, riset referensi CNN, dan cara membuat/edit headline pembuka tersedia di [docs/CG_GUIDE.md](docs/CG_GUIDE.md), juga melalui `GET /api/agent/cg-guide.md`. Discovery menyediakan preset siap isi di `graphicPresets`. Agent bisa PATCH headline maupun metadata rundown, mengurutkan berita, lalu readback; edit tersimpan tidak mengubah Program sampai perintah live dijalankan.
 
 NewsCG dibangun dengan struktur monorepo menggunakan **npm workspaces**:
 

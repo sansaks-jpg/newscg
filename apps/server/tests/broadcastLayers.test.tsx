@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, selectBroadcastColorTheme } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, headlineBulletinPreset, selectBroadcastColorTheme } from "@newscg/shared";
 import type { GraphicItem, MasterOverlayState, OverlayEvent } from "@newscg/shared";
 import OverlayWindow from "../../web/src/OverlayWindow";
 import { ProgramMonitor } from "../../web/src/ProgramMonitor";
@@ -54,6 +54,38 @@ afterEach(async () => {
 });
 
 describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", Component: ProgramMonitor }])("broadcast layer lifecycle ($name)", ({ Component }) => {
+  it("renders an opening headline, updates both texts in place and retains the label through OUT", async () => {
+    await act(async () => root.render(createElement(Component)));
+    const bulletin = { ...headlineBulletinPreset, headline: "HEADLINE PEMBUKA" };
+    await send({ type: "TAKE", graphic, fields: bulletin, master });
+    const panel = element(".cg-main-box.cg-headline-bulletin");
+    const label = element(".cg-headline-label");
+    const title = element(".cg-headline-row-single");
+    const ticker = element(".cg-ticker-track");
+    expect(panel).not.toBeNull();
+    expect(label?.textContent).toBe("HEADLINE");
+    expect(title?.textContent).toBe(bulletin.headline);
+    expect(element(".cg-location-tag")).toBeNull();
+    expect(element(".cg-kicker-tab")).toBeNull();
+    expect(element(".cg-subline-row")).toBeNull();
+    expect(getComputedStyle(label!).overflow).toBe("hidden");
+    expect(getComputedStyle(label!.firstElementChild!).animation).toContain("news-text-in");
+    await send({ type: "UPDATE", graphicId: graphic.id, fields: { ...bulletin, headline: "JUDUL REVISI", headlineLabel: "BERITA UTAMA" }, master });
+    expect(element(".cg-main-box")).toBe(panel);
+    expect(element(".cg-headline-label")).toBe(label);
+    expect(element(".cg-headline-row-single")).toBe(title);
+    expect(title?.textContent).toBe("JUDUL REVISI");
+    expect(label?.textContent).toBe("BERITA UTAMA");
+    expect(element(".cg-ticker-track")).toBe(ticker);
+    await send({ type: "CLEAR", master });
+    expect(getComputedStyle(label!.firstElementChild!).animation).toContain("news-text-out");
+    await advance(broadcastMotion.retainMs - 1);
+    expect(element(".cg-headline-label")).toBe(label);
+    await advance(1);
+    expect(element(".cg-headline-label")).toBeNull();
+    expect(element(".cg-ticker-track")).toBe(ticker);
+  });
+
   it.each(["studio-navy", "studio-graphite", "studio-copper"] as const)("applies %s to every layer without replaying the headline or ticker", async (colorTheme) => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });

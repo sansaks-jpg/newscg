@@ -54,6 +54,7 @@ export function BroadcastGraphic({
   const isLocationOnly = type === "LOCATION";
 
   const effectiveFields = fields || {};
+  const isHeadlineBulletin = type === "HEADLINE" && effectiveFields.headlinePresentation === "bulletin";
   const hasContent = !isLocationOnly && Boolean(type && fields && (fields.headline || fields.name || fields.location || fields.text));
 
   // Location tag di pojok kiri atas (otomatis tampil dinamis jika field lokasi diisi)
@@ -166,7 +167,10 @@ export function BroadcastGraphic({
             ) : null}
 
             {/* Kotak Utama Putih */}
-            <div className={`cg-main-box ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
+            <div className={`cg-main-box ${isHeadlineBulletin ? "cg-headline-bulletin" : ""} ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
+              {isHeadlineBulletin && <div className="cg-headline-label">
+                <div className="cg-copy-motion"><AutoSquishText text={effectiveFields.headlineLabel || "HEADLINE"} minScale={0.5} /></div>
+              </div>}
               <div className={`cg-text-area ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
                 {/* Varian A: Paragraf / Keterangan Tunggal (Gambar 3 - Sentence Case Wardah Style) */}
                 {contentMode === "paragraph" ? (

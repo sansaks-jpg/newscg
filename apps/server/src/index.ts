@@ -32,6 +32,9 @@ app.get("/api/agent/guide.md", (_req, res) => {
 app.get("/api/agent/rundown-guide.md", (_req, res) => {
   res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/AI_RUNDOWN_GUIDE.md", import.meta.url)));
 });
+app.get("/api/agent/cg-guide.md", (_req, res) => {
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/CG_GUIDE.md", import.meta.url)));
+});
 
 app.post("/api/uploads/logo", (req, res, next) => {
   const contentType = req.get("Content-Type")?.toLowerCase().split(";")[0]?.trim();
