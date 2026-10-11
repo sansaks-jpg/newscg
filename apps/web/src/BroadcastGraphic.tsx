@@ -125,15 +125,13 @@ export function BroadcastGraphic({
   const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText && !detailLayer.present && !sotLayer.present;
 
   const brandText = master.brandText?.trim() || "CNNINDONESIA.COM";
-  const tickerText =
-    effectiveFields.ticker?.trim() ||
-    master.tickerText?.trim() ||
-    "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI";
+  // Only the explicitly applied rundown snapshot supplies ticker content.
+  const tickerText = master.tickerText?.trim() || "";
 
   return (
     <>
       {/* 1. Location Tag di Pojok Kiri Atas (Aktif atau Bayangan Ghost) */}
-      {locationLayer.present ? (
+      {type && fields && locationLayer.present ? (
         <div key={`location-${contentKey}`} style={graphicStyle} data-color-theme={colorTheme.id} className={`cg-location-tag ${cnn ? "cnn-template" : ""} ${isExiting || locationLayer.exiting ? "cg-exit" : ""} ${isMini ? "mini" : ""}`}>
           <span>{effectiveFields.location || lastLocation}</span>
         </div>

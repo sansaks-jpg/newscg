@@ -27,11 +27,14 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
         revision = event.revision;
       }
       switch (event.type) {
-        case "SYNC":
+        case "SYNC": {
           cancel();
+          const hasLiveGraphic = Boolean(event.onAir && event.graphic && event.fields);
+          const hasMaster = event.master.showLogo || event.master.showTicker || event.master.showLiveBadge;
           commit({ graphic: event.onAir ? event.graphic : null, fields: event.onAir ? event.fields : null,
-            master: event.master, exiting: false, exitAll: false, blackout: false, synced: true });
+            master: event.master, exiting: false, exitAll: false, blackout: !hasLiveGraphic && !hasMaster, synced: true });
           break;
+        }
         case "TAKE": {
           const needsOut = Boolean(state.graphic && state.graphic.id !== event.graphic.id);
           cancel();
@@ -51,8 +54,16 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
           break;
         }
         case "SWITCH_DETAIL": {
+          if (state.exiting && pending && timer) {
+            // A full panel OUT is already running. Replace its queued destination
+            // without cutting the outgoing graphic or restarting the timer.
+            pending = event;
+            commit({ master: event.master, exitAll: false, blackout: false });
+            break;
+          }
           cancel();
           if (!state.graphic || state.exiting) {
+            commit({ master: event.master });
             enter({ ...event, type: "TAKE" });
             break;
           }
@@ -66,7 +77,9 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
               const next = pending;
               pending = null;
               timer = undefined;
-              if (next) commit({ graphic: next.graphic, fields: next.fields, master: next.master });
+              // Master changes are broadcast independently during the detail OUT.
+              // Preserve the latest master instead of restoring the switch snapshot.
+              if (next) commit({ graphic: next.graphic, fields: next.fields });
             }, broadcastMotion.detailOutMs + 20);
           } else commit({ graphic: event.graphic, fields: event.fields, master: event.master });
           break;

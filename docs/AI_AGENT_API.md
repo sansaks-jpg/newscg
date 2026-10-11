@@ -55,9 +55,9 @@ Pada tabel ini, `:id` merupakan ID entitas target. Dalam OpenAPI, parameter yang
 | Method dan path | Body / hasil |
 |---|---|
 | `GET /api/rundowns` | Array rundown lengkap dengan berita dan CG. |
-| `POST /api/rundowns` | `RundownInput`; hasil 201 berupa rundown baru. |
+| `POST /api/rundowns` | `RundownInput`; hasil 201 berupa rundown baru, dengan ID rundown/berita/CG baru meskipun input berisi ID dari salinan. |
 | `GET /api/rundowns/:id` | Satu rundown lengkap. |
-| `PATCH /api/rundowns/:id` | Sebagian `programName`/`title`; minimal satu field. |
+| `PATCH /api/rundowns/:id` | Sebagian `programName`/`title`/`broadcastSchedule`/`ticker`; minimal satu field. Jadwal dan ticker divalidasi terhadap gabungan data lama. |
 | `DELETE /api/rundowns/:id` | Hapus rundown beserta berita/CG; 204 tanpa body. |
 | `POST /api/rundowns/:id/reorder` | `{"itemIds":["id-berita-2","id-berita-1"]}`; sertakan semua ID berita tepat sekali. |
 | `PUT /api/rundowns/:id/story` | `StorySave`; simpan berita dan daftar CG dalam satu transaksi. |
@@ -73,6 +73,8 @@ Pada tabel ini, `:id` merupakan ID entitas target. Dalam OpenAPI, parameter yang
 | `DELETE /api/graphics/:id` | Hapus satu CG; 204 tanpa body. |
 
 Penghapusan rundown, berita, atau CG yang sedang terkait dengan Program ditolak 409. Jangan menjalankan CLEAR otomatis demi menghapusnya; ikuti instruksi operator.
+
+PATCH grafis dan PATCH master harus berisi setidaknya satu field yang dikenal. Body kosong, field yang tidak dikenal saja, atau `PATCH /api/graphics/:id` berisi hanya `{ "draftFields": {} }` ditolak HTTP 400. Periksa ejaan nama field melalui OpenAPI sebelum mengulang request.
 
 Mengganti `templateType` cue yang sedang Program juga ditolak 409 melalui PATCH maupun PUT story. Ini menjaga template Program saat output reconnect. Edit teks pada cue tersebut tetap diperbolehkan dan belum diterapkan sampai UPDATE. Bila perlu template baru selama siaran, buat cue baru lalu tayangkan sesuai instruksi operator.
 
@@ -173,6 +175,8 @@ Impor menerima objek rundown atau envelope `schemaVersion: 1`. Bila versi dicant
 | `GET /api/live/master` | Baca master saat ini. |
 | `PATCH /api/live/master` | Terapkan sebagian master **langsung ke output**. |
 
+Perubahan master diproses mengikuti antrean perintah siaran yang sudah diterima server, termasuk STAGE dan CLEAR_ALL, sehingga PATCH berikutnya tidak tertimpa aksi terdahulu yang masih dalam antrean. Periksa respons dan lakukan GET `/api/live/master` untuk readback.
+
 Logo yang dianjurkan: PNG transparan **800×500 px**, ruang kosong **40 px** di setiap sisi, maksimal **2 MiB**. Upload juga menerima JPEG, WebP, dan SVG statis tanpa skrip/aset eksternal. Batas decoding adalah 4096 px per dimensi dan 4096² piksel. Endpoint menerima body binary, bukan JSON/base64/multipart.
 
 ```powershell
@@ -183,11 +187,92 @@ $newsCgLogo
 
 Upload menghasilkan URL unik dan belum mengubah logo master. Jika user meminta menerapkannya, kirim `PATCH /api/live/master` dengan `{"logoType":"image","logoImage":"/uploads/URL-DARI-RESPONS","showLogo":true}`. Pertahankan field master lain.
 
-Master mendukung `colorTheme`, `showLogo`, `showTicker`, `showLiveBadge`, `brandText` (120), `tickerText` (10000), `tickerSpeed` (30–250 px/detik), `outputFps` (25/30/60), `logoType` (text/image), `logoImage` (string/null), `logoText` (120), `logoSub` (120), `timezone` (WIB/WITA/WIT/CUSTOM), dan `customTimezoneLabel` (40). `tickerRevision` dikelola alur ticker server; jangan menyalin nilai lama untuk menimpa revisi baru. Lihat `MasterPatch` untuk kontrak validasi.
+PATCH master mendukung `colorTheme`, `showLogo`, `showTicker`, `showLiveBadge`, `brandText` (120), `outputFps` (25/30/60), `logoType` (text/image), `logoImage` (string/null), `logoText` (120), `logoSub` (120), `timezone` (WIB/WITA/WIT/CUSTOM), dan `customTimezoneLabel` (40). `tickerText`, `tickerSpeed`, `tickerRundownId`, `tickerForDate`, dan `tickerRevision` hanya tersedia pada readback/SSE sebagai snapshot ticker output. PATCH master menolak field tersebut dan field tak dikenal; teks ticker disimpan pada rundown. Lihat `MasterPatch` untuk kontrak validasi.
+
+### Peta elemen dan contoh perubahan melalui API
+
+Contoh `PATCH /api/live/master` di bawah adalah operasi **langsung ke output**, termasuk saat lower third kosong. Baca `GET /api/live/master`, kirim PATCH hanya field yang diminta user/operator, lalu GET kembali dan cocokkan fieldnya. PATCH master tidak menyediakan penyimpanan terpisah untuk Preview dan belum menerima deduplikasi `Idempotency-Key` seperti TAKE/STAGE; setelah timeout lakukan readback sebelum retry. Hindari mengirim seluruh master dari snapshot lama.
+
+| Elemen | Endpoint dan contoh body | Efek / batas |
+|---|---|---|
+| Logo teks | `PATCH /api/live/master` → `{"logoType":"text","logoText":"NEWS","logoSub":"BERITA","showLogo":true}` | Teks utama/subjudul masing-masing maksimal 120 karakter. |
+| Logo gambar | Upload binary ke `POST /api/uploads/logo`, kemudian `PATCH /api/live/master` → `{"logoType":"image","logoImage":"/uploads/URL-DARI-RESPONS","showLogo":true}` | Upload saja tidak menayangkan. Gunakan URL respons, bukan path lokal komputer. |
+| Tampil/sembunyi logo | `PATCH /api/live/master` → `{"showLogo":false}` | Tidak menghapus gambar atau teks logo tersimpan. |
+| Badge LIVE | `PATCH /api/live/master` → `{"showLiveBadge":true}` atau false | Teks badge saat ini tetap `LIVE`; tidak ada field API untuk menggantinya. |
+| Label merek/program di bar ticker | `PATCH /api/live/master` → `{"brandText":"NEWS SORE"}` | Maksimal 120 karakter; berbeda dari `programName` rundown dan `logoText`. `brand` per cue tidak mengubah label ini. |
+| Tampil/sembunyi bar ticker beserta jam | `PATCH /api/live/master` → `{"showTicker":false}` | Jam ikut bar ticker; belum ada flag `showClock` mandiri. |
+| Kecepatan ticker per rundown | `PATCH /api/rundowns/:id` dengan `ticker.speedMode: "auto"` (lihat rumus berikut) | Dihitung dari konten, disimpan sebagai `ticker.speed`, diterapkan bersama ticker. Manual memakai `speedMode: "manual"` dan `speed` 30–250 hanya jika diminta operator. |
+| Teks ticker per rundown | `PATCH /api/rundowns/:id` dengan `broadcastSchedule` dan `ticker` (contoh berikut) | Maksimal 10000 karakter, tersimpan tanpa mengubah output. |
+| Terapkan ticker rundown | `POST /api/live/ticker` → `{"rundownId":"ID-RUNDOWN","immediate":false}` | Snapshot output per ID rundown; Idempotency-Key wajib digunakan agen. Flag `showTicker` tetap seperti sebelumnya. |
+| Ticker cue lama | `draftFields.ticker` | Masih diterima saat membaca/impor data lama, tetapi tidak dipakai output. Simpan materi baru pada `rundown.ticker`. |
+| Jam WIB/WITA/WIT | `PATCH /api/live/master` → `{"timezone":"WITA"}` | WIB UTC+7, WITA UTC+8, WIT UTC+9. Jam dihitung klien output; tidak ada API untuk mengisi waktu jam manual. |
+| Label jam CUSTOM | `PATCH /api/live/master` → `{"timezone":"CUSTOM","customTimezoneLabel":"JAKARTA"}` | Label maksimal 40 karakter. Implementasi CUSTOM tetap memakai UTC+7; mengganti label tidak mengatur offset zona waktu lain. |
+| Tema warna semua layer | `PATCH /api/live/master` → `{"colorTheme":"studio-navy"}` | Pilihan `cnn`, `studio-navy`, `studio-graphite`, `studio-copper`; belum ada API warna bebas/posisi layer. |
+| FPS output | `PATCH /api/live/master` → `{"outputFps":25}` | Angka 25, 30, atau 60; bukan jaminan FPS switcher/perangkat. |
+| Headline, topik, lokasi, detail | `PATCH /api/graphics/:id` → `{"draftFields":{"headline":"JUDUL SUMBER","kicker":"TOPIK","location":"JAKARTA","subline":"DETAIL SUMBER","showKicker":"true","showLocation":"true","showDetail":"true","layoutStyle":"sub"}}` | Tersimpan sebagai materi; TAKE/UPDATE menerapkan ke Program. Batas mengikuti template pada bagian 3. |
+| Identitas reporter/narasumber | `PATCH /api/graphics/:id` → `{"draftFields":{"name":"NAMA SUMBER","role":"JABATAN SUMBER"}}` | Gunakan REPORTER atau SOT; SOT tetap memerlukan headline. `socialHandle` tersedia pada template yang mendukungnya; baca schema dan batasnya. |
+| Nilai awal headline/topik/lokasi/detail | `PATCH /api/settings/headline-defaults` → `{"kicker":"TOPIK AWAL"}` | Nilai awal editor, tidak mengubah cue lama atau Program. |
+
+Ticker output hanya memakai **snapshot ticker dari rundown yang diterapkan**. Tidak ada override cue atau fallback ticker umum. `GET /api/live/master` menyediakan `tickerRundownId`, `tickerForDate`, dan `tickerText` untuk memeriksa asal dan isinya; GET rundown menyediakan materi/sumber yang tersimpan. TAKE mengambil ticker rundown cue tersebut, termasuk teks kosong pada rundown tanpa ticker. Edit rundown tidak mengubah snapshot live. CLEAR lower third mempertahankan ticker; CLEAR ALL mengosongkan snapshot. Perubahan normal pada rundown yang sama masuk pada segmen berikutnya; `POST /api/live/ticker` dengan `immediate:true` mereset guliran, dan perpindahan ID rundown juga mereset guliran agar ticker edisi lama tidak terbawa. `showTicker:false` menyembunyikan bar, sedangkan ticker kosong menampilkan bar/jam tanpa headline jika flag aktif. Jadwal bukan pemicu penayangan otomatis.
+
+Bagian ini mencakup elemen NewsCG yang sudah tersedia. Elemen seperti jam mandiri, penggantian tulisan LIVE, flipper, layer kredit sumber, atau grafis layar penuh belum mempunyai kontrak API tersendiri; lihat [CG_GUIDE.md](CG_GUIDE.md). Jangan mengirim field atau menebak endpoint untuk fitur yang belum tersedia.
+
+### Aturan wajib ticker untuk rundown kiriman user
+
+Saat user memberikan rundown dalam PDF, Excel/XLSX/XLS/CSV, dokumen, gambar, chat, JSON, atau format lain, **wajib tanyakan apakah ticker juga ingin dibuatkan**, kecuali keputusan sudah eksplisit. Sambil menunggu jawaban, pemetaan/impor rundown yang jelas tetap boleh berjalan. Jika diminta, ticker terikat **rundown dan jadwal tayangnya**, bukan harus berisi berita yang sama dengan rundown. **Tidak ada ticker global dalam alur agen** dan paket ticker tidak boleh otomatis dipakai pada rundown lain.
+
+Wajib mencari dan membuka sumber berita internet dari **H−2/H−1 terhadap tanggal tayang yang tercantum di jadwal**, memakai zona waktu jadwal; jangan memakai tanggal impor/hari ini sebagai pengganti. Jika jadwal belum jelas, tanyakan sebelum riset. Susun headline singkat dan lampirkan URL, tanggal publikasi/peristiwa, serta waktu akses sebagai bukti. Jangan mengarang berita bila rentang belum terjadi atau sumber belum terverifikasi. Alur lengkap dan contoh rentang tanggal ada di [AI_RUNDOWN_GUIDE.md](AI_RUNDOWN_GUIDE.md).
+
+Simpan `broadcastSchedule` dan `ticker` pada rundown melalui POST/import atau PATCH, lalu GET kembali. `ticker.forDate` wajib cocok dengan `broadcastSchedule.date` saat ada materi; server memvalidasi tanggal publikasi tiap sumber terhadap H−2/H−1 dalam zona waktu jadwal. URL/waktu yang dikirim belum membuktikan artikel telah diverifikasi: agen tetap harus membukanya. Materi manual tanpa sumber bukan hasil riset terverifikasi. Jika jadwal diganti, kirim ticker yang sesuai atau kosongkan ticker secara eksplisit; server menolak gabungan yang tidak cocok. PATCH ticker mengganti objeknya, sehingga semua sumber yang masih diperlukan harus disertakan.
+
+Contoh struktur (ganti seluruh teks/URL contoh dengan sumber nyata sebelum menulis):
+
+```json
+{
+  "broadcastSchedule": {"date":"2026-10-11","time":"18:00","timezone":"WIB"},
+  "ticker": {
+    "text":"HEADLINE BERITA HASIL RISET",
+    "speedMode":"auto",
+    "forDate":"2026-10-11",
+    "sources":[{
+      "headline":"HEADLINE BERITA HASIL RISET",
+      "sourceName":"NAMA SUMBER",
+      "url":"https://example.com/berita",
+      "publishedAt":"2026-10-10T09:00:00+07:00",
+      "eventDate":"2026-10-10",
+      "accessedAt":"2026-10-10T12:00:00+07:00"
+    }]
+  }
+}
+```
+
+`date`/`forDate`/`eventDate` memakai YYYY-MM-DD, jam HH:mm, dan timezone jadwal WIB/WITA/WIT. Jadwal boleh null jika belum diketahui; ticker kosong memakai `{"text":"","forDate":null,"sources":[]}`. `ticker.sources` maksimal 100 entri; headline/nama sumber maksimal 120 karakter; publishedAt/accessedAt harus ISO datetime dengan offset (termasuk Z); eventDate boleh null. Jadwal dan ticker ikut ekspor/impor, sedangkan ID rundown baru tetap diregenerasi. Tidak ada pemakaian ticker global lintas rundown. Tidak ada penelusuran internet otomatis oleh backend.
+
+Penyimpanan materi tidak memberi izin menerapkan ke output. Gunakan `POST /api/live/ticker` hanya dengan instruksi live, lalu GET master untuk memastikan ID rundown, tanggal, dan teks. Penerapan ditolak 409 jika CG Program berasal dari rundown lain; jangan CLEAR otomatis untuk mengatasinya. Penghapusan rundown sumber ticker Program yang berisi teks juga ditolak 409 sampai operator mengganti sumber ticker atau CLEAR ALL.
+
+### Kecepatan seimbang sesudah agen menyusun ticker
+
+Agen **wajib memakai `ticker.speedMode: "auto"`** untuk ticker hasil riset, kecuali user/operator secara eksplisit meminta kecepatan manual. Kecepatan dihitung dari isi ticker melalui fungsi shared `calculateTickerSpeed`; server menyimpan hasilnya sebagai `ticker.speed`. Tidak perlu menebak kecepatan atau menulis `tickerSpeed` ke master. Setelah menyimpan, GET rundown dan laporkan speedMode/speed aktual. Memperbarui teks dalam mode auto menghitung ulang speed, tetapi snapshot Program baru berubah setelah TAKE/penerapan ticker eksplisit. Mode manual mempertahankan speed meskipun teks disunting.
+
+Rumus untuk setiap headline `i`:
+
+```text
+D_i = jumlah kata yang mengandung angka / jumlah kata
+L_i = jumlah kata dengan lebih dari 10 huruf / jumlah kata
+P_i = min(1, jumlah tanda baca kompleks / jumlah kata)
+v_i = clamp(85 - 15 D_i - 10 L_i - 5 P_i, 70, 85)
+v   = round(min(v_i dari semua headline))    [px/detik pada kanvas 1920 × 1080]
+```
+
+`clamp(x,70,85)` membatasi nilai ke 70–85. Headline dipisahkan dengan ` • `, `■`, atau baris baru; kata dipisahkan spasi. Tanda baca kompleks yang dihitung adalah koma, titik dua, titik koma, kurung buka/tutup, dan garis miring. Tanda koma/titik pemisah desimal/ribuan di antara angka tidak menambah P karena sudah tercakup D. Huruf besar semua tidak menambah penalti. Teks kosong memakai 85. Memilih speed headline paling rumit mencegah headline padat angka kehilangan waktu baca; menambah headline sederhana atau memperpanjang daftar tidak mempercepat ticker.
+
+Contoh `HARGA BERAS NAIK 5 PERSEN`: 5 kata, D=1/5, L=0, P=0 → **82 px/detik**. Headline sederhana tanpa indikator kompleksitas memakai 85; headline yang seluruh katanya angka memakai batas 70. Ini **heuristik editorial NewsCG**, bukan standar ilmiah atau jaminan kenyamanan semua penonton. Operator dapat menyesuaikan setelah melihat output. Jangan mempercepat ticker hanya agar daftar berita lebih cepat selesai.
+
+Bila user meminta manual, baca rundown lalu PATCH objek ticker lengkap dengan `"speedMode":"manual","speed":80` (pertahankan text/forDate/sources), kemudian readback. Nilai manual wajib angka 30–250 dan wajib ada saat mode manual. Jangan memilih nilai ekstrem tanpa instruksi. Jika speedMode diabaikan, mode auto dipakai; nilai speed yang dikirim pada mode auto diganti hasil rumus. Ekspor/impor mempertahankan mode dan kecepatan per rundown. Discovery `rundownTicker.speedPolicy` mempublikasikan konstanta/formula agar agen tidak membuat versi rumus sendiri.
 
 ## 5. Kontrol siaran dan observasi
 
-Menambah/edit materi memberi izin menyimpan materi tersebut. Menjalankan TAKE/UPDATE/CLEAR/STAGE/VARIANT atau mengubah master memerlukan instruksi siaran dari user/operator. Tidak ada tahap persetujuan status materi lagi; penyimpanan tetap terpisah dari penerapan ke Program.
+Menambah/edit materi memberi izin menyimpan materi tersebut. Menjalankan TAKE/UPDATE/CLEAR/STAGE/VARIANT/TICKER atau mengubah master memerlukan instruksi siaran dari user/operator. Tidak ada tahap persetujuan status materi lagi; penyimpanan tetap terpisah dari penerapan ke Program.
 
 | Method dan path | Body / perilaku |
 |---|---|
@@ -199,13 +284,14 @@ Menambah/edit materi memberi izin menyimpan materi tersebut. Menjalankan TAKE/UP
 | `POST /api/live/clear` | Body opsional `{}`; lower third OUT, master tetap aktif. |
 | `POST /api/live/clear-all` | `{"immediate":false}` untuk animasi; true atau body kosong melakukan blackout instan seluruh layer. |
 | `POST /api/live/stage` | `{"mode":"empty"}`/`"logo"`/`"full"`; **langsung mengubah master dan membersihkan lower third Program**. |
-| `PATCH /api/live/master` | Terapkan perubahan master langsung; hasil berupa master. |
+| `PATCH /api/live/master` | Terapkan logo/warna/jam/flag; teks, kecepatan, identitas, dan revisi ticker tidak diterima. |
+| `POST /api/live/ticker` | `{"rundownId":"ID-RUNDOWN","immediate":false}`; terapkan snapshot ticker rundown tanpa mengubah lower third atau flag ticker. |
 | `GET /api/live/stream?role=monitor` | SSE untuk agent/pemantau. |
 | `GET /api/actions?limit=50` | Log terbaru; limit bilangan bulat 1–200, default 50. |
 
 UPDATE menerima cue yang sama dengan Program atau perpindahan HEADLINE↔SOT pada berita yang sama; tidak menayangkan cue berita lain. Semua body live divalidasi sebelum perintah dieksekusi. Gunakan boolean JSON untuk `immediate` dan `syncComposition`, bukan string.
 
-Kirim **`Idempotency-Key`** unik per aksi TAKE/UPDATE/VARIANT/CLEAR/CLEAR_ALL/STAGE. Retry aksi yang sama menggunakan key yang sama; jangan memakai satu key untuk aksi berbeda. Server mengingat hasil selama sekitar 60 detik dalam proses yang sama, tidak bertahan setelah restart. Bila diabaikan, server membuat key baru sehingga retry client tidak terdeduplikasi. TAKE/UPDATE/VARIANT/CLEAR/CLEAR_ALL juga menerima `idempotencyKey` di body; header didahulukan. STAGE menggunakan header.
+Kirim **`Idempotency-Key`** unik per aksi TAKE/UPDATE/VARIANT/CLEAR/CLEAR_ALL/STAGE/TICKER. Nilai key wajib 1–200 karakter setelah spasi tepi dihapus. Retry aksi beserta payload yang sama menggunakan key yang sama; memakai key untuk aksi atau payload berbeda ditolak **409** tanpa mengubah Program. Server mengingat hasil selama sekitar 60 detik dalam proses yang sama, tidak bertahan setelah restart. Bila diabaikan, server membuat key baru sehingga retry client tidak terdeduplikasi. TAKE/UPDATE/VARIANT/CLEAR/CLEAR_ALL juga menerima `idempotencyKey` di body; header didahulukan. STAGE dan TICKER menggunakan header.
 
 ```python
 # Jalankan hanya bila user meminta menayangkan cue ini.
@@ -220,7 +306,7 @@ assert state["onAirGraphicId"] == graphic["id"]
 
 Perintah live dapat mengembalikan **HTTP 200 dengan `commandStatus: "failed"`**. Selalu periksa `commandStatus` dan `error`, kemudian readback. `confirmed` berarti state/perintah telah diproses server; angka koneksi SSE bukan bukti frame telah dirender di vMix/OBS.
 
-SSE mengirim baris `data: {...}` dengan properti `type`, antara lain `SYNC`, `TAKE`, `SWITCH_DETAIL`, `UPDATE`, `CLEAR`, `MASTER_UPDATE`, `CLEAR_ALL_IMMEDIATE`, dan `CLEAR_ALL_ANIMATED`. Ada komentar keepalive sekitar 15 detik. Gunakan role monitor agar observasi agent tidak dihitung sebagai browser output. Setelah reconnect, terapkan snapshot SYNC terkini.
+SSE mengirim baris `data: {...}` dengan properti `type`, antara lain `SYNC`, `TAKE`, `SWITCH_DETAIL`, `UPDATE`, `CLEAR`, `MASTER_UPDATE`, `CLEAR_ALL_IMMEDIATE`, dan `CLEAR_ALL_ANIMATED`. Ada komentar keepalive sekitar 15 detik. Gunakan `role=monitor` agar observasi agent tidak dihitung sebagai browser output; role kosong memakai `output`, dan nilai di luar `monitor`/`output` ditolak 400. Setelah reconnect, terapkan snapshot SYNC terkini.
 
 ## 6. Respons gagal
 
@@ -239,6 +325,6 @@ DELETE sukses adalah 204 dan tidak memiliki JSON. Jangan memanggil parser JSON p
 
 Instruksi singkat yang bisa diberikan kepada agent:
 
-> Gunakan base URL NewsCG yang diberikan operator. Baca GET /api/agent, panduan Markdown, dan OpenAPI dahulu. Pilih operasi sesuai permintaan user, baca data terbaru, tulis perubahan terkecil yang diperlukan, lalu readback. Pertahankan fakta dan urutan materi sumber. Menyimpan materi tidak memberi izin mengubah siaran. Jalankan operasi dengan efek on-air hanya jika user menginstruksikannya. Gunakan role=monitor untuk SSE dan Idempotency-Key unik per aksi live. Laporkan hasil API dan data yang tersimpan; jangan mengklaim frame vMix/OBS hanya dari HTTP/SSE.
+> Gunakan base URL NewsCG yang diberikan operator. Baca GET /api/agent, panduan Markdown, dan OpenAPI dahulu. Pilih operasi sesuai permintaan user, baca data terbaru, tulis perubahan terkecil yang diperlukan, lalu readback. Pertahankan fakta dan urutan materi sumber. Saat menerima rundown dalam format apa pun, tanyakan kebutuhan ticker kecuali sudah diputuskan user. Jika diminta, riset internet H−2/H−1 berdasarkan jadwal tayang dan buat headline bersumber. Ticker terikat tiap rundown/jadwal, bukan ticker global atau harus sama dengan isi rundown. Simpan broadcastSchedule dan ticker.text/forDate/sources pada rundown dengan speedMode auto, lalu readback kecepatan hasil rumus. Manual hanya jika diminta operator. Terapkan snapshot melalui POST /api/live/ticker atau TAKE hanya dengan instruksi live; jangan menulis ticker ke master. Menyimpan materi tidak memberi izin mengubah siaran. Jalankan operasi dengan efek on-air hanya jika user menginstruksikannya. Gunakan role=monitor untuk SSE dan Idempotency-Key unik per aksi live yang mendukungnya. Laporkan hasil API dan data yang tersimpan; jangan mengklaim frame vMix/OBS hanya dari HTTP/SSE.
 
 Kontrak runtime ada di [packages/shared/src/index.ts](../packages/shared/src/index.ts), katalog operasi/generator OpenAPI di [apps/server/src/agentApi.ts](../apps/server/src/agentApi.ts), dan route di [apps/server/src/index.ts](../apps/server/src/index.ts). Schema JSON dihasilkan dari Zod bersama; aturan gabungan field CG tetap divalidasi server. Dokumentasi ekspor schema: [Zod JSON Schema](https://zod.dev/json-schema).

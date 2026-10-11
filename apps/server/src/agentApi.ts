@@ -6,10 +6,10 @@ import {
   headlineBulletinPreset, headlineDefaultsPatchSchema, headlineDefaultsSchema, liveClearAllInputSchema, liveClearInputSchema,
   liveCommandResultSchema, livePrepareInputSchema, liveStageInputSchema, liveStateSchema,
   liveTakeInputSchema, liveUpdateInputSchema, liveVariantInputSchema, logoUploadResultSchema,
-  masterOverlayPatchSchema, masterOverlaySchema, rundownExportSchema, rundownImportInputSchema,
+  masterOverlayPatchSchema, masterOverlaySchema, liveTickerInputSchema, rundownExportSchema, rundownImportInputSchema,
   rundownInputSchema, rundownItemInputSchema, rundownItemPatchSchema, rundownItemRecordSchema,
   rundownPatchSchema, rundownRecordSchema, rundownReorderInputSchema, settingsPatchSchema,
-  storySaveInputSchema, templateTypes,
+  storySaveInputSchema, templateTypes, tickerSpeedPolicy,
   type AgentApiOperation
 } from "@newscg/shared";
 
@@ -22,9 +22,9 @@ export const agentApiOperations: readonly AgentApiOperation[] = [
   { method: "GET", path: "/api/agent/cg-guide.md", operationId: "getCgGuide", summary: "Baca jenis CG, riset CNN, dan headline pembuka", effect: "read", responseContentType: "text/markdown" },
   { method: "GET", path: "/api/health", operationId: "getHealth", summary: "Periksa layanan", effect: "read", responseSchema: "Health" },
   { method: "GET", path: "/api/rundowns", operationId: "listRundowns", summary: "Daftar rundown beserta berita dan CG", effect: "read", responseSchema: "RundownList" },
-  { method: "POST", path: "/api/rundowns", operationId: "createRundown", summary: "Buat rundown", effect: "edit", requestSchema: "RundownInput", responseSchema: "Rundown", successStatus: 201, requestExample: { programName: "NEWS LIVE", title: "Edisi sore", items: [] } },
+  { method: "POST", path: "/api/rundowns", operationId: "createRundown", summary: "Buat rundown", effect: "edit", requestSchema: "RundownInput", responseSchema: "Rundown", successStatus: 201, description: "Rundown, berita, dan CG baru selalu menerima ID baru. ID dari data yang disalin tidak dipakai kembali.", requestExample: { programName: "NEWS LIVE", title: "Edisi sore", items: [] } },
   { method: "GET", path: "/api/rundowns/{id}", operationId: "getRundown", summary: "Baca satu rundown", effect: "read", responseSchema: "Rundown" },
-  { method: "PATCH", path: "/api/rundowns/{id}", operationId: "editRundown", summary: "Edit nama program atau judul rundown", effect: "edit", requestSchema: "RundownPatch", responseSchema: "Rundown", requestExample: { title: "Edisi sore revisi" } },
+  { method: "PATCH", path: "/api/rundowns/{id}", operationId: "editRundown", summary: "Edit identitas, jadwal, atau ticker rundown tanpa mengubah Program", effect: "edit", requestSchema: "RundownPatch", responseSchema: "Rundown", description: "broadcastSchedule berisi date/time/timezone; ticker berisi text/forDate/sources. Validasi gabungan mensyaratkan forDate sama dengan tanggal tayang dan setiap publishedAt dalam H−2/H−1 menurut zona waktu jadwal. TAKE memilih snapshot ticker rundown cue; POST /api/live/ticker menerapkan edit secara eksplisit.", requestExample: { title: "Edisi sore revisi" } },
   { method: "DELETE", path: "/api/rundowns/{id}", operationId: "deleteRundown", summary: "Hapus rundown dan seluruh isinya", effect: "delete", successStatus: 204 },
   { method: "POST", path: "/api/rundowns/{id}/reorder", operationId: "reorderStories", summary: "Atur ulang urutan semua berita", effect: "edit", requestSchema: "RundownReorder", responseSchema: "Rundown", description: "Sertakan setiap ID berita dari rundown ini tepat sekali; ID asing, duplikat, dan daftar parsial ditolak." },
   { method: "PUT", path: "/api/rundowns/{id}/story", operationId: "saveStory", summary: "Tambah atau simpan berita beserta daftar CG", effect: "edit", requestSchema: "StorySave", responseSchema: "RundownItem", description: "Tanpa itemId: tambah berita. Dengan itemId: ganti data berita dan daftar CG; CG lama yang tidak disertakan akan dihapus. Pertahankan ID CG saat mengedit." },
@@ -45,6 +45,7 @@ export const agentApiOperations: readonly AgentApiOperation[] = [
   { method: "POST", path: "/api/uploads/logo", operationId: "uploadLogo", summary: "Unggah gambar logo; belum diterapkan ke master", effect: "edit", requestSchema: "LogoBinary", responseSchema: "LogoUpload" },
   { method: "GET", path: "/api/live/state", operationId: "getLiveState", summary: "Baca status perintah dan snapshot Program", effect: "read", responseSchema: "LiveState" },
   { method: "GET", path: "/api/live/master", operationId: "getMaster", summary: "Baca master logo, ticker, jam, dan warna", effect: "read", responseSchema: "Master" },
+  { method: "POST", path: "/api/live/ticker", operationId: "applyRundownTicker", summary: "Terapkan snapshot ticker dari satu rundown", effect: "on-air", requestSchema: "LiveTicker", responseSchema: "LiveCommandResult", idempotency: true, description: "Teks ticker disimpan pada rundown, bukan master global. Tolak 409 bila CG Program berasal dari rundown lain. immediate true mereset guliran; retry identik memakai key sama." },
   { method: "POST", path: "/api/live/prepare", operationId: "prepareGraphic", summary: "Pilih cue standby tanpa menayangkan", effect: "prepare", requestSchema: "LivePrepare", responseSchema: "LiveState" },
   { method: "POST", path: "/api/live/take", operationId: "takeGraphic", summary: "Tayangkan CG tersimpan", effect: "on-air", requestSchema: "LiveTake", responseSchema: "LiveCommandResult", idempotency: true },
   { method: "POST", path: "/api/live/update", operationId: "updateLiveGraphic", summary: "Terapkan edit tersimpan ke CG live", effect: "on-air", requestSchema: "LiveUpdate", responseSchema: "LiveCommandResult", idempotency: true },
@@ -70,7 +71,7 @@ function buildSchemas() {
     HeadlineDefaultsPatch: headlineDefaultsPatchSchema, MasterPatch: masterOverlayPatchSchema,
     LivePrepare: livePrepareInputSchema, LiveTake: liveTakeInputSchema, LiveUpdate: liveUpdateInputSchema,
     LiveVariant: liveVariantInputSchema, LiveClear: liveClearInputSchema,
-    LiveClearAll: liveClearAllInputSchema, LiveStage: liveStageInputSchema
+    LiveClearAll: liveClearAllInputSchema, LiveStage: liveStageInputSchema, LiveTicker: liveTickerInputSchema
   };
   const outputs = {
     Health: apiHealthSchema, Error: apiErrorSchema, Rundown: rundownRecordSchema,
@@ -111,7 +112,15 @@ function buildSchemas() {
     }
     return Object.fromEntries(Object.entries(object).map(([key, item]) => [key, withGraphicFields(item)]));
   };
-  const convertedInputs = Object.fromEntries(Object.entries(inputs).map(([name, schema]) => [name, withGraphicFields(inputJson(schema))]));
+  const convertedInputs = Object.fromEntries(Object.entries(inputs).map(([name, schema]) => {
+    const converted = withGraphicFields(inputJson(schema));
+    if (name !== "GraphicPatch") return [name, converted];
+    // A PATCH containing only draftFields:{} does not edit anything.
+    return [name, { ...(converted as object), anyOf: [
+      { required: ["templateType"] }, { required: ["sortOrder"] },
+      { required: ["draftFields"], properties: { draftFields: { minProperties: 1 } } }
+    ] }];
+  }));
   return {
     ...convertedInputs, ...Object.fromEntries(Object.entries(outputs).map(([name, schema]) => [name, outputJson(schema)])),
     ...fields, GraphicInput: graphicInput,
@@ -126,8 +135,8 @@ function buildOperation(operation: AgentApiOperation) {
     name: match[1], in: "path", required: true, schema: { type: "string", minLength: 1 }, description: "ID hasil readback API."
   }));
   if (operation.idempotency) parameters.push({
-    name: "Idempotency-Key", in: "header", required: false, schema: { type: "string" },
-    description: "Gunakan key unik per aksi; retry aksi yang sama memakai key yang sama. Cache 60 detik dalam proses server."
+    name: "Idempotency-Key", in: "header", required: false, schema: { type: "string", minLength: 1, maxLength: 200 },
+    description: "Gunakan key unik per aksi (1–200 karakter setelah trim); retry aksi dan payload yang sama memakai key yang sama. Pemakaian key untuk aksi/payload berbeda ditolak 409. Cache 60 detik dalam proses server."
   });
   if (operation.operationId === "observeLiveEvents") parameters.push({
     name: "role", in: "query", schema: { type: "string", enum: ["monitor", "output"], default: "output" }, example: "monitor"
@@ -175,7 +184,12 @@ export const agentApiDiscovery = {
   links: { openapi: "/api/agent/openapi.json", guide: "/api/agent/guide.md", rundownGuide: "/api/agent/rundown-guide.md", cgGuide: "/api/agent/cg-guide.md", health: "/api/health" },
   authentication: { type: "none", access: "local-or-controlled-lan" },
   conventions: { contentType: "application/json; charset=utf-8", idSource: "Gunakan ID dari respons API; encode setiap segmen ID di URL.", fieldValues: "draftFields berisi string, termasuk flag true/false sebagai string.", getIsReadOnly: true, deleteSuccessStatus: 204, jsonBodyMaxBytes: 2 * 1024 * 1024 },
-  safety: { materialApprovalRequired: false, materialEditsChangeProgram: false, liveEffectsRequireExplicitInstruction: true, observationStream: "/api/live/stream?role=monitor", serverConfirmationProvesRenderedFrame: false, mutationRetry: "Pembuatan/impor belum idempotent. Setelah timeout, lakukan readback sebelum retry. Perintah live memakai Idempotency-Key; key unik per aksi, cache 60 detik sampai proses restart." },
+  rundownTicker: { scope: "rundown", editPath: "/api/rundowns/{id}", applyPath: "/api/live/ticker", askUserWhenReceivingRundown: true,
+    speedPolicy: { ...tickerSpeedPolicy, formula: "round(min_per_headline(clamp(85 - 15D - 10L - 5P, 70, 85)))", defaultMode: "auto",
+      description: "D: proporsi kata berangka; L: proporsi kata dengan >10 huruf; P: jumlah tanda baca kompleks dibagi jumlah kata, maksimal 1. Angka desimal tidak dihitung sebagai tanda baca. Manual hanya jika diminta operator. Simpan speedMode dan speed pada ticker rundown; penerapan membawa kecepatan bersama teks." },
+    research: "Wajib riset internet H−2/H−1 berdasarkan broadcastSchedule, bukan isi rundown atau tanggal impor. Simpan ticker.forDate dan sources. Tidak ada ticker global.",
+    materialEditsChangeOutput: false },
+  safety: { materialApprovalRequired: false, materialEditsChangeProgram: false, liveEffectsRequireExplicitInstruction: true, observationStream: "/api/live/stream?role=monitor", serverConfirmationProvesRenderedFrame: false, mutationRetry: "Pembuatan/impor belum idempotent. Setelah timeout, lakukan readback sebelum retry. Perintah live memakai Idempotency-Key unik per aksi dan payload; retry identik memakai key yang sama, perubahan aksi/payload dengan key sama ditolak 409. Cache 60 detik setelah aksi selesai atau sampai proses restart." },
   templates: templateTypes.map(templateType => ({ templateType, fieldsSchema: `#/components/schemas/${templateType}Fields`, fieldLimits: graphicFieldLimits[templateType] })),
   graphicPresets: [{ id: "headline-bulletin", label: "Highlight Berita", templateType: "HEADLINE", draftFields: headlineBulletinPreset,
     requiredFields: ["headline"], createPath: "/api/items/{id}/graphics", editPath: "/api/graphics/{id}",

@@ -27,13 +27,22 @@ export const headlineBulletinPreset = {
 } as const;
 
 // Compatibility with the first side-label preset; all new editing uses kicker.
-export function normalizeHeadlineTopicFields(type: TemplateType | null | undefined, fields: Record<string, string>): Record<string, string> {
+// changedFields differentiates explicit PATCH intent from legacy stored values.
+export function normalizeHeadlineTopicFields(
+  type: TemplateType | null | undefined,
+  fields: Record<string, string>,
+  changedFields?: Readonly<Record<string, string>>
+): Record<string, string> {
   if (type !== "HEADLINE" || fields.headlinePresentation !== "bulletin" || !fields.headlineLabel) return fields;
   const { headlineLabel, ...topicFields } = fields;
-  const hasTopic = Boolean(fields.kicker?.trim());
+  // The old side label was always visible, even with a separately hidden kicker.
+  // An explicitly PATCHed kicker, including an empty/hidden one, takes precedence.
+  if (changedFields && Object.hasOwn(changedFields, "kicker")) return topicFields;
+  const explicitlyChangedLabel = Boolean(changedFields && Object.hasOwn(changedFields, "headlineLabel"));
+  const hasVisibleTopic = !explicitlyChangedLabel && Boolean(fields.kicker?.trim()) && fields.showKicker !== "false";
   return { ...topicFields,
-    kicker: hasTopic ? fields.kicker! : headlineLabel === "HEADLINE" ? "HIGHLIGHT" : headlineLabel,
-    showKicker: hasTopic ? fields.showKicker ?? "true" : "true"
+    kicker: hasVisibleTopic ? fields.kicker! : headlineLabel === "HEADLINE" ? "HIGHLIGHT" : headlineLabel,
+    showKicker: "true"
   };
 }
 
@@ -113,6 +122,8 @@ export type MasterOverlayState = {
   tickerSpeed?: number;
   outputFps: OutputFrameRate;
   tickerRevision?: number;
+  tickerRundownId?: string | null;
+  tickerForDate?: string | null;
   logoType: "text" | "image";
   logoImage: string | null;
   logoText: string;
@@ -127,7 +138,9 @@ export const defaultMasterOverlayState: MasterOverlayState = {
   showLiveBadge: false,
   showTicker: false,
   brandText: "CNNINDONESIA.COM",
-  tickerText: "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI",
+  tickerText: "",
+  tickerRundownId: null,
+  tickerForDate: null,
   tickerSpeed: 85,
   outputFps: 30,
   logoType: "text",
@@ -192,14 +205,22 @@ export const masterOverlaySchema = z.object({
   showLogo: z.boolean(), showLiveBadge: z.boolean(), showTicker: z.boolean(),
   brandText: z.string().max(120), tickerText: z.string().max(10000),
   tickerSpeed: z.number().min(30).max(250).optional(), tickerRevision: z.number().int().nonnegative().optional(),
+  tickerRundownId: z.string().nullable().optional(), tickerForDate: z.iso.date().nullable().optional(),
   outputFps: z.union([z.literal(25), z.literal(30), z.literal(60)]),
   logoType: z.enum(["text", "image"]), logoImage: z.string().nullable(),
   logoText: z.string().max(120), logoSub: z.string().max(120),
   timezone: z.enum(timezoneModes), customTimezoneLabel: z.string().max(40)
 });
-export const masterOverlayPatchSchema = masterOverlaySchema.partial();
+export const masterOverlayPatchSchema = masterOverlaySchema.omit({ tickerText: true, tickerSpeed: true, tickerRevision: true, tickerRundownId: true, tickerForDate: true }).partial().strict()
+  .refine(data => Object.keys(data).length > 0, "Minimal satu field master yang dikenal harus diisi")
+  .meta({ minProperties: 1 });
+
+export function masterControlPatch(master: MasterOverlayState) {
+  return masterOverlayPatchSchema.parse(Object.fromEntries(Object.entries(master).filter(([key]) => key in masterOverlayPatchSchema.shape)));
+}
 
 const headlineFieldLimits = { headline: 120, kicker: 60, subline: 160, location: 60, ticker: 160, brand: 40, socialHandle: 80 } as const;
+const visibilityFlagSchema = z.enum(["true", "false"]);
 export const graphicFieldLimits = {
   HEADLINE: { ...headlineFieldLimits, headlineLabel: 24 },
   BREAKING: headlineFieldLimits,
@@ -226,9 +247,9 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     layoutStyle: z.enum(layoutStyles).optional().default("sub"),
     contentMode: z.enum(contentModes).optional().default("headline"),
     socialHandle: z.string().trim().max(graphicFieldLimits.HEADLINE.socialHandle).optional().default(""),
-    showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("true"),
-    showDetail: z.string().optional().default("false")
+    showKicker: visibilityFlagSchema.optional().default("true"),
+    showLocation: visibilityFlagSchema.optional().default("true"),
+    showDetail: visibilityFlagSchema.optional().default("false")
   }).passthrough(),
   REPORTER: z.object({
     name: z.string().trim().min(1).max(graphicFieldLimits.REPORTER.name),
@@ -240,9 +261,9 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     layoutStyle: z.enum(layoutStyles).optional().default("sub"),
     contentMode: z.enum(contentModes).optional().default("presenter"),
     socialHandle: z.string().trim().max(graphicFieldLimits.REPORTER.socialHandle).optional().default(""),
-    showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("false"),
-    showDetail: z.string().optional().default("false"),
+    showKicker: visibilityFlagSchema.optional().default("true"),
+    showLocation: visibilityFlagSchema.optional().default("false"),
+    showDetail: visibilityFlagSchema.optional().default("false"),
     headline: z.string().trim().max(graphicFieldLimits.REPORTER.headline).optional().default(""),
     subline: z.string().trim().max(graphicFieldLimits.REPORTER.subline).optional().default("")
   }).passthrough(),
@@ -255,7 +276,8 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     brand: z.string().trim().max(graphicFieldLimits.SOT.brand).optional().default("CNNINDONESIA.COM"),
     visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")),
     contentMode: z.literal("sot").default("sot"),
-    showLocation: z.string().optional().default("false")
+    showLocation: visibilityFlagSchema.optional().default("false"),
+    showSot: visibilityFlagSchema.optional()
   }).passthrough(),
   LOCATION: z.object({ visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn")), location: z.string().trim().min(1).max(graphicFieldLimits.LOCATION.location) }).passthrough(),
   BREAKING: z.object({
@@ -269,9 +291,9 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     layoutStyle: z.enum(layoutStyles).optional().default("sub"),
     contentMode: z.enum(contentModes).optional().default("headline"),
     socialHandle: z.string().trim().max(graphicFieldLimits.BREAKING.socialHandle).optional().default(""),
-    showKicker: z.string().optional().default("true"),
-    showLocation: z.string().optional().default("false"),
-    showDetail: z.string().optional().default("false")
+    showKicker: visibilityFlagSchema.optional().default("true"),
+    showLocation: visibilityFlagSchema.optional().default("false"),
+    showDetail: visibilityFlagSchema.optional().default("false")
   }).passthrough()
 };
 
@@ -282,13 +304,22 @@ export const graphicInputSchema = z.object({
 }).superRefine((value, ctx) => {
   const parsed = fieldSchemas[value.templateType].safeParse(value.draftFields);
   if (!parsed.success) parsed.error.issues.forEach(issue => ctx.addIssue({ ...issue, path: ["draftFields", ...issue.path] }));
+}).overwrite((value) => {
+  // Zod's field validation trims text and resolves legacy aliases. Keep only
+  // fields supplied by the caller, so optional defaults are not added to drafts.
+  const parsed = fieldSchemas[value.templateType].safeParse(value.draftFields);
+  if (!parsed.success) return value; // superRefine reports the same field errors.
+  const parsedFields = parsed.data as Record<string, string>;
+  const draftFields = Object.fromEntries(Object.entries(value.draftFields).map(([key, original]) => [key, parsedFields[key] ?? original]));
+  return { ...value, draftFields };
 });
 
 export const graphicPatchSchema = z.object({
   templateType: z.enum(templateTypes).optional(),
   sortOrder: z.number().int().nonnegative().optional(),
   draftFields: z.record(z.string(), z.string()).optional()
-});
+}).refine(data => Object.keys(data).length > 0, "Minimal satu field grafis yang dikenal harus diisi")
+  .meta({ minProperties: 1 });
 
 export function validateGraphicPatch(
   current: GraphicItem,
@@ -302,7 +333,7 @@ export function validateGraphicPatch(
     : currentFields;
   const result = schema.safeParse(mergedFields);
   if (result.success) {
-    return { success: true, data: normalizeHeadlineTopicFields(targetTemplateType, result.data as Record<string, string>) };
+    return { success: true, data: normalizeHeadlineTopicFields(targetTemplateType, result.data as Record<string, string>, patch.draftFields) };
   }
   return { success: false, error: result.error };
 }
@@ -316,13 +347,82 @@ export const rundownItemInputSchema = z.object({
   sortOrder: z.number().int().nonnegative().default(0)
 });
 
-export const rundownInputSchema = z.object({
+export const broadcastScheduleSchema = z.object({
+  date: z.iso.date(), time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Jam tayang harus HH:mm"),
+  timezone: z.enum(["WIB", "WITA", "WIT"])
+});
+export type BroadcastSchedule = z.infer<typeof broadcastScheduleSchema>;
+export const tickerSourceSchema = z.object({
+  headline: z.string().trim().min(1).max(120), sourceName: z.string().trim().min(1).max(120),
+  url: z.url().regex(/^https?:\/\//), publishedAt: z.iso.datetime({ offset: true }),
+  eventDate: z.iso.date().nullable().default(null), accessedAt: z.iso.datetime({ offset: true })
+});
+// An editorial heuristic for the fixed 1920px ticker, not a reading-speed standard.
+// Use the most demanding headline so a long list cannot dilute its complexity.
+export const tickerSpeedPolicy = { version: 1, base: 85, min: 70, max: 85,
+  numericPenalty: 15, longWordPenalty: 10, punctuationPenalty: 5, longWordLetters: 10 } as const;
+export function calculateTickerSpeed(text: string) {
+  const headlines = text.split(/[•■\n]+/u).map(headline => headline.trim()).filter(Boolean);
+  const candidates = headlines.map(headline => {
+    const words = headline.split(/\s+/u);
+    const numericRatio = words.filter(word => /\d/u.test(word)).length / words.length;
+    const longWordRatio = words.filter(word => word.replace(/[^\p{L}]/gu, "").length > tickerSpeedPolicy.longWordLetters).length / words.length;
+    // Decimal/grouping punctuation inside numbers is already covered by numericRatio.
+    const punctuation = headline.replace(/(\d)[,.](?=\d)/gu, "$1").match(/[,:;()/]/gu)?.length ?? 0;
+    const punctuationRatio = Math.min(1, punctuation / words.length);
+    const rawSpeed = tickerSpeedPolicy.base - tickerSpeedPolicy.numericPenalty * numericRatio
+      - tickerSpeedPolicy.longWordPenalty * longWordRatio - tickerSpeedPolicy.punctuationPenalty * punctuationRatio;
+    return Math.max(tickerSpeedPolicy.min, Math.min(tickerSpeedPolicy.max, rawSpeed));
+  });
+  return Math.round(candidates.length ? Math.min(...candidates) : tickerSpeedPolicy.base);
+}
+export const rundownTickerSchema = z.object({
+  text: z.string().trim().max(10000).default(""), forDate: z.iso.date().nullable().default(null),
+  sources: z.array(tickerSourceSchema).max(100).default([]),
+  speedMode: z.enum(["auto", "manual"]).optional(), speed: z.number().min(30).max(250).optional()
+}).superRefine((ticker, ctx) => {
+  if (ticker.speedMode === "manual" && ticker.speed === undefined) ctx.addIssue({ code: "custom", path: ["speed"], message: "Isi kecepatan ticker saat memilih mode manual (30–250 px/detik)." });
+}).overwrite(ticker => ({ ...ticker, speedMode: ticker.speedMode ?? "auto",
+  speed: ticker.speedMode === "manual" ? ticker.speed : calculateTickerSpeed(ticker.text) }));
+export type RundownTicker = z.infer<typeof rundownTickerSchema>;
+export function getRundownTickerSpeed(ticker: RundownTicker) {
+  return ticker.speedMode === "manual" ? ticker.speed ?? tickerSpeedPolicy.base : calculateTickerSpeed(ticker.text);
+}
+export const emptyRundownTicker: RundownTicker = { text: "", forDate: null, sources: [] };
+export function getTickerResearchWindow(date: string) {
+  const day = Date.parse(`${date}T12:00:00Z`);
+  return { from: new Date(day - 2 * 86400000).toISOString().slice(0, 10), to: new Date(day - 86400000).toISOString().slice(0, 10) };
+}
+export const rundownBroadcastSchema = z.object({
+  broadcastSchedule: broadcastScheduleSchema.nullable(), ticker: rundownTickerSchema
+}).superRefine(({ broadcastSchedule, ticker }, ctx) => {
+  if (!ticker.text && !ticker.sources.length) return;
+  if (!broadcastSchedule || ticker.forDate !== broadcastSchedule.date) {
+    ctx.addIssue({ code: "custom", path: ["ticker", "forDate"], message: "Ticker harus terikat tanggal jadwal tayang rundown ini." });
+    return;
+  }
+  const window = getTickerResearchWindow(broadcastSchedule.date);
+  const offset = { WIB: 7, WITA: 8, WIT: 9 }[broadcastSchedule.timezone];
+  ticker.sources.forEach((source, index) => {
+    const publicationDate = new Date(Date.parse(source.publishedAt) + offset * 3600000).toISOString().slice(0, 10);
+    if (publicationDate < window.from || publicationDate > window.to) ctx.addIssue({ code: "custom", path: ["ticker", "sources", index, "publishedAt"], message: `Sumber ticker harus terbit ${window.from} sampai ${window.to} (${broadcastSchedule.timezone}, H−2/H−1).` });
+  });
+});
+export const liveTickerInputSchema = z.strictObject({ rundownId: z.string().trim().min(1).max(200), immediate: z.boolean().default(false) });
+
+const rundownBaseInputSchema = z.object({
   programName: z.string().trim().min(1).max(80),
   title: z.string().trim().min(1).max(100),
+  broadcastSchedule: broadcastScheduleSchema.nullable().default(null),
+  ticker: rundownTickerSchema.default(emptyRundownTicker),
   items: z.array(rundownItemInputSchema.extend({
     id: z.string().optional(),
     graphics: z.array(graphicInputSchema.extend({ id: z.string().optional() })).default([])
   })).default([])
+});
+export const rundownInputSchema = rundownBaseInputSchema.superRefine((value, ctx) => {
+  const result = rundownBroadcastSchema.safeParse(value);
+  if (!result.success) result.error.issues.forEach(issue => ctx.addIssue({ ...issue }));
 });
 
 export const storyInputSchema = rundownItemInputSchema.extend({
@@ -331,7 +431,8 @@ export const storyInputSchema = rundownItemInputSchema.extend({
 
 export const rundownPatchSchema = z.object({
   programName: z.string().trim().min(1).max(80).optional(),
-  title: z.string().trim().min(1).max(100).optional()
+  title: z.string().trim().min(1).max(100).optional(),
+  broadcastSchedule: broadcastScheduleSchema.nullable().optional(), ticker: rundownTickerSchema.optional()
 }).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi").meta({ minProperties: 1 });
 
 export const rundownItemPatchSchema = z.object({
@@ -362,7 +463,7 @@ export type RundownItem = {
   id: string; rundownId: string; slug: string; title: string; format: string;
   cgRequired: boolean; estimatedDurationSeconds: number; sortOrder: number; graphics: GraphicItem[];
 };
-export type Rundown = { id: string; programName: string; title: string; updatedAt: string; items: RundownItem[] };
+export type Rundown = { id: string; programName: string; title: string; updatedAt: string; items: RundownItem[]; broadcastSchedule?: BroadcastSchedule | null; ticker?: RundownTicker };
 export type OverlayState = { overlayNumber: number; inputGuid: string | null };
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type LiveState = {
@@ -449,7 +550,7 @@ export const storySaveInputSchema = storyInputSchema.extend({ itemId: apiIdSchem
 export const rundownReorderInputSchema = z.object({ itemIds: z.array(apiIdSchema).min(1).meta({ uniqueItems: true }) })
   .refine(({ itemIds }) => new Set(itemIds).size === itemIds.length, "ID berita tidak boleh berulang");
 export const rundownImportInputSchema = z.union([
-  rundownInputSchema.extend({ schemaVersion: z.literal(1).optional() }),
+  rundownInputSchema.safeExtend({ schemaVersion: z.literal(1).optional() }),
   z.object({ schemaVersion: z.literal(1).optional(), exportedAt: z.string().optional(), rundown: rundownInputSchema })
 ]);
 
@@ -463,7 +564,7 @@ export const graphicRecordSchema = z.object({
 export const rundownItemRecordSchema = rundownItemInputSchema.extend({
   id: apiIdSchema, rundownId: apiIdSchema, cgRequired: z.boolean(), graphics: z.array(graphicRecordSchema)
 });
-export const rundownRecordSchema = rundownInputSchema.omit({ items: true }).extend({
+export const rundownRecordSchema = rundownBaseInputSchema.omit({ items: true }).extend({
   id: apiIdSchema, updatedAt: z.string(), items: z.array(rundownItemRecordSchema)
 });
 export const rundownExportSchema = z.object({ schemaVersion: z.literal(1), exportedAt: z.string(), rundown: rundownRecordSchema });

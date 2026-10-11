@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
-import { graphicInputSchema, graphicPatchSchema, rundownInputSchema, storyInputSchema } from "@newscg/shared";
+import { graphicInputSchema, graphicPatchSchema, masterOverlayPatchSchema, normalizeHeadlineTopicFields, rundownInputSchema, storyInputSchema, validateGraphicPatch } from "@newscg/shared";
 
 const draftFields = { headline: "MATERI LAMA", location: "Jakarta", visualTemplate: "cnn" };
 const pushedFields = { ...draftFields, headline: "TEKS PROGRAM LAMA", showLocation: "true" };
@@ -92,7 +92,7 @@ describe("Graphic storage without material approval", () => {
     expect(dbModule.getOnAir()).toEqual({ graphicId: "CG-LEGACY-DRAFT", inputGuid: "web-overlay", overlayNumber: 1, snapshot: pushedFields, status: "confirmed", updatedAt: "2026-01-02T00:00:00.000Z" });
     expect(dbModule.db.prepare("SELECT value FROM settings WHERE key='master_overlay'").get()).toEqual({ value: storedMaster });
     expect(dbModule.db.pragma("foreign_key_check")).toEqual([]);
-    expect(dbModule.db.prepare("SELECT version FROM migrations ORDER BY version").all()).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(dbModule.db.prepare("SELECT version FROM migrations ORDER BY version").all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
   });
 
   it("accepts and strips legacy status from graphic, patch, story, and import payloads", () => {
@@ -123,6 +123,114 @@ describe("Graphic storage without material approval", () => {
     expect(dbModule.db.prepare("SELECT retained_metadata FROM graphic_items WHERE id='CG-LEGACY-DRAFT'").get()).toEqual({ retained_metadata: "draft-metadata" });
   });
 
+  it("normalizes stored bulletin side labels for all readers without modifying raw drafts or Program", () => {
+    const legacy = {
+      headline: "BERITA LAMA", headlinePresentation: "bulletin", headlineLabel: "HEADLINE",
+      kicker: "TOPIK TERSEMBUNYI", showKicker: "false", layoutStyle: "single"
+    };
+    dbModule.db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?,?,?,?,?,?)")
+      .run("CG-OLD-BULLETIN", "ITEM-LEGACY", "HEADLINE", 2, JSON.stringify(legacy), JSON.stringify(legacy));
+    const oldProgram = dbModule.getOnAir();
+    const converted = dbModule.getGraphic("CG-OLD-BULLETIN")!;
+    expect(converted.draftFields).toMatchObject({ kicker: "HIGHLIGHT", showKicker: "true", headlinePresentation: "bulletin" });
+    expect(converted.draftFields).not.toHaveProperty("headlineLabel");
+    expect(converted.lastPushedFields).toEqual(legacy);
+    expect(dbModule.getRundown("RD-LEGACY")?.items[0]?.graphics.find(g => g.id === converted.id)?.draftFields).toEqual(converted.draftFields);
+    expect(dbModule.db.prepare("SELECT draft_fields FROM graphic_items WHERE id='CG-OLD-BULLETIN'").get()).toEqual({ draft_fields: JSON.stringify(legacy) });
+    expect(dbModule.getOnAir()).toEqual(oldProgram);
+    expect(legacy).toHaveProperty("headlineLabel", "HEADLINE");
+  });
+
+  it("preserves an explicitly visible legacy topic and leaves regular headlines unchanged", () => {
+    const bulletin = { headline: "BERITA", headlinePresentation: "bulletin", headlineLabel: "HEADLINE", kicker: "TOPIK LAMA", showKicker: "true" };
+    const converted = normalizeHeadlineTopicFields("HEADLINE", bulletin);
+    expect(converted).toMatchObject({ kicker: "TOPIK LAMA", showKicker: "true" });
+    expect(converted).not.toHaveProperty("headlineLabel");
+    expect(bulletin.headlineLabel).toBe("HEADLINE");
+    const story = { ...bulletin, headlinePresentation: "story" };
+    expect(normalizeHeadlineTopicFields("HEADLINE", story)).toEqual(story);
+  });
+
+  it("keeps legacy PATCH headlineLabel editable with explicit kicker precedence and isolated Program", () => {
+    const previousProgram = dbModule.getOnAir();
+    const old = dbModule.getGraphic("CG-OLD-BULLETIN")!;
+    const parsed = graphicPatchSchema.parse({ draftFields: { headlineLabel: "BERITA UTAMA" } });
+    const validated = validateGraphicPatch(old, parsed);
+    expect(validated.success).toBe(true);
+    if (!validated.success) throw new Error("Validasi legacy gagal");
+    expect(validated.data).toMatchObject({ kicker: "BERITA UTAMA", showKicker: "true" });
+    expect(validated.data).not.toHaveProperty("headlineLabel");
+    const saved = dbModule.updateGraphic(old.id, { draftFields: validated.data })!;
+    expect(saved.draftFields.kicker).toBe("BERITA UTAMA");
+    expect(dbModule.updateGraphic(old.id, { draftFields: { headlineLabel: "RUBRIK" } })?.draftFields.kicker).toBe("RUBRIK");
+    const explicitTopic = { headlineLabel: "TIDAK DIGUNAKAN", kicker: "TOPIK BARU", showKicker: "false" };
+    const explicitValidated = validateGraphicPatch(dbModule.getGraphic(old.id)!, { draftFields: explicitTopic });
+    expect(explicitValidated.success).toBe(true);
+    if (!explicitValidated.success) throw new Error("Validasi topik gagal");
+    expect(explicitValidated.data).toMatchObject({ kicker: "TOPIK BARU", showKicker: "false" });
+    expect(dbModule.updateGraphic(old.id, { draftFields: explicitTopic })?.draftFields).toMatchObject({ kicker: "TOPIK BARU", showKicker: "false" });
+    expect(dbModule.getGraphic(old.id)?.draftFields).not.toHaveProperty("headlineLabel");
+    expect(dbModule.getOnAir()).toEqual(previousProgram);
+    expect(validateGraphicPatch(dbModule.getGraphic(old.id)!, { draftFields: { headlineLabel: "" } }).success).toBe(false);
+  });
+
+  it("normalizes imported and newly created legacy bulletin drafts on persistence", () => {
+    const legacy = { headline: "JUDUL LAMA", headlinePresentation: "bulletin", headlineLabel: "HEADLINE", showKicker: "false" };
+    const created = dbModule.createGraphic("ITEM-LEGACY", graphicInputSchema.parse({ templateType: "HEADLINE", draftFields: legacy }));
+    expect(created.draftFields).toMatchObject({ kicker: "HIGHLIGHT", showKicker: "true" });
+    expect(dbModule.db.prepare("SELECT draft_fields FROM graphic_items WHERE id=?").get(created.id)).toEqual({ draft_fields: JSON.stringify(created.draftFields) });
+
+    const imported = dbModule.createRundown(rundownInputSchema.parse({ programName: "RUNDOWN IMPOR", title: "Materi lawas", items: [{
+      slug: "LAMA", title: "Judul", format: "VO", graphics: [{ templateType: "HEADLINE", draftFields: legacy }]
+    }] }));
+    const graphic = imported.items[0]!.graphics[0]!;
+    expect(graphic.draftFields).toMatchObject({ kicker: "HIGHLIGHT", showKicker: "true" });
+    expect(graphic.draftFields).not.toHaveProperty("headlineLabel");
+    expect(dbModule.db.prepare("SELECT draft_fields FROM graphic_items WHERE id=?").get(graphic.id)).toEqual({ draft_fields: JSON.stringify(graphic.draftFields) });
+  });
+
+  it("persists the validated and trimmed graphic values through create and rundown import", () => {
+    const supplied = { headline: ` ${"A".repeat(120)} `, kicker: "  TOPIK  ", visualTemplate: "classic" };
+    const parsed = graphicInputSchema.parse({ templateType: "HEADLINE", draftFields: supplied });
+    expect(parsed.draftFields).toEqual({ headline: "A".repeat(120), kicker: "TOPIK", visualTemplate: "cnn" });
+    const created = dbModule.createGraphic("ITEM-LEGACY", parsed);
+    expect(created.draftFields).toEqual(parsed.draftFields);
+
+    const importedInput = rundownInputSchema.parse({ programName: "UJI NORMALISASI", title: "Edisi", items: [
+      { slug: "SCHEMA-01", title: "Berita", graphics: [{ templateType: "HEADLINE", draftFields: supplied }] }
+    ] });
+    const imported = dbModule.createRundown(importedInput);
+    expect(imported.items[0]!.graphics[0]!.draftFields).toEqual(parsed.draftFields);
+    expect(supplied).toEqual({ headline: ` ${"A".repeat(120)} `, kicker: "  TOPIK  ", visualTemplate: "classic" });
+  });
+
+  it("rejects empty and unknown-only graphic or master patches", () => {
+    for (const schema of [graphicPatchSchema, masterOverlayPatchSchema]) {
+      expect(schema.safeParse({}).success).toBe(false);
+      expect(schema.safeParse({ obsoleteField: "ignored" }).success).toBe(false);
+    }
+    expect(graphicPatchSchema.safeParse({ draftFields: { headline: "BARU" } }).success).toBe(true);
+    expect(masterOverlayPatchSchema.safeParse({ showLogo: false }).success).toBe(true);
+  });
+
+  it("rejects invalid visibility strings rather than interpreting them as visible on air", () => {
+    const invalidCases = [
+      { templateType: "HEADLINE", draftFields: { headline: "BERITA", showKicker: "0" } },
+      { templateType: "HEADLINE", draftFields: { headline: "BERITA", showLocation: "yes" } },
+      { templateType: "HEADLINE", draftFields: { headline: "BERITA", showDetail: "" } },
+      { templateType: "REPORTER", draftFields: { name: "REPORTER", showKicker: "TRUE" } },
+      { templateType: "SOT", draftFields: { headline: "BERITA", name: "NARASUMBER", showLocation: "no" } },
+      { templateType: "SOT", draftFields: { headline: "BERITA", name: "NARASUMBER", showSot: "0" } },
+      { templateType: "BREAKING", draftFields: { headline: "BERITA", showDetail: "invalid" } }
+    ];
+    for (const input of invalidCases) {
+      expect(graphicInputSchema.safeParse(input).success).toBe(false);
+    }
+    const original = dbModule.getGraphic("CG-OLD-BULLETIN")!;
+    expect(validateGraphicPatch(original, { draftFields: { showKicker: "0" } }).success).toBe(false);
+    expect(validateGraphicPatch(original, { draftFields: { showKicker: "false" } }).success).toBe(true);
+  });
+
   it("can TAKE formerly DRAFT material after migration without approval", async () => {
     const live = await import("../src/live.js");
     const result = await live.take("CG-LEGACY-DRAFT", "take-migrated-material");
@@ -135,13 +243,14 @@ describe("Graphic storage without material approval", () => {
   it("runs the migration again without changing material or Program", async () => {
     const material = dbModule.db.prepare("SELECT rowid,* FROM graphic_items ORDER BY rowid").all();
     const program = dbModule.getOnAir();
+    const masterBeforeRestart = dbModule.db.prepare("SELECT value FROM settings WHERE key='master_overlay'").get();
     dbModule.db.close();
     vi.resetModules();
     dbModule = await import("../src/db.js");
     expect(dbModule.db.prepare("SELECT rowid,* FROM graphic_items ORDER BY rowid").all()).toEqual(material);
     expect(dbModule.getOnAir()).toEqual(program);
-    expect(dbModule.db.prepare("SELECT version FROM migrations ORDER BY version").all()).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(dbModule.db.prepare("SELECT version FROM migrations ORDER BY version").all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
     expect(dbModule.db.pragma("foreign_key_check")).toEqual([]);
-    expect(dbModule.db.prepare("SELECT value FROM settings WHERE key='master_overlay'").get()).toEqual({ value: storedMaster });
+    expect(dbModule.db.prepare("SELECT value FROM settings WHERE key='master_overlay'").get()).toEqual(masterBeforeRestart);
   });
 });

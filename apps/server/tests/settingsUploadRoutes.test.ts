@@ -158,9 +158,9 @@ describe("general settings and persisted configuration", () => {
     try {
       const invalid = await jsonRequest("/api/live/master", "PATCH", { tickerText: 123 });
       expect(invalid.response.status).toBe(400);
-      const valid = await jsonRequest("/api/live/master", "PATCH", { tickerText: "BERITA TERVERIFIKASI", colorTheme: "studio-navy" });
+      const valid = await jsonRequest("/api/live/master", "PATCH", { colorTheme: "studio-navy" });
       expect(valid.response.status).toBe(200);
-      expect(events.at(-1)).toMatchObject({ type: "MASTER_UPDATE", master: { tickerText: "BERITA TERVERIFIKASI", colorTheme: "studio-navy" } });
+      expect(events.at(-1)).toMatchObject({ type: "MASTER_UPDATE", master: { colorTheme: "studio-navy" } });
     } finally { unsubscribe(); }
   });
 });

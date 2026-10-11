@@ -5,7 +5,7 @@ import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import {
-  broadcastLogoUploadSpec, graphicFieldLimits, graphicRecordSchema, headlineBulletinPreset,
+  apiErrorSchema, broadcastLogoUploadSpec, graphicFieldLimits, graphicRecordSchema, headlineBulletinPreset,
   liveCommandResultSchema, rundownRecordSchema, templateTypes
 } from "@newscg/shared";
 import type { OverlayEvent } from "@newscg/shared";
@@ -109,6 +109,8 @@ describe("agent discovery and shared API contract", () => {
     for (const [, name] of references) expect(spec.components.schemas[name!]).toBeDefined();
     expect(spec.paths["/api/live/stage"].post["x-newscg-effect"]).toBe("on-air");
     expect(spec.paths["/api/live/stream"].get.parameters[0].example).toBe("monitor");
+    expect(spec.paths["/api/live/take"].post.parameters.find((value: any) => value.name === "Idempotency-Key").schema)
+      .toMatchObject({ type: "string", minLength: 1, maxLength: 200 });
   });
 
   it("exposes template-specific required fields and limits while PATCH remains partial", async () => {
@@ -123,12 +125,174 @@ describe("agent discovery and shared API contract", () => {
       expect(schemas[`${type}Fields`].properties.visualTemplate.anyOf[0].const).toBe("cnn");
     }
     expect(schemas.GraphicPatch.required).toBeUndefined();
+    expect(schemas.GraphicPatch.minProperties).toBe(1);
+    expect(schemas.MasterPatch.minProperties).toBe(1);
+    expect(schemas.GraphicPatch.anyOf).toContainEqual({ required: ["draftFields"], properties: { draftFields: { minProperties: 1 } } });
     expect(schemas.HEADLINEFields.properties.headlinePresentation).toMatchObject({ enum: ["story", "bulletin"], default: "story" });
     expect(schemas.GraphicPatch.properties.draftFields.additionalProperties).toEqual({ type: "string" });
     expect(JSON.stringify(schemas.GraphicInput)).not.toContain('"status"');
     expect(schemas.RundownInput.properties.items.items.properties.graphics.items.oneOf).toHaveLength(templateTypes.length);
     expect(schemas.StorySave.properties.itemId).toBeDefined();
     expect(schemas.LiveClearAll.properties.immediate.default).toBe(true);
+  });
+
+  it("documents accepted legacy graphic metadata in direct and nested create/import requests", async () => {
+    const spec = (await request("/api/agent/openapi.json")).body;
+    const branches = [
+      spec.components.schemas.GraphicInput.oneOf,
+      spec.components.schemas.RundownInput.properties.items.items.properties.graphics.items.oneOf,
+      spec.components.schemas.StorySave.properties.graphics.items.oneOf,
+      spec.components.schemas.RundownImport.anyOf[1].properties.rundown.properties.items.items.properties.graphics.items.oneOf
+    ];
+    for (const branch of branches) {
+      expect(branch).toHaveLength(templateTypes.length);
+      const headline = branch.find((entry: any) => entry.properties.templateType.const === "HEADLINE");
+      expect(headline).toBeDefined();
+      // Older exported payloads can contain status; Zod strips it at runtime.
+      expect(headline.additionalProperties).not.toBe(false);
+    }
+  });
+});
+
+describe("rundown schedule and isolated ticker through real HTTP", () => {
+  const schedule = { date: "2026-10-11", time: "18:00", timezone: "WIB" };
+  const source = { headline: "HEADLINE HASIL RISET", sourceName: "SUMBER TEST", url: "https://example.com/news-test",
+    publishedAt: "2026-10-09T17:30:00Z", eventDate: "2026-10-09", accessedAt: "2026-10-10T10:00:00+07:00" };
+  const ticker = { text: source.headline, forDate: schedule.date, sources: [source] };
+  async function scheduledMaterial() {
+    const material = await createMaterial();
+    const saved = await request(`/api/rundowns/${material.rundown.id}`, "PATCH", { broadcastSchedule: schedule, ticker });
+    expect(saved.status).toBe(200);
+    return { ...material, rundown: saved.body };
+  }
+
+  it("stores calculated speed per rundown, keeps live speed isolated, and applies auto/manual speed with its ticker", async () => {
+    const { rundown, graphic } = await scheduledMaterial();
+    const before = dbModule.getMasterOverlay();
+    const edit = await request(`/api/rundowns/${rundown.id}`, "PATCH", {
+      ticker: { ...ticker, text: "HARGA BERAS NAIK 5 PERSEN", speedMode: "auto", speed: 200, sources: [] }
+    });
+    expect(edit.status).toBe(200);
+    expect(edit.body.ticker).toMatchObject({ speedMode: "auto", speed: 82 });
+    expect(dbModule.getMasterOverlay()).toEqual(before);
+    await request("/api/live/take", "POST", { graphicId: graphic.id });
+    expect(dbModule.getMasterOverlay()).toMatchObject({ tickerRundownId: rundown.id, tickerSpeed: 82 });
+    const manual = { ...edit.body.ticker, speedMode: "manual", speed: 95 };
+    expect((await request(`/api/rundowns/${rundown.id}`, "PATCH", { ticker: manual })).status).toBe(200);
+    expect(dbModule.getMasterOverlay().tickerSpeed).toBe(82);
+    const applied = await request("/api/live/ticker", "POST", { rundownId: rundown.id });
+    expect(applied.body.master.tickerSpeed).toBe(95);
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber(event => events.push(event), "monitor");
+    expect(events[0]).toMatchObject({ type: "SYNC", master: { tickerSpeed: 95, tickerRundownId: rundown.id } });
+    unsubscribe();
+    const exported = (await request(`/api/rundowns/${rundown.id}/export`)).body;
+    const imported = await request("/api/rundowns/import", "POST", exported);
+    expect(imported.body.ticker).toMatchObject({ speedMode: "manual", speed: 95 });
+    expect((await request(`/api/rundowns/${rundown.id}`, "PATCH", { ticker: { ...manual, speed: 251 } })).status).toBe(400);
+    expect((await request("/api/live/master", "PATCH", { tickerSpeed: 70 })).status).toBe(400);
+    const auto = { ...manual, text: "2026 2027 2028", speedMode: "auto" };
+    const saved = await request(`/api/rundowns/${rundown.id}`, "PATCH", { ticker: auto });
+    expect(saved.body.ticker).toMatchObject({ speedMode: "auto", speed: 70 });
+    expect(dbModule.getMasterOverlay().tickerSpeed).toBe(95);
+    expect((await request("/api/live/ticker", "POST", { rundownId: rundown.id, immediate: true })).body.master.tickerSpeed).toBe(70);
+  });
+
+  it("saves and exports per-rundown ticker sources without changing Program, and preserves them on import", async () => {
+    const beforeMaster = dbModule.getMasterOverlay();
+    const beforeProgram = liveModule.getLiveState();
+    const { rundown } = await scheduledMaterial();
+    expect((await request(`/api/rundowns/${rundown.id}`)).body).toMatchObject({ broadcastSchedule: schedule, ticker });
+    expect(dbModule.getMasterOverlay()).toEqual(beforeMaster);
+    expect(liveModule.getLiveState()).toEqual(beforeProgram);
+    const exported = (await request(`/api/rundowns/${rundown.id}/export`)).body;
+    const imported = await request("/api/rundowns/import", "POST", exported);
+    expect(imported.status).toBe(201);
+    expect(imported.body.id).not.toBe(rundown.id);
+    expect(imported.body).toMatchObject({ broadcastSchedule: schedule, ticker });
+    expect(dbModule.getMasterOverlay()).toEqual(beforeMaster);
+  });
+
+  it("rejects wrong dates, invalid schedules and sources outside H−2/H−1 without overwriting saved data", async () => {
+    const { rundown } = await scheduledMaterial();
+    for (const patch of [
+      { broadcastSchedule: { ...schedule, date: "2026-10-12" } },
+      { broadcastSchedule: { ...schedule, time: "25:00" } },
+      { broadcastSchedule: { ...schedule, date: "2026-02-30" } },
+      { broadcastSchedule: null },
+      { ticker: { ...ticker, forDate: "2026-10-10" } },
+      { ticker: { ...ticker, sources: [{ ...source, publishedAt: "2026-10-08T10:00:00+07:00" }] } },
+      { ticker: { ...ticker, sources: [{ ...source, publishedAt: "2026-10-10T17:00:00Z" }] } }
+    ]) {
+      expect((await request(`/api/rundowns/${rundown.id}`, "PATCH", patch)).status).toBe(400);
+      expect(dbModule.getRundown(rundown.id)).toEqual(rundown);
+    }
+    expect((await request("/api/rundowns", "POST", { programName: "TEST", title: "TEST", ticker })).status).toBe(400);
+    expect((await request("/api/rundowns/import", "POST", { programName: "TEST", title: "TEST", broadcastSchedule: schedule,
+      ticker: { ...ticker, sources: [{ ...source, publishedAt: "2026-10-11T12:00:00+07:00" }] } })).status).toBe(400);
+  });
+
+  it("uses the schedule timezone for publication dates across midnight and month boundaries", async () => {
+    const { rundown } = await scheduledMaterial();
+    const nextSchedule = { date: "2026-11-01", time: "00:30", timezone: "WIT" };
+    const nextTicker = { ...ticker, forDate: nextSchedule.date, sources: [{ ...source, publishedAt: "2026-10-29T15:30:00Z" }] };
+    expect((await request(`/api/rundowns/${rundown.id}`, "PATCH", { broadcastSchedule: nextSchedule, ticker: nextTicker })).status).toBe(200);
+  });
+
+  it("applies only the targeted rundown, keeps edits isolated, retries idempotently, and restores the snapshot on reconnect", async () => {
+    const { rundown } = await scheduledMaterial();
+    const key = randomUUID();
+    const before = (await request("/api/live/state")).body;
+    const applied = await request("/api/live/ticker", "POST", { rundownId: rundown.id }, { "Idempotency-Key": key });
+    expect(applied.status).toBe(200);
+    expect(applied.body.master).toMatchObject({ tickerRundownId: rundown.id, tickerText: ticker.text, tickerForDate: schedule.date });
+    expect((await request("/api/live/state")).body).toEqual(before);
+    await request(`/api/rundowns/${rundown.id}`, "PATCH", { ticker: { ...ticker, text: "TEKS REVISI", sources: [] } });
+    expect(dbModule.getMasterOverlay().tickerText).toBe(ticker.text);
+    expect((await request("/api/live/ticker", "POST", { rundownId: rundown.id }, { "Idempotency-Key": key })).body).toEqual(applied.body);
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber(event => events.push(event), "monitor");
+    expect(events[0]).toMatchObject({ type: "SYNC", master: { tickerText: ticker.text, tickerRundownId: rundown.id } });
+    unsubscribe();
+    const updated = await request("/api/live/ticker", "POST", { rundownId: rundown.id, immediate: true });
+    expect(updated.body.master.tickerText).toBe("TEKS REVISI");
+    expect(updated.body.master.tickerRevision).toBeGreaterThan(applied.body.master.tickerRevision);
+    expect((await request(`/api/rundowns/${rundown.id}`, "DELETE")).status).toBe(409);
+    await request("/api/live/clear-all", "POST", { immediate: true });
+    expect(dbModule.getMasterOverlay()).toMatchObject({ tickerText: "", tickerRundownId: null });
+    expect((await request(`/api/rundowns/${rundown.id}`, "DELETE")).status).toBe(204);
+  });
+
+  it("TAKE switches ticker ownership and never carries another rundown or a legacy global ticker into Program", async () => {
+    const first = await scheduledMaterial();
+    const second = await createMaterial();
+    await request("/api/live/take", "POST", { graphicId: first.graphic.id });
+    expect(dbModule.getMasterOverlay()).toMatchObject({ tickerRundownId: first.rundown.id, tickerText: ticker.text });
+    expect((await request("/api/live/ticker", "POST", { rundownId: second.rundown.id })).status).toBe(409);
+    await request("/api/live/take", "POST", { graphicId: second.graphic.id });
+    expect(dbModule.getMasterOverlay()).toMatchObject({ tickerRundownId: second.rundown.id, tickerText: "" });
+    const snapshot = dbModule.getMasterOverlay();
+    expect((await request("/api/live/master", "PATCH", { tickerText: "GLOBAL TERLARANG", showTicker: true })).status).toBe(400);
+    expect((await request("/api/live/master", "PATCH", { tickerRundownId: first.rundown.id })).status).toBe(400);
+    expect(dbModule.getMasterOverlay()).toEqual(snapshot);
+    expect((await request("/api/live/ticker", "POST", { rundownId: "MISSING" })).status).toBe(409);
+    await request("/api/live/clear", "POST");
+    expect((await request("/api/live/ticker", "POST", { rundownId: "MISSING" })).status).toBe(404);
+    expect((await request("/api/live/ticker", "POST", { rundownId: second.rundown.id }, { "Idempotency-Key": "x".repeat(201) })).status).toBe(400);
+  });
+
+  it("ignores legacy global ticker storage and rolls back ticker snapshot when TAKE fails to save", async () => {
+    dbModule.db.prepare("INSERT INTO settings(key,value) VALUES ('master_overlay',?)").run(JSON.stringify({ tickerText: "LEGACY GLOBAL" }));
+    expect(dbModule.getMasterOverlay().tickerText).toBe("");
+    const { graphic } = await scheduledMaterial();
+    const beforeMaster = dbModule.getMasterOverlay();
+    dbModule.db.exec("CREATE TRIGGER reject_ticker_program BEFORE INSERT ON on_air_state BEGIN SELECT RAISE(ABORT, 'Program test failed'); END");
+    try {
+      const result = await request("/api/live/take", "POST", { graphicId: graphic.id });
+      expect(result.body.commandStatus).toBe("failed");
+      expect(dbModule.getMasterOverlay()).toEqual(beforeMaster);
+      expect(dbModule.getGraphic(graphic.id)?.lastPushedFields).toBeNull();
+    } finally { dbModule.db.exec("DROP TRIGGER reject_ticker_program"); }
   });
 });
 
@@ -235,6 +399,16 @@ describe("agent material editing through real HTTP", () => {
     }
   });
 
+  it("rejects empty or unknown-only graphic PATCH instead of acknowledging a discarded edit", async () => {
+    const { graphic } = await createMaterial();
+    for (const body of [{}, { wrongField: "MATERI PENTING" }, { draftFields: {} }]) {
+      const result = await request(`/api/graphics/${graphic.id}`, "PATCH", body);
+      expect(result.status).toBe(400);
+      expect(apiErrorSchema.safeParse(result.body).success).toBe(true);
+      expect((await request(`/api/graphics/${graphic.id}`)).body).toEqual(graphic);
+    }
+  });
+
   it("blocks active template changes in PATCH and story PUT without changing any material or Program", async () => {
     const { rundown, item, graphic } = await createMaterial();
     await request("/api/live/take", "POST", { graphicId: graphic.id });
@@ -272,6 +446,33 @@ describe("agent material editing through real HTTP", () => {
     expect((await request(`/api/items/${item.id}`)).body.title).toBe("Judul revisi");
   });
 
+  it("returns 404 for missing story targets, 409 for foreign cue IDs, without changing any material", async () => {
+    const { rundown, item, graphic } = await createMaterial();
+    const story = { itemId: item.id, slug: item.slug, title: "REVISI", format: "PKG", graphics: [{ ...graphicInput, id: graphic.id }] };
+    const before = (await request(`/api/rundowns/${rundown.id}`)).body;
+    const missingRundown = await request("/api/rundowns/missing-rundown/story", "PUT", story);
+    expect(missingRundown.status).toBe(404);
+    expect(missingRundown.body.error).toBe("Rundown tidak ditemukan");
+    const missingStory = await request(`/api/rundowns/${rundown.id}/story`, "PUT", { ...story, itemId: "missing-story" });
+    expect(missingStory.status).toBe(404);
+    expect(missingStory.body.error).toBe("Berita tidak ditemukan");
+    const badCue = await request(`/api/rundowns/${rundown.id}/story`, "PUT", { ...story, graphics: [{ ...graphicInput, id: "foreign-cue" }] });
+    expect(badCue.status).toBe(409);
+    expect((await request(`/api/rundowns/${rundown.id}`)).body).toEqual(before);
+  });
+
+  it("generates new story and cue IDs when creating a rundown from an existing export", async () => {
+    const { rundown, item, graphic } = await createMaterial();
+    const created = await request("/api/rundowns", "POST", {
+      programName: "SALINAN", title: "Edisi salinan", items: [{ ...item, graphics: [graphic] }]
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.id).not.toBe(rundown.id);
+    expect(created.body.items[0].id).not.toBe(item.id);
+    expect(created.body.items[0].graphics[0].id).not.toBe(graphic.id);
+    expect((await request(`/api/rundowns/${rundown.id}`)).body).toEqual(rundown);
+  });
+
   it("imports old status fields without an approval workflow and regenerates all IDs", async () => {
     const { rundown, item, graphic } = await createMaterial();
     const exported = (await request(`/api/rundowns/${rundown.id}/export`)).body;
@@ -285,6 +486,54 @@ describe("agent material editing through real HTTP", () => {
     expect(cue).not.toHaveProperty("status");
     expect(cue.draftFields).toEqual(graphic.draftFields);
     expect((await request("/api/live/take", "POST", { graphicId: cue.id })).body.commandStatus).toBe("confirmed");
+  });
+
+  it("edits a copied rundown through all PATCH entity routes, exports exact readback and isolates Program", async () => {
+    const { rundown, graphic } = await createMaterial();
+    const beforeProgram = liveModule.getLiveState();
+    const original = (await request(`/api/rundowns/${rundown.id}/export`)).body;
+    const cloned = await request("/api/rundowns/import", "POST", original);
+    expect(cloned.status).toBe(201);
+    const itemId = cloned.body.items[0].id;
+    const cueId = cloned.body.items[0].graphics[0].id;
+    const rd = await request(`/api/rundowns/${cloned.body.id}`, "PATCH", { title: "EDISI HASIL IMPOR" });
+    const item = await request(`/api/items/${itemId}`, "PATCH", { title: "BERITA HASIL IMPOR", estimatedDurationSeconds: 175 });
+    const cue = await request(`/api/graphics/${cueId}`, "PATCH", { draftFields: { headline: "HEADLINE HASIL IMPOR", showKicker: "true", kicker: "TOPIK BARU" } });
+    expect([rd.status, item.status, cue.status]).toEqual([200, 200, 200]);
+    expect(cue.body.draftFields).toMatchObject({ headline: "HEADLINE HASIL IMPOR", kicker: "TOPIK BARU", location: "JAKARTA" });
+    const exported = await request(`/api/rundowns/${cloned.body.id}/export`);
+    expect(exported.status).toBe(200);
+    expect(exported.headers.get("content-disposition")).toContain(`${cloned.body.id}.json`);
+    expect(exported.body.schemaVersion).toBe(1);
+    expect(exported.body.rundown).toEqual((await request(`/api/rundowns/${cloned.body.id}`)).body);
+    expect(exported.body.rundown.items[0].title).toBe("BERITA HASIL IMPOR");
+    expect(exported.body.rundown.items[0].graphics[0]).toEqual(cue.body);
+    expect((await request(`/api/rundowns/${rundown.id}`)).body.items[0].graphics[0]).toEqual(graphic);
+    expect(liveModule.getLiveState()).toEqual(beforeProgram);
+    const rejected = await request(`/api/graphics/${cueId}`, "PATCH", { draftFields: { headline: "X".repeat(121) } });
+    expect(rejected.status).toBe(400);
+    expect((await request(`/api/graphics/${cueId}`)).body).toEqual(cue.body);
+  });
+
+  it("returns JSON API errors matching the advertised schema without leaking HTML", async () => {
+    for (const [path, method, body, expected] of [
+      ["/api/not-a-route", "GET", undefined, 404],
+      ["/api/rundowns/unknown/export", "GET", undefined, 404],
+      ["/api/rundowns", "POST", { programName: "", title: "INVALID" }, 400],
+      ["/api/rundowns/import", "POST", { schemaVersion: 2, rundown: {} }, 400],
+      ["/api/live/stream?role=invalid", "GET", undefined, 400],
+      ["/api/graphics/unknown", "PATCH", { draftFields: { headline: "TEST" } }, 404]
+    ] as const) {
+      const response = await request(path, method, body);
+      expect(response.status).toBe(expected);
+      expect(response.headers.get("content-type")).toContain("application/json");
+      expect(apiErrorSchema.safeParse(response.body).success).toBe(true);
+      expect(response.body.error).not.toContain("<html");
+    }
+    const malformed = await fetch(`${baseUrl}/api/rundowns`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{invalid" });
+    expect(malformed.status).toBe(400);
+    expect(malformed.headers.get("content-type")).toContain("application/json");
+    expect(apiErrorSchema.safeParse(await malformed.json()).success).toBe(true);
   });
 
   it.each([
@@ -339,6 +588,31 @@ describe("agent material editing through real HTTP", () => {
 });
 
 describe("agent live requests", () => {
+  it.each([" ", "x".repeat(201)])("rejects invalid live idempotency header %j before a command", async key => {
+    const { graphic } = await createMaterial();
+    const before = liveModule.getLiveState();
+    const result = await request("/api/live/take", "POST", { graphicId: graphic.id }, { "Idempotency-Key": key });
+    expect(result.status).toBe(400);
+    expect(result.body.error).toMatch(/Idempotency-Key/);
+    expect(liveModule.getLiveState()).toEqual(before);
+  });
+
+  it("rejects a malformed STAGE idempotency header without updating Program", async () => {
+    const before = dbModule.getMasterOverlay();
+    const result = await request("/api/live/stage", "POST", { mode: "logo" }, { "Idempotency-Key": " " });
+    expect(result.status).toBe(400);
+    expect(dbModule.getMasterOverlay()).toEqual(before);
+  });
+
+  it("returns 404 JSON for PREPARE with a missing cue instead of changing selection", async () => {
+    const before = liveModule.getLiveState();
+    const response = await request("/api/live/prepare", "POST", { graphicId: "missing-graphic-id" });
+    expect(response.status).toBe(404);
+    expect(apiErrorSchema.safeParse(response.body).success).toBe(true);
+    expect(response.body.error).toBe("Grafis tidak ditemukan");
+    expect(liveModule.getLiveState()).toEqual(before);
+  });
+
   it.each([
     ["prepare", undefined], ["prepare", { graphicId: 123 }], ["take", {}], ["take", { graphicId: "CG", presentation: "bad" }],
     ["update", { graphicId: "CG", syncComposition: "false" }], ["variant", { graphicId: "CG", action: "toggle-topic" }],
@@ -372,6 +646,97 @@ describe("agent live requests", () => {
     } finally { unsubscribe(); }
   });
 
+  it("returns 409 when a live key is reused for a different command or payload", async () => {
+    const { graphic } = await createMaterial();
+    const key = randomUUID();
+    const first = await request("/api/live/take", "POST", { graphicId: graphic.id }, { "Idempotency-Key": key });
+    expect(first.status).toBe(200);
+    expect(first.body.commandStatus).toBe("confirmed");
+    const changedCommand = await request("/api/live/clear", "POST", {}, { "Idempotency-Key": key });
+    expect(changedCommand.status).toBe(409);
+    expect(changedCommand.body.error).toContain("Idempotency-Key");
+    const changedPayload = await request("/api/live/take", "POST", { graphicId: graphic.id, presentation: "clean" }, { "Idempotency-Key": key });
+    expect(changedPayload.status).toBe(409);
+    expect(liveModule.getLiveState().onAirGraphicId).toBe(graphic.id);
+    const unchangedRetry = await request("/api/live/take", "POST", { graphicId: graphic.id }, { "Idempotency-Key": key });
+    expect(unchangedRetry.body).toEqual(first.body);
+  });
+
+  it("honors the same HTTP header idempotency contract on all six live commands", async () => {
+    const { graphic } = await createMaterial();
+    for (const [path, body] of [
+      ["take", { graphicId: graphic.id }],
+      ["update", { graphicId: graphic.id, syncComposition: true }],
+      ["variant", { graphicId: graphic.id, action: "toggle-kicker" }],
+      ["clear", {}],
+      ["clear-all", { immediate: false }],
+      ["stage", { mode: "logo" }]
+    ] as const) {
+      const headers = { "Idempotency-Key": randomUUID() };
+      const first = await request(`/api/live/${path}`, "POST", body, headers);
+      const retry = await request(`/api/live/${path}`, "POST", body, headers);
+      expect(first.status).toBe(200);
+      expect(retry.status).toBe(200);
+      expect(first.body.commandStatus).toBe("confirmed");
+      expect(retry.body).toEqual(first.body);
+    }
+  });
+
+  it("accepts body idempotency keys and consistently prioritizes an explicit header", async () => {
+    const { graphic } = await createMaterial();
+    for (const [path, body] of [
+      ["take", { graphicId: graphic.id }],
+      ["update", { graphicId: graphic.id }],
+      ["variant", { graphicId: graphic.id, action: "toggle-kicker" }],
+      ["clear", {}],
+      ["clear-all", { immediate: true }]
+    ] as const) {
+      const idempotencyKey = randomUUID();
+      const first = await request(`/api/live/${path}`, "POST", { ...body, idempotencyKey });
+      const second = await request(`/api/live/${path}`, "POST", { ...body, idempotencyKey });
+      expect(first.status).toBe(200);
+      expect(second.body).toEqual(first.body);
+    }
+    const headerKey = randomUUID();
+    const first = await request("/api/live/stage", "POST", { mode: "full" }, { "Idempotency-Key": headerKey });
+    const retried = await request("/api/live/stage", "POST", { mode: "full" }, { "Idempotency-Key": headerKey });
+    expect(retried.body).toEqual(first.body);
+    const firstTake = await request("/api/live/take", "POST", { graphicId: graphic.id, idempotencyKey: "body-one" }, { "Idempotency-Key": headerKey + "-take" });
+    const repeatedTake = await request("/api/live/take", "POST", { graphicId: graphic.id, idempotencyKey: "body-two" }, { "Idempotency-Key": headerKey + "-take" });
+    expect(repeatedTake.body).toEqual(firstTake.body);
+  });
+
+  it("applies an HTTP master PATCH after an already queued STAGE command", async () => {
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber(event => events.push(event), "monitor");
+    try {
+      // Queue STAGE before HTTP PATCH starts, while no previous command is awaited.
+      const first = liveModule.setStage("full", randomUUID());
+      const patch = request("/api/live/master", "PATCH", { showTicker: false });
+      expect((await first).commandStatus).toBe("confirmed");
+      const result = await patch;
+      expect(result.status).toBe(200);
+      expect(result.body).toMatchObject({ showLogo: true, showTicker: false, showLiveBadge: true });
+      expect((await request("/api/live/master")).body.showTicker).toBe(false);
+      expect(events.map(event => event.type).slice(-2)).toEqual(["SYNC", "MASTER_UPDATE"]);
+    } finally { unsubscribe(); }
+  });
+
+  it("rejects empty or unknown-only master PATCH without emitting a live update", async () => {
+    const master = (await request("/api/live/master")).body;
+    const events: OverlayEvent[] = [];
+    const unsubscribe = liveModule.addOverlaySubscriber(event => events.push(event), "monitor");
+    try {
+      for (const body of [{}, { showTiker: true }]) {
+        const result = await request("/api/live/master", "PATCH", body);
+        expect(result.status).toBe(400);
+        expect(apiErrorSchema.safeParse(result.body).success).toBe(true);
+      }
+      expect((await request("/api/live/master")).body).toEqual(master);
+      expect(events.map(event => event.type)).toEqual(["SYNC"]);
+    } finally { unsubscribe(); }
+  });
+
   it("observes SYNC with role monitor without counting the agent as an output", async () => {
     const response = await fetch(`${baseUrl}/api/live/stream?role=monitor`);
     expect(response.headers.get("content-type")).toBe("text/event-stream");
@@ -385,5 +750,36 @@ describe("agent live requests", () => {
       }
       expect(liveModule.getLiveState().overlayClientsCount).toBe(0);
     } finally { await reader.cancel(); }
+  });
+
+  it("keeps SSE output subscribed throughout the response and releases it after disconnect", async () => {
+    const response = await fetch(`${baseUrl}/api/live/stream?role=output`);
+    expect(response.status).toBe(200);
+    const reader = response.body!.getReader();
+    try {
+      let received = "";
+      while (!received.includes('"type":"SYNC"')) {
+        const chunk = await reader.read();
+        if (chunk.done) throw new Error("SSE berhenti sebelum SYNC");
+        received += new TextDecoder().decode(chunk.value);
+      }
+      await vi.waitFor(() => {
+        expect(liveModule.getLiveState().overlayClientsCount).toBe(1);
+        expect(liveModule.getLiveState().connection).toBe("CONNECTED");
+      }, { timeout: 300, interval: 10 });
+    } finally { await reader.cancel(); }
+    await vi.waitFor(() => {
+      expect(liveModule.getLiveState().overlayClientsCount).toBe(0);
+      expect(liveModule.getLiveState().connection).toBe("STANDALONE");
+    }, { timeout: 1000, interval: 10 });
+  });
+
+  it("rejects unknown or repeated SSE roles instead of registering phantom output connections", async () => {
+    for (const query of ["role=moniter", "role=monitor&role=output"]) {
+      const response = await request(`/api/live/stream?${query}`);
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("role");
+      expect(liveModule.getLiveState().overlayClientsCount).toBe(0);
+    }
   });
 });

@@ -6,7 +6,7 @@ import { advanceTicker, tickerCopies, tickerFrameDue } from "./tickerMotion";
 export function BroadcastTicker({ text, speed = tickerPresets.normal, revision = 0, fps = 60 }: {
   text: string; speed?: number; revision?: number; fps?: OutputFrameRate;
 }) {
-  const normalized = text.trim() || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI";
+  const normalized = text.trim();
   const [segments, setSegments] = useState<[string, string]>([normalized, normalized]);
   const [copies, setCopies] = useState([2, 2]);
   const viewport = useRef<HTMLDivElement>(null);
@@ -18,8 +18,9 @@ export function BroadcastTicker({ text, speed = tickerPresets.normal, revision =
   const revisionRef = useRef(revision);
 
   useLayoutEffect(() => {
+    const previousText = latest.current.text;
     latest.current = { text: normalized, speed };
-    if (revisionRef.current !== revision) {
+    if (revisionRef.current !== revision || !previousText || !normalized) {
       revisionRef.current = revision;
       position.current = 0;
       setSegments([normalized, normalized]);
@@ -94,7 +95,7 @@ export function BroadcastTicker({ text, speed = tickerPresets.normal, revision =
             {Array.from({ length: copies[index] || 2 }, (_, copy) => (
               <span key={copy} className="cg-ticker-copy">
                 <span className="cg-ticker-text">{segment}</span>
-                <span className="cg-ticker-bullet" aria-hidden="true">■</span>
+                <span className="cg-ticker-bullet" aria-hidden="true">{segment ? "■" : ""}</span>
               </span>
             ))}
           </div>

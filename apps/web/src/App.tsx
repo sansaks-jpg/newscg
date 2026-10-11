@@ -26,7 +26,7 @@ import type {
   Rundown,
   TimezoneMode
 } from "@newscg/shared";
-import { broadcastLogoUploadSpec, defaultHeadlineDefaults, defaultMasterOverlayState, getGraphicFieldLimit, headlineDefaultsSchema, masterOverlayPatchSchema, selectBroadcastColorTheme } from "@newscg/shared";
+import { broadcastLogoUploadSpec, defaultHeadlineDefaults, defaultMasterOverlayState, getGraphicFieldLimit, headlineDefaultsSchema, masterOverlayPatchSchema, masterControlPatch, selectBroadcastColorTheme } from "@newscg/shared";
 import { api, mutate } from "./api";
 import TemplatePreview from "./TemplatePreview";
 import OverlayWindow from "./OverlayWindow";
@@ -100,12 +100,18 @@ export default function App() {
   const [master, setMaster] = useState<MasterOverlayState>(defaultMasterOverlayState);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const liveReadSequence = useRef(0);
+  const masterWriteSequence = useRef(0);
 
   const [toast, setToast] = useState("");
+  const reloadSequence = useRef(0);
 
   const active = rundowns.find((r) => r.id === activeId) || rundowns[0];
 
   const reload = useCallback(async () => {
+    const requestSequence = ++reloadSequence.current;
+    const liveSequence = ++liveReadSequence.current;
+    const masterSequence = masterWriteSequence.current;
     const [r, s, l, m] = await Promise.all([
       api<Rundown[]>("/api/rundowns"),
       api<AppSettings>("/api/settings"),
@@ -113,27 +119,33 @@ export default function App() {
 
       api<MasterOverlayState>("/api/live/master")
     ]);
+    if (requestSequence !== reloadSequence.current) return;
     setRundowns(r);
     setSettings(s);
-    setLive(l);
+    if (liveSequence === liveReadSequence.current) setLive(l);
 
-    if (m) setMaster(m);
-    setActiveId((id) => id || r[0]?.id || "");
+    if (m && masterSequence === masterWriteSequence.current) setMaster(m);
+    setActiveId((id) => r.some((item) => item.id === id) ? id : r[0]?.id || "");
   }, []);
 
   useEffect(() => {
     reload().catch((e) => setToast(e.message));
     const id = setInterval(
-      () =>
+      () => {
+        const sequence = ++liveReadSequence.current;
         api<LiveState>("/api/live/state")
-          .then(setLive)
-          .catch(() => setLive((previous) => ({
-            ...previous,
-            connection: "STANDALONE",
-            overlayClientsCount: 0,
-            commandStatus: "unknown",
-            error: "Koneksi ke server NewsCG terputus"
-          }))),
+          .then((next) => { if (sequence === liveReadSequence.current) setLive(next); })
+          .catch(() => {
+            if (sequence !== liveReadSequence.current) return;
+            setLive((previous) => ({
+              ...previous,
+              connection: "STANDALONE",
+              overlayClientsCount: 0,
+              commandStatus: "unknown",
+              error: "Koneksi ke server NewsCG terputus"
+            }));
+          });
+      },
       2000
     );
     return () => clearInterval(id);
@@ -142,8 +154,10 @@ export default function App() {
   async function updateMaster(patch: Partial<MasterOverlayState>) {
     try {
       const parsed = masterOverlayPatchSchema.safeParse(patch);
-      if (!parsed.success) throw new Error("Pengaturan master tidak valid. Periksa isi ticker dan kecepatan (30–250 px/detik).");
+      if (!parsed.success) throw new Error("Pengaturan master tidak valid. Teks dan kecepatan ticker diatur melalui rundown.");
+      ++masterWriteSequence.current;
       const res = await mutate<MasterOverlayState>("/api/live/master", "PATCH", parsed.data);
+      ++masterWriteSequence.current;
       setMaster(res);
       setToast("Pengaturan master diterapkan ke output NewsCG");
     } catch (e: any) {
@@ -492,17 +506,7 @@ function BroadcastSetupModal({
                 </div>
               </label>
 
-              <label style={{ marginTop: 10 }}>
-                <span className="master-label">Isi Running Ticker Berita Default</span>
-                <textarea
-                  className="master-input full"
-                  value={draft.tickerText || ""}
-                  placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"
-                  onChange={(e) => patchDraft({ tickerText: e.target.value })}
-                  rows={4}
-                />
-                <small className="field-hint">Ticker berjalan sesuai target fps output yang dipilih di Settings.</small>
-              </label>
+              <p className="field-hint">Materi ticker mengikuti rundown dan jadwal tayang. Sunting di Rundown &amp; CG.</p>
 
               {/* Pratinjau Interaktif Ticker */}
               <div style={{ marginTop: 14 }}>
@@ -524,7 +528,7 @@ function BroadcastSetupModal({
                   <div className="cg-ticker-badge" style={{ height: "100%", fontSize: 18 }}>
                      <span>{draft.brandText || "CNNINDONESIA.COM"}</span>
                   </div>
-                   <BroadcastTicker text={draft.tickerText || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"} fps={30} />
+                   <BroadcastTicker text={draft.tickerText} fps={30} />
                   <div className="cg-ticker-clock" style={{ height: "100%", fontSize: 20 }}>
                      <BroadcastClock timezone={draft.timezone} customLabel={draft.customTimezoneLabel} />
                   </div>
@@ -676,6 +680,11 @@ function SettingsView({
   const [masterForm, setMasterForm] = useState<MasterOverlayState>(master);
   const [headlineDefaults, setHeadlineDefaults] = useState<HeadlineDefaults>(defaultHeadlineDefaults);
   const [savingHeadline, setSavingHeadline] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
+  const [savingMaster, setSavingMaster] = useState(false);
+  const allSaveInFlight = useRef(false);
+  const masterSaveInFlight = useRef(false);
+  const headlineSaveInFlight = useRef(false);
   const [loadingHeadline, setLoadingHeadline] = useState(true);
   const [headlineLoaded, setHeadlineLoaded] = useState(false);
   const [headlineLoadError, setHeadlineLoadError] = useState("");
@@ -683,9 +692,19 @@ function SettingsView({
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const editedHeadlineFields = useRef(new Set<keyof HeadlineDefaults>());
   const masterLogoInputRef = useRef<HTMLInputElement>(null);
+  const previousMaster = useRef(master);
 
   useEffect(() => setForm(value), [value]);
-  useEffect(() => setMasterForm(master), [master]);
+  useEffect(() => {
+    const source = previousMaster.current;
+    previousMaster.current = master;
+    setMasterForm((current) => ({
+      ...master,
+      ...Object.fromEntries((Object.keys(master) as Array<keyof MasterOverlayState>)
+        .filter((field) => current[field] !== source[field])
+        .map((field) => [field, current[field]]))
+    }));
+  }, [master]);
   useEffect(() => {
     let active = true;
     setLoadingHeadline(true);
@@ -716,38 +735,50 @@ function SettingsView({
   };
 
   async function save() {
-    if (!headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo) {
+    if (allSaveInFlight.current || masterSaveInFlight.current) return;
+    if (!headlineLoaded || loadingHeadline || headlineSaveInFlight.current || uploadingLogo) {
       toast(headlineLoadError || "Tunggu sampai pengaturan dan logo selesai dimuat sebelum menyimpan semua.");
       return;
     }
+    allSaveInFlight.current = true;
+    setSavingAll(true);
     try {
       await mutate("/api/settings", "PATCH", form);
-      await onUpdateMaster(masterForm);
+      await onUpdateMaster(masterControlPatch(masterForm));
       await saveHeadlineDefaultsData(false);
       await onSaved();
       toast("Semua pengaturan berhasil disimpan");
     } catch (error) {
       toast(`Sebagian pengaturan belum tersimpan: ${(error as Error).message}`);
+    } finally {
+      allSaveInFlight.current = false;
+      setSavingAll(false);
     }
   }
 
   async function saveMaster() {
-    if (uploadingLogo) return;
+    if (uploadingLogo || allSaveInFlight.current || masterSaveInFlight.current) return;
+    masterSaveInFlight.current = true;
+    setSavingMaster(true);
     try {
-      await onUpdateMaster(masterForm);
+      await onUpdateMaster(masterControlPatch(masterForm));
       toast("Pengaturan default elemen master berhasil disimpan");
     } catch (error) {
       toast((error as Error).message || "Gagal menerapkan master");
+    } finally {
+      masterSaveInFlight.current = false;
+      setSavingMaster(false);
     }
   }
 
   async function saveHeadlineDefaultsData(notify = true) {
-    if (!headlineLoaded || loadingHeadline || savingHeadline) {
+    if ((notify && allSaveInFlight.current) || !headlineLoaded || loadingHeadline || headlineSaveInFlight.current) {
       const message = headlineLoadError || "Default headline masih dimuat. Tunggu sebelum menyimpan.";
       if (notify) toast(message);
       else throw new Error(message);
       return;
     }
+    headlineSaveInFlight.current = true;
     setSavingHeadline(true);
     const submitted = headlineDefaults;
     try {
@@ -766,6 +797,7 @@ function SettingsView({
       if (notify) toast(e.message || "Gagal menyimpan default headline");
       else throw e;
     } finally {
+      headlineSaveInFlight.current = false;
       setSavingHeadline(false);
     }
   }
@@ -818,9 +850,9 @@ function SettingsView({
         eyebrow="GRAPHICS & CONNECTION CONFIG"
         title="Settings"
         action={
-          <button className="primary-small" onClick={save} disabled={!headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo}>
+          <button className="primary-small" onClick={save} disabled={savingAll || savingMaster || !headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo}>
             <Save size={16} />
-            Simpan Semua
+            {savingAll ? "Menyimpan…" : "Simpan Semua"}
           </button>
         }
       />
@@ -829,10 +861,10 @@ function SettingsView({
         <div className="settings-card broadcast-defaults-card">
           <h3>
             <SlidersHorizontal size={17} />
-            Pengaturan Default Siaran & Ticker
+            Pengaturan Siaran · Logo & Jam
           </h3>
           <p>
-            Atur warna, logo, dan ticker di Preview. Klik Simpan Default Master untuk menyimpan dan menerapkan perubahan ke siaran.
+            Atur warna, logo, dan jam di Preview. Klik Simpan Default Master untuk menyimpan dan menerapkan perubahan ke siaran.
           </p>
 
           <BroadcastColorThemePicker value={masterForm.colorTheme} onChange={(colorTheme) => {
@@ -1026,85 +1058,9 @@ function SettingsView({
             </label>
           </div>
 
-          {/* Subgrup 3: Isi Ticker Berita Default */}
-          <div className="form-grid" style={{ marginBottom: 12 }}>
-            <label className="wide">
-              <span>Isi Running Ticker Berita Default (Animasi Berjalan Kontinu)</span>
-              <textarea
-                value={masterForm.tickerText || ""}
-                placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI"
-                onChange={(e) => setMasterForm({ ...masterForm, tickerText: e.target.value })}
-                rows={4}
-                style={{ width: "100%", resize: "vertical", font: "inherit" }}
-              />
-              <small style={{ color: "#94a3b8", fontSize: 10, marginTop: 4, display: "block" }}>
-                Isi baru masuk pada batas segmen. Kecepatan dihitung pada kanvas 1920 × 1080.
-              </small>
-            </label>
-          </div>
+          <p>Materi ticker disimpan per rundown. Atur jadwal dan teksnya di Rundown &amp; CG.</p>
 
-          {/* Subgrup 4: Kecepatan Running Ticker */}
-          <div className="form-grid" style={{ marginBottom: 14 }}>
-            <label className="wide">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span>Kecepatan Running Ticker: <b style={{ color: "#38bdf8" }}>{masterForm.tickerSpeed || 85} px/detik</b></span>
-                <div className="tab-pill-group" style={{ display: "flex", gap: 4 }}>
-                  <button
-                    type="button"
-                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 65 ? "active" : ""}`}
-                    onClick={() => {
-                      const u = { ...masterForm, tickerSpeed: 65 };
-                      setMasterForm(u);
-
-                    }}
-                  >
-                    Lambat (65)
-                  </button>
-                  <button
-                    type="button"
-                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 85 ? "active" : ""}`}
-                    onClick={() => {
-                      const u = { ...masterForm, tickerSpeed: 85 };
-                      setMasterForm(u);
-
-                    }}
-                  >
-                    Standar (85)
-                  </button>
-                  <button
-                    type="button"
-                    className={`mini-pill-btn ${(masterForm.tickerSpeed || 85) === 105 ? "active" : ""}`}
-                    onClick={() => {
-                      const u = { ...masterForm, tickerSpeed: 105 };
-                      setMasterForm(u);
-
-                    }}
-                  >
-                    Cepat (105)
-                  </button>
-                </div>
-              </div>
-              <input
-                type="range"
-                min={40}
-                max={200}
-                step={5}
-                value={masterForm.tickerSpeed || 85}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  const u = { ...masterForm, tickerSpeed: val };
-                  setMasterForm(u);
-
-                }}
-                style={{ width: "100%", cursor: "pointer", accentColor: "#e11d48" }}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: 10, marginTop: 2 }}>
-                <span>40 px/s (Sangat Santai)</span>
-                <span>85 px/s (Normal)</span>
-                <span>200 px/s (Sangat Cepat)</span>
-              </div>
-            </label>
-          </div>
+          <p>Kecepatan ticker dihitung otomatis dari isinya dan disimpan per rundown. Pilih mode manual di Rundown &amp; CG jika diperlukan.</p>
 
           {/* Subgrup 5: Zona Waktu Siaran */}
           <div className="form-grid" style={{ marginBottom: 14 }}>
@@ -1142,7 +1098,7 @@ function SettingsView({
               marginTop: 10
             }}
           >
-            <button className="primary-small" onClick={saveMaster} disabled={uploadingLogo}>
+            <button className="primary-small" onClick={saveMaster} disabled={uploadingLogo || savingMaster || savingAll}>
               <Save size={13} /> Simpan Default Master
             </button>
             <span style={{ fontSize: 10, color: "#64748b" }}>
@@ -1231,7 +1187,7 @@ function SettingsView({
             <button
               className="primary-small"
               onClick={() => void saveHeadlineDefaultsData()}
-              disabled={savingHeadline || loadingHeadline || !headlineLoaded}
+              disabled={savingHeadline || savingAll || loadingHeadline || !headlineLoaded}
             >
               <Save size={13} /> {savingHeadline ? "Menyimpan..." : "Simpan Default Headline"}
             </button>

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
-import { getGraphic, getItem, getMasterOverlay, getOnAir, logAction, markGraphicPushed, saveMasterOverlay, saveOnAir } from "./db.js";
+import type { GraphicItem, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
+import { normalizeHeadlineTopicFields } from "@newscg/shared";
+import { getGraphic, getItem, getMasterOverlay, getOnAir, logAction, markGraphicPushed, rundownTickerSnapshot, saveProgramWithTicker, saveMasterAndClearOnAir, saveMasterOverlay, saveOnAir } from "./db.js";
 
 let selectedGraphicId: string | null = null;
 let live: LiveState = {
@@ -14,7 +15,7 @@ let live: LiveState = {
   error: null,
   overlayClientsCount: 0
 };
-const idempotency = new Map<string, Promise<any>>();
+const idempotency = new Map<string, { signature: string; result: Promise<any> }>();
 let queue: Promise<unknown> = Promise.resolve();
 
 type OverlaySubscriberRole = "output" | "monitor";
@@ -25,6 +26,10 @@ type OverlaySubscriber = {
 };
 const subscribers = new Map<string, OverlaySubscriber>();
 let currentRevision = 1;
+
+function effectiveOnAirFields(graphic: GraphicItem | null, fields: Record<string, string> | null | undefined) {
+  return fields ? normalizeHeadlineTopicFields(graphic?.templateType, fields) : null;
+}
 
 export function addOverlaySubscriber(
   handler: (event: OverlayEvent) => void,
@@ -39,7 +44,7 @@ export function addOverlaySubscriber(
     type: "SYNC",
     onAir: Boolean(current?.graphicId),
     graphic,
-    fields: (current?.snapshot as Record<string, string> | null) || null,
+    fields: effectiveOnAirFields(graphic, current?.snapshot as Record<string, string> | null),
     master,
     revision: currentRevision
   });
@@ -68,14 +73,26 @@ export function getOutputClientsCount(): number {
   return count;
 }
 
-function enqueue<T>(key: string, action: () => Promise<T>): Promise<T> {
+function enqueue<T>(key: string, signature: string, action: () => Promise<T>): Promise<T> {
   const existing = idempotency.get(key);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.signature !== signature) {
+      const error = Object.assign(new Error("Idempotency-Key sudah digunakan untuk perintah atau data siaran berbeda. Gunakan kunci baru."),
+        { status: 409, code: "IDEMPOTENCY_KEY_CONFLICT" });
+      return Promise.reject(error);
+    }
+    return existing.result;
+  }
   const result = queue.then(action, action);
   queue = result.catch(() => undefined);
-  idempotency.set(key, result);
-  const timer = setTimeout(() => idempotency.delete(key), 60_000);
-  if (timer.unref) timer.unref();
+  idempotency.set(key, { signature, result });
+  const expire = () => {
+    const timer = setTimeout(() => {
+      if (idempotency.get(key)?.result === result) idempotency.delete(key);
+    }, 60_000);
+    if (timer.unref) timer.unref();
+  };
+  void result.then(expire, expire);
   return result;
 }
 
@@ -90,7 +107,10 @@ function publicState(): LiveState {
     overlayClientsCount: outputClientsCount,
     onAirGraphicId: persisted?.graphicId || null,
     actualOverlayInputGuid: persisted?.graphicId ? "web-overlay" : null,
-    onAirSnapshot: (persisted?.snapshot as Record<string, string> | null) || null
+    onAirSnapshot: effectiveOnAirFields(
+      persisted?.graphicId ? getGraphic(persisted.graphicId) : null,
+      persisted?.snapshot as Record<string, string> | null
+    )
   };
 }
 
@@ -104,7 +124,7 @@ export function prepare(graphicId: string) {
 }
 
 export function take(graphicId: string, idempotencyKey: string, options?: { presentation?: "clean" }) {
-  return enqueue(idempotencyKey, async () => {
+  return enqueue(idempotencyKey, `TAKE:${JSON.stringify([graphicId, options?.presentation ?? null])}`, async () => {
     const requestId = randomUUID();
     const graphic = getGraphic(graphicId);
     live = { ...live, commandStatus: "pending", error: null, lastActionAt: new Date().toISOString() };
@@ -118,17 +138,17 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
         previousGraphic.itemId === graphic.itemId &&
         ["HEADLINE", "SOT"].includes(previousGraphic.templateType) &&
         ["HEADLINE", "SOT"].includes(graphic.templateType));
+      const normalized = normalizeHeadlineTopicFields(graphic.templateType, graphic.draftFields);
       const effectiveFields: Record<string, string> = options?.presentation === "clean"
-        ? { ...graphic.draftFields, showLocation: "false", showKicker: "false", layoutStyle: "single" }
-        : { ...graphic.draftFields };
+        ? { ...normalized, showLocation: "false", showKicker: "false", layoutStyle: "single" }
+        : { ...normalized };
       if (switchDetail && previous?.snapshot) {
-        const snapshot = previous.snapshot as Record<string, string>;
+        const snapshot = effectiveOnAirFields(previousGraphic, previous.snapshot as Record<string, string>) || {};
         effectiveFields.location = snapshot.location || effectiveFields.location || "";
         effectiveFields.showLocation = snapshot.showLocation ?? (snapshot.location?.trim() ? "true" : "false");
       }
 
-      markGraphicPushed(graphic.id, effectiveFields);
-      saveOnAir(graphic.id, "web-overlay", 1, effectiveFields, "confirmed");
+      const master = saveProgramWithTicker(graphic, effectiveFields);
       live = {
         ...live,
         commandStatus: "confirmed",
@@ -137,7 +157,7 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
         onAirSnapshot: effectiveFields,
         error: null
       };
-      broadcastOverlayEvent({ type: switchDetail ? "SWITCH_DETAIL" : "TAKE", graphic, fields: effectiveFields, master: getMasterOverlay() });
+      broadcastOverlayEvent({ type: switchDetail ? "SWITCH_DETAIL" : "TAKE", graphic, fields: effectiveFields, master });
       const currentOutputs = getOutputClientsCount();
       const statusNote = currentOutputs > 0 ? `(${currentOutputs} output terhubung)` : "(siaga / belum ada output vMix-OBS)";
       logAction("TAKE", "confirmed", `${graphic.templateType} terkonfirmasi ON AIR ${statusNote}`, graphic.id, requestId);
@@ -162,12 +182,12 @@ export function updateLive(
   idempotencyKey: string,
   options?: { syncComposition?: boolean }
 ) {
-  return enqueue(idempotencyKey, async () => {
+  return enqueue(idempotencyKey, `UPDATE:${JSON.stringify([graphicId, options?.syncComposition ?? false])}`, async () => {
     const requestId = randomUUID();
-    const graphic = getGraphic(graphicId);
-    const current = getOnAir();
 
     try {
+      const graphic = getGraphic(graphicId);
+      const current = getOnAir();
       const previousGraphic = current?.graphicId ? getGraphic(current.graphicId) : null;
       const switchDetail = Boolean(graphic && previousGraphic && previousGraphic.id !== graphic.id &&
         previousGraphic.itemId === graphic.itemId &&
@@ -178,9 +198,9 @@ export function updateLive(
       }
       live = { ...live, commandStatus: "pending", error: null };
 
-      const existingSnapshot = (current.snapshot as Record<string, string>) || {};
+      const existingSnapshot = effectiveOnAirFields(previousGraphic, current.snapshot as Record<string, string>) || {};
       const effectiveFields: Record<string, string> = {
-        ...graphic.draftFields
+        ...normalizeHeadlineTopicFields(graphic.templateType, graphic.draftFields)
       };
       if (!options?.syncComposition) {
         if (existingSnapshot.showLocation !== undefined) effectiveFields.showLocation = existingSnapshot.showLocation;
@@ -193,7 +213,7 @@ export function updateLive(
       }
       markGraphicPushed(graphic.id, effectiveFields);
       saveOnAir(graphic.id, "web-overlay", 1, effectiveFields, "confirmed");
-      live = { ...live, commandStatus: "confirmed", onAirGraphicId: graphic.id, onAirSnapshot: effectiveFields, lastActionAt: new Date().toISOString() };
+      live = { ...live, commandStatus: "confirmed", onAirGraphicId: graphic.id, onAirSnapshot: effectiveFields, lastActionAt: new Date().toISOString(), error: null };
       broadcastOverlayEvent(switchDetail
         ? { type: "SWITCH_DETAIL", graphic, fields: effectiveFields, master: getMasterOverlay() }
         : { type: "UPDATE", graphicId: graphic.id, fields: effectiveFields, master: getMasterOverlay() });
@@ -202,7 +222,7 @@ export function updateLive(
     } catch (e: any) {
       live = { ...live, commandStatus: "failed", error: e.message };
       logAction("UPDATE", "failed", e.message, graphicId, requestId);
-      return { requestId, commandStatus: "failed", actualOverlayInputGuid: current?.inputGuid || null, timestamp: new Date().toISOString(), error: e.message, state: publicState() };
+      return { requestId, commandStatus: "failed", actualOverlayInputGuid: getOnAir()?.inputGuid || null, timestamp: new Date().toISOString(), error: e.message, state: publicState() };
     }
   });
 }
@@ -212,17 +232,18 @@ export function takeVariantLive(
   action: LiveVariantAction,
   idempotencyKey: string
 ) {
-  return enqueue(idempotencyKey, async () => {
+  return enqueue(idempotencyKey, `VARIANT:${JSON.stringify([graphicId, action])}`, async () => {
     const requestId = randomUUID();
-    const graphic = getGraphic(graphicId);
-    const current = getOnAir();
 
     try {
+      const graphic = getGraphic(graphicId);
+      const current = getOnAir();
       if (!graphic || !current || current.graphicId !== graphicId) {
         throw new Error("Perubahan varian diblokir: grafis ini tidak sedang ON AIR");
       }
 
-      const currentSnapshot = (current.snapshot as Record<string, string>) || { ...graphic.draftFields };
+      const currentSnapshot = effectiveOnAirFields(graphic, current.snapshot as Record<string, string>) ||
+        normalizeHeadlineTopicFields(graphic.templateType, graphic.draftFields);
       const updatedSnapshot = { ...currentSnapshot };
 
       if (action === "clean-headline") {
@@ -230,21 +251,21 @@ export function takeVariantLive(
         updatedSnapshot.showKicker = "false";
         updatedSnapshot.layoutStyle = "single";
       } else if (action === "toggle-location") {
-        const hasLocation = Boolean(graphic.draftFields.location?.trim());
+        const hasLocation = Boolean(currentSnapshot.location?.trim());
         if (!hasLocation) {
           throw new Error("Data lokasi belum tersedia pada berita ini");
         }
         const isCurrentShown = currentSnapshot.showLocation !== "false";
         updatedSnapshot.showLocation = isCurrentShown ? "false" : "true";
       } else if (action === "toggle-kicker") {
-        const hasKicker = Boolean(graphic.draftFields.kicker?.trim());
+        const hasKicker = Boolean(currentSnapshot.kicker?.trim());
         if (!hasKicker) {
           throw new Error("Topik/kicker belum tersedia pada berita ini");
         }
         const isCurrentShown = currentSnapshot.showKicker !== "false";
         updatedSnapshot.showKicker = isCurrentShown ? "false" : "true";
       } else if (action === "toggle-detail") {
-        const hasDetail = Boolean(graphic.draftFields.subline?.trim());
+        const hasDetail = Boolean(currentSnapshot.subline?.trim());
         if (!hasDetail) {
           throw new Error("Detail/subline belum tersedia pada berita ini");
         }
@@ -259,7 +280,8 @@ export function takeVariantLive(
         ...live,
         commandStatus: "confirmed",
         onAirSnapshot: updatedSnapshot,
-        lastActionAt: new Date().toISOString()
+        lastActionAt: new Date().toISOString(),
+        error: null
       };
       broadcastOverlayEvent({
         type: "UPDATE",
@@ -282,7 +304,7 @@ export function takeVariantLive(
       return {
         requestId,
         commandStatus: "failed",
-        actualOverlayInputGuid: current?.inputGuid || null,
+        actualOverlayInputGuid: getOnAir()?.inputGuid || null,
         timestamp: new Date().toISOString(),
         error: e.message,
         state: publicState()
@@ -292,21 +314,22 @@ export function takeVariantLive(
 }
 
 export function clearLive(idempotencyKey: string) {
-  return enqueue(idempotencyKey, async () => {
+  return enqueue(idempotencyKey, "CLEAR", async () => {
     const requestId = randomUUID();
-    const current = getOnAir();
 
     try {
+      const current = getOnAir();
       if (!current?.graphicId) throw new Error("Tidak ada grafis NewsCG yang terverifikasi ON AIR");
       live = { ...live, commandStatus: "pending", error: null };
 
       saveOnAir(null, null, 1, null, "confirmed");
-      live = { ...live, commandStatus: "confirmed", onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: new Date().toISOString() };
+      live = { ...live, commandStatus: "confirmed", onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: new Date().toISOString(), error: null };
       broadcastOverlayEvent({ type: "CLEAR", master: getMasterOverlay() });
       logAction("CLEAR", "confirmed", "Lower third NewsCG terkonfirmasi bersih (Web Overlay)", current.graphicId, requestId);
       return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: null, timestamp: new Date().toISOString(), error: null, state: publicState() };
     } catch (e: any) {
       live = { ...live, commandStatus: "failed", error: e.message };
+      const current = getOnAir();
       logAction("CLEAR", "failed", e.message, current?.graphicId, requestId);
       return { requestId, commandStatus: "failed", actualOverlayInputGuid: current?.inputGuid || null, timestamp: new Date().toISOString(), error: e.message, state: publicState() };
     }
@@ -314,32 +337,68 @@ export function clearLive(idempotencyKey: string) {
 }
 
 export function clearAllLive(idempotencyKey: string, options?: { immediate?: boolean }) {
-  return enqueue(idempotencyKey, async () => {
+  return enqueue(idempotencyKey, `CLEAR_ALL:${options?.immediate !== false}`, async () => {
     const requestId = randomUUID();
-    saveMasterOverlay({ showLogo: false, showTicker: false, showLiveBadge: false });
-    saveOnAir(null, null, 1, null, "confirmed");
-    live = { ...live, commandStatus: "confirmed", onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: new Date().toISOString() };
-    const immediate = options?.immediate !== false;
-    broadcastOverlayEvent(immediate ? { type: "CLEAR_ALL_IMMEDIATE" } : { type: "CLEAR_ALL_ANIMATED" });
-    logAction("CLEAR_ALL", "confirmed", `Seluruh layer grafis (Blackout) dibersihkan (${immediate ? "Instan" : "Animasi"})`, null, requestId);
-    return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: null, timestamp: new Date().toISOString(), error: null, state: publicState() };
+    try {
+      live = { ...live, commandStatus: "pending", error: null };
+      saveMasterAndClearOnAir({ showLogo: false, showTicker: false, showLiveBadge: false, tickerText: "", tickerRundownId: null, tickerForDate: null });
+      live = { ...live, commandStatus: "confirmed", onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: new Date().toISOString(), error: null };
+      const immediate = options?.immediate !== false;
+      broadcastOverlayEvent(immediate ? { type: "CLEAR_ALL_IMMEDIATE" } : { type: "CLEAR_ALL_ANIMATED" });
+      logAction("CLEAR_ALL", "confirmed", `Seluruh layer grafis (Blackout) dibersihkan (${immediate ? "Instan" : "Animasi"})`, null, requestId);
+      return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: null, timestamp: new Date().toISOString(), error: null, state: publicState() };
+    } catch (error) {
+      const message = `Gagal mengosongkan seluruh layer: ${error instanceof Error ? error.message : "Kesalahan penyimpanan"}`;
+      live = { ...live, commandStatus: "failed", error: message };
+      logAction("CLEAR_ALL", "failed", message, getOnAir()?.graphicId, requestId);
+      return { requestId, commandStatus: "failed", actualOverlayInputGuid: getOnAir()?.inputGuid || null, timestamp: new Date().toISOString(), error: message, state: publicState() };
+    }
   });
 }
 
 export function setStage(mode: "empty" | "logo" | "full", idempotencyKey: string) {
-  return enqueue(idempotencyKey, async () => {
-    const master = saveMasterOverlay({ showLogo: mode !== "empty", showTicker: mode === "full", showLiveBadge: mode === "full" });
-    saveOnAir(null, null, 1, null, "confirmed");
-    live = { ...live, commandStatus: "confirmed", error: null, lastActionAt: new Date().toISOString() };
-    broadcastOverlayEvent({ type: "SYNC", onAir: false, graphic: null, fields: null, master });
-    logAction("STAGE", "confirmed", `Preset ${mode}`);
-    return { state: publicState(), master, commandStatus: "confirmed" };
+  return enqueue(idempotencyKey, `STAGE:${mode}`, async () => {
+    try {
+      live = { ...live, commandStatus: "pending", error: null };
+      const master = saveMasterAndClearOnAir({ showLogo: mode !== "empty", showTicker: mode === "full", showLiveBadge: mode === "full" });
+      live = { ...live, commandStatus: "confirmed", error: null, lastActionAt: new Date().toISOString() };
+      broadcastOverlayEvent({ type: "SYNC", onAir: false, graphic: null, fields: null, master });
+      logAction("STAGE", "confirmed", `Preset ${mode}`);
+      return { state: publicState(), master, commandStatus: "confirmed" };
+    } catch (error) {
+      const message = `Gagal menerapkan preset ${mode}: ${error instanceof Error ? error.message : "Kesalahan penyimpanan"}`;
+      live = { ...live, commandStatus: "failed", error: message };
+      logAction("STAGE", "failed", message, getOnAir()?.graphicId);
+      return { state: publicState(), master: getMasterOverlay(), commandStatus: "failed", error: message };
+    }
   });
 }
 
-export function updateMasterState(patch: Partial<MasterOverlayState>) {
-  const updated = saveMasterOverlay(patch);
-  broadcastOverlayEvent({ type: "MASTER_UPDATE", master: updated });
-  logAction("MASTER", "confirmed", "Master broadcast layer diperbarui");
-  return updated;
+export function updateMasterState(patch: Partial<MasterOverlayState>): Promise<MasterOverlayState> {
+  // Master PATCH must obey the same command order as STAGE/CLEAR_ALL, both of
+  // which also update master layers. A synchronous PATCH can otherwise be
+  // overwritten by a previously received but still queued STAGE command.
+  const action = () => {
+    const updated = saveMasterOverlay(patch);
+    broadcastOverlayEvent({ type: "MASTER_UPDATE", master: updated });
+    logAction("MASTER", "confirmed", "Master broadcast layer diperbarui");
+    return updated;
+  };
+  const result = queue.then(action, action);
+  queue = result.catch(() => undefined);
+  return result;
+}
+
+export function applyRundownTicker(rundownId: string, idempotencyKey: string, immediate = false) {
+  return enqueue(idempotencyKey, `TICKER:${rundownId}:${immediate}`, async () => {
+    const program = getOnAir();
+    const graphic = program?.graphicId ? getGraphic(program.graphicId) : null;
+    if (graphic && getItem(graphic.itemId)?.rundownId !== rundownId) {
+      throw Object.assign(new Error("Ticker berasal dari rundown berbeda dengan CG Program. TAKE rundown target atau CLEAR dengan instruksi operator terlebih dahulu."), { status: 409 });
+    }
+    const master = saveMasterOverlay(rundownTickerSnapshot(rundownId, immediate));
+    broadcastOverlayEvent({ type: "MASTER_UPDATE", master });
+    logAction("TICKER", "confirmed", `Ticker rundown ${rundownId} diterapkan`);
+    return { commandStatus: "confirmed" as const, state: publicState(), master };
+  });
 }

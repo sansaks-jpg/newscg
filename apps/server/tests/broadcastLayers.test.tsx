@@ -54,6 +54,44 @@ afterEach(async () => {
 });
 
 describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", Component: ProgramMonitor }])("broadcast layer lifecycle ($name)", ({ Component }) => {
+  it("renders only the applied rundown ticker, ignores legacy cue overrides, and has no fallback on an empty ticker", async () => {
+    await act(async () => root.render(createElement(Component)));
+    const legacyFields = { ...fields, ticker: "TICKER CUE LAMA" };
+    await send({ type: "SYNC", onAir: true, graphic, fields: legacyFields,
+      master: { ...master, tickerText: "TICKER RUNDOWN A", tickerRundownId: "A", tickerRevision: 1 } });
+    expect(element(".cg-ticker-content")?.textContent).toContain("TICKER RUNDOWN A");
+    expect(host.textContent).not.toContain("TICKER CUE LAMA");
+    await send({ type: "MASTER_UPDATE", master: { ...master, tickerText: "TICKER RUNDOWN B", tickerRundownId: "B", tickerRevision: 2 } });
+    expect(element(".cg-ticker-content")?.textContent).toContain("TICKER RUNDOWN B");
+    expect(host.textContent).not.toContain("TICKER RUNDOWN A");
+    await send({ type: "MASTER_UPDATE", master: { ...master, tickerText: "", tickerRundownId: "EMPTY", tickerRevision: 3 } });
+    expect(element(".cg-ticker-content")?.textContent).toBe("");
+    expect(host.textContent).not.toContain("INFORMASI TERKINI");
+    await send({ type: "MASTER_UPDATE", master: { ...master, tickerText: "ISI BARU", tickerRundownId: "EMPTY", tickerRevision: 3 } });
+    expect(element(".cg-ticker-content")?.textContent).toContain("ISI BARU");
+  });
+  it("immediately reflects a reconnect SYNC with no ON AIR layers", async () => {
+    await act(async () => root.render(createElement(Component)));
+    await send({ type: "TAKE", graphic, fields, master });
+    expect(element(".cg-location-tag")).not.toBeNull();
+    expect(element(".cg-logo-box.standalone")).not.toBeNull();
+    await send({ type: "SYNC", onAir: false, graphic: null, fields: null,
+      master: { ...defaultMasterOverlayState, showLogo: false, showTicker: false, showLiveBadge: false }, revision: 100 });
+    expect(element(".cg-main-box")).toBeNull();
+    expect(element(".cg-location-tag")).toBeNull();
+    expect(element(".cg-logo-box.standalone")).toBeNull();
+    expect(element(".cg-ticker-bar")).toBeNull();
+  });
+  it("removes the previous location on reconnect when only master layers remain", async () => {
+    await act(async () => root.render(createElement(Component)));
+    await send({ type: "TAKE", graphic, fields, master, revision: 10 });
+    expect(element(".cg-location-tag")?.textContent).toBe("JAKARTA");
+    await send({ type: "SYNC", onAir: false, graphic: null, fields: null, master, revision: 11 });
+    expect(element(".cg-main-box")).toBeNull();
+    expect(element(".cg-location-tag")).toBeNull();
+    expect(element(".cg-ticker-bar")).not.toBeNull();
+    expect(element(".cg-logo-box.standalone")).not.toBeNull();
+  });
   it("renders HIGHLIGHT above the full-width headline and uses staged topic IN/OUT", async () => {
     await act(async () => root.render(createElement(Component)));
     const bulletin = { ...headlineBulletinPreset, headline: "HEADLINE PEMBUKA" };
@@ -313,16 +351,15 @@ describe("broadcast color selection", () => {
     const urgent = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent === "TICKER SEGERA")!;
     await act(async () => urgent.click());
-    expect(updateMaster).toHaveBeenCalledTimes(1);
-    expect(updateMaster.mock.calls[0]?.[0]).not.toHaveProperty("colorTheme");
-    expect(updateMaster.mock.calls[0]?.[0]).not.toHaveProperty("brandText");
+    expect(urgent.disabled).toBe(true); // no rundown selected, never apply a shared ticker
+    expect(updateMaster).not.toHaveBeenCalled();
     expect(select.value).toBe("studio-navy");
     const apply = Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.startsWith("TERAPKAN MASTER"))!;
     expect(apply.disabled).toBe(false);
     await act(async () => apply.click());
-    expect(updateMaster).toHaveBeenCalledTimes(2);
-    expect(updateMaster.mock.calls[1]?.[0]).toMatchObject({ colorTheme: "studio-navy", brandText: "NEWS UPDATE", logoText: "NEWS" });
+    expect(updateMaster).toHaveBeenCalledTimes(1);
+    expect(updateMaster.mock.calls[0]?.[0]).toMatchObject({ colorTheme: "studio-navy", brandText: "NEWS UPDATE", logoText: "NEWS" });
     await send({ type: "MASTER_UPDATE", master: selectBroadcastColorTheme(master, "studio-navy") });
     expect(Array.from(host.querySelectorAll<HTMLElement>(".cg-lower-third")).every((node) => node.dataset.colorTheme === "studio-navy")).toBe(true);
     expect(host.contains(programPanel)).toBe(true);

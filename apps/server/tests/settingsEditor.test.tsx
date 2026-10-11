@@ -142,7 +142,7 @@ describe("settings/default editor safety", () => {
     expect(field("Default Headline / Judul Utama").value).toBe("DEFAULT SERVER");
   });
 
-  it("merges an uploaded logo into the latest ticker and palette edits", async () => {
+  it("merges an uploaded logo into the latest branding and palette edits without a global ticker editor", async () => {
     const pending = deferred<Response>();
     uploadFetch.mockReturnValueOnce(pending.promise);
     await openSettings();
@@ -152,17 +152,76 @@ describe("settings/default editor safety", () => {
     await act(async () => fileInput.dispatchEvent(new Event("change", { bubbles: true })));
     expect(button("Simpan Default Master").disabled).toBe(true);
     await change(field("Nama Berita di Ticker"), "NEWS TERBARU");
-    await change(field("Isi Running Ticker Berita Default"), "TICKER YANG BARU DIKETIK");
     await act(async () => host.querySelector<HTMLInputElement>('input[value="studio-graphite"]')!.click());
     await act(async () => pending.resolve(response({ url: "/uploads/station.png" })));
     expect(field("Nama Berita di Ticker").value).toBe("NEWS TERBARU");
-    expect(field("Isi Running Ticker Berita Default").value).toBe("TICKER YANG BARU DIKETIK");
+    expect(host.textContent).not.toContain("Isi Running Ticker Berita Default");
     expect(host.querySelector<HTMLInputElement>('input[value="studio-graphite"]')!.checked).toBe(true);
     await click("Simpan Default Master");
     expect(bodyOf("/api/live/master", "PATCH")).toMatchObject({
       logoImage: "/uploads/station.png", logoType: "image", colorTheme: "studio-graphite",
-      brandText: "NEWS TERBARU", tickerText: "TICKER YANG BARU DIKETIK"
+      brandText: "NEWS TERBARU"
     });
+    expect(bodyOf("/api/live/master", "PATCH")).not.toHaveProperty("tickerText");
+  });
+
+  it("preserves edits made during a delayed master save after the server responds", async () => {
+    await openSettings();
+    const pending = deferred<Response>();
+    const delegate = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (path, options) => {
+      if (path === "/api/live/master" && options?.method === "PATCH") return pending.promise;
+      return delegate(path, options);
+    });
+    await change(field("Nama Berita di Ticker"), "VERSI PERTAMA");
+    await act(async () => button("Simpan Default Master").click());
+    await change(field("Nama Berita di Ticker"), "VERSI KEDUA BELUM DISIMPAN");
+    await act(async () => pending.resolve(response({ ...master, brandText: "VERSI PERTAMA" })));
+    expect(field("Nama Berita di Ticker").value).toBe("VERSI KEDUA BELUM DISIMPAN");
+  });
+
+  it("prevents duplicate Simpan Semua requests while the first save is pending", async () => {
+    await openSettings();
+    const pending = deferred<Response>();
+    const delegate = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (path, options) => {
+      if (path === "/api/settings" && options?.method === "PATCH") return pending.promise;
+      return delegate(path, options);
+    });
+    await act(async () => {
+      button("Simpan Semua").click();
+      button("Simpan Semua").click();
+    });
+    expect(requests("/api/settings", "PATCH")).toHaveLength(1);
+    expect(button("Menyimpan…").disabled).toBe(true);
+    await act(async () => pending.resolve(response({ outputMode: "web" })));
+    expect(requests("/api/live/master", "PATCH")).toHaveLength(1);
+    expect(requests("/api/settings/headline-defaults", "PATCH")).toHaveLength(1);
+  });
+
+  it("ignores an older live-status poll after a newer poll succeeds", async () => {
+    const pending = deferred<Response>();
+    const delegate = fetchMock.getMockImplementation()!;
+    let reads = 0;
+    fetchMock.mockImplementation(async (path, options) => {
+      if (path === "/api/live/state" && (!options?.method || options.method === "GET")) {
+        reads += 1;
+        if (reads === 2) return pending.promise;
+        if (reads === 3) return response({ ...live, overlayClientsCount: 2 });
+      }
+      return delegate(path, options);
+    });
+    vi.useFakeTimers();
+    try {
+      await act(async () => root.render(createElement(App)));
+      await act(async () => vi.advanceTimersByTimeAsync(2000));
+      await act(async () => vi.advanceTimersByTimeAsync(2000));
+      expect(host.querySelector(".status-chip")?.textContent).toContain("2 KLIEN OUTPUT");
+      await act(async () => pending.resolve(response({ ...live, overlayClientsCount: 0 })));
+      expect(host.querySelector(".status-chip")?.textContent).toContain("2 KLIEN OUTPUT");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("fills only untouched story fields after a slow defaults response", async () => {
@@ -236,6 +295,90 @@ describe("settings/default editor safety", () => {
     expect(requests("/api/live/take", "POST")).toHaveLength(0);
   });
 
+  it("does not create duplicate stories when the save form is submitted twice", async () => {
+    await openStory();
+    await change(field("Judul Berita"), "BERITA SEKALI SIMPAN");
+    const pending = deferred<Response>();
+    const delegate = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (path, options) => {
+      if (String(path).endsWith("/story") && options?.method === "PUT") return pending.promise;
+      return delegate(path, options);
+    });
+    const dialog = host.querySelector<HTMLFormElement>(".story-editor-modal")!;
+    await act(async () => {
+      dialog.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      dialog.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(requests("/api/rundowns/rundown-a/story", "PUT")).toHaveLength(1);
+    await act(async () => pending.resolve(response({})));
+  });
+
+  it("retries a story refresh with its persisted id after the first reload fails", async () => {
+    await openStory();
+    await change(field("Judul Berita"), "CERITA TERSIMPAN");
+    let failRefresh = true;
+    let saved = false;
+    const delegate = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (path, options) => {
+      if (path === "/api/rundowns" && saved && failRefresh) {
+        failRefresh = false;
+        return response({ error: "Server tidak dapat memuat rundown" }, 503);
+      }
+      if (path === "/api/rundowns/rundown-a/story" && options?.method === "PUT") {
+        saved = true;
+        return response({ id: "berita-yang-sudah-dibuat" });
+      }
+      return delegate(path, options);
+    });
+    const submit = async () => act(async () => host.querySelector<HTMLFormElement>(".story-editor-modal")!
+      .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    await submit();
+    expect(host.querySelector(".modal-error-banner")?.textContent).toContain("Server tidak dapat memuat rundown");
+    await change(field("Judul Berita"), "CERITA REVISI");
+    await submit();
+    expect(requests("/api/rundowns/rundown-a/story", "PUT")).toHaveLength(2);
+    expect(JSON.parse(requests("/api/rundowns/rundown-a/story", "PUT")[1]![1]!.body as string))
+      .toMatchObject({ itemId: "berita-yang-sudah-dibuat", title: "CERITA REVISI" });
+  });
+
+  it("closes the old story editor when the topbar switches rundown", async () => {
+    await openStory();
+    await change(field("Judul Berita"), "DRAFT RUNDOWN A");
+    await change(host.querySelector<HTMLSelectElement>('[aria-label="Pilih Rundown Program"]')!, "rundown-b");
+    expect(host.querySelector(".story-editor-modal")).toBeNull();
+    expect(host.querySelector(".prep-title-group")?.textContent).toContain("EDISI B");
+    expect(requests("/api/rundowns/rundown-b/story", "PUT")).toHaveLength(0);
+  });
+
+  it("prevents duplicate rundown creation while its first request is pending", async () => {
+    await act(async () => root.render(createElement(App)));
+    await click("Rundown & CG");
+    const pending = deferred<Response>();
+    const delegate = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (path, options) => {
+      if (path === "/api/rundowns" && options?.method === "POST") return pending.promise;
+      return delegate(path, options);
+    });
+    await act(async () => {
+      button("Rundown Baru").click();
+      button("Rundown Baru").click();
+    });
+    expect(requests("/api/rundowns", "POST")).toHaveLength(1);
+    expect(button("Rundown Baru").disabled).toBe(true);
+    await act(async () => pending.resolve(response({ ...rundownA, id: "rundown-c" })));
+  });
+
+  it("keeps the selected cue preview when an earlier cue is removed", async () => {
+    await openStory();
+    await click("+ Tambah Headline");
+    await click("+ Tambah Headline");
+    const previewPills = host.querySelectorAll<HTMLButtonElement>(".preview-pill-btn");
+    await act(async () => previewPills[2]!.click());
+    expect(host.querySelector(".preview-pill-btn.active")?.textContent).toContain("#3");
+    await act(async () => host.querySelectorAll<HTMLButtonElement>('.cue-editor-card button[title="Hapus materi CG ini"]')[0]!.click());
+    expect(host.querySelector(".preview-pill-btn.active")?.textContent).toContain("#2");
+  });
+
   it("adds an editable opening headline and saves its shared preset without any live command", async () => {
     await openStory();
     await click("+ Highlight Berita");
@@ -253,6 +396,37 @@ describe("settings/default editor safety", () => {
       layoutStyle: "single", showLocation: "false", showKicker: "true", showDetail: "false"
     } });
     expect(fetchMock.mock.calls.filter(([path, options]) => String(path).startsWith("/api/live/") && options?.method)).toHaveLength(0);
+  });
+
+  it("removes only the generated HIGHLIGHT topic when returning to ordinary headline", async () => {
+    defaults.kicker = "";
+    await openStory();
+    const mode = field("Jenis Headline") as HTMLSelectElement;
+    expect(mode.value).toBe("story");
+    await change(mode, "bulletin");
+    expect(field("Sub Topik di Atas / Kicker").value).toBe("HIGHLIGHT");
+    await change(mode, "story");
+    expect(field("Sub Topik di Atas / Kicker").value).toBe("");
+    await act(async () => host.querySelector<HTMLFormElement>(".story-editor-modal")!
+      .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(bodyOf("/api/rundowns/rundown-a/story", "PUT").graphics[0].draftFields)
+      .toMatchObject({ headlinePresentation: "story", kicker: "", showKicker: "false",
+        layoutStyle: "sub", showLocation: "true", visualTemplate: "cnn" });
+  });
+
+  it("does not overwrite an authored topic when switching headline presentations", async () => {
+    await openStory();
+    await change(field("Sub Topik di Atas / Kicker"), "EKONOMI");
+    const mode = field("Jenis Headline") as HTMLSelectElement;
+    await change(mode, "bulletin");
+    expect(field("Sub Topik di Atas / Kicker").value).toBe("EKONOMI");
+    await change(mode, "story");
+    expect(field("Sub Topik di Atas / Kicker").value).toBe("EKONOMI");
+    await act(async () => host.querySelector<HTMLFormElement>(".story-editor-modal")!
+      .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(bodyOf("/api/rundowns/rundown-a/story", "PUT").graphics[0].draftFields)
+      .toMatchObject({ headlinePresentation: "story", kicker: "EKONOMI", showKicker: "true",
+        layoutStyle: "sub", showLocation: "true", visualTemplate: "cnn" });
   });
 
   it("adds a Breaking News cue with its visible urgency flag", async () => {

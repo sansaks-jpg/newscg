@@ -18,7 +18,7 @@ Pada paket CNN Juni 2023, informasi dipisahkan menjadi headline, tab topik/progr
 | SOT identifier | Identitas pembicara sambil mempertahankan judul berita | `SOT`; headline + nama + jabatan |
 | Locator | Tempat laporan atau gambar | `LOCATION` atau field lokasi pada cue |
 | Station bug / LIVE / clock | Identitas kanal dan status siaran | Master logo, LIVE, jam/zona waktu |
-| Ticker / crawl / flipper | Informasi tambahan bergantian/berjalan | Master ticker berjalan; flipper belum tersedia |
+| Ticker / crawl / flipper | Informasi tambahan bergantian/berjalan | Ticker per rundown dan jadwal tayang, diterapkan sebagai snapshot output; flipper belum tersedia |
 | Program / segment bug | Identitas acara atau segmen | `brandText` pada ticker; belum berupa layer program mandiri |
 | Source / courtesy / archive label | Menjelaskan asal/tanggal gambar | Belum ada layer khusus; jangan menyamarkan kredit sumber sebagai locator |
 | Full-screen / quote / factbox | Kutipan, fakta, kronologi, atau poin data | Belum ada template khusus; subline hanya untuk detail pendek |

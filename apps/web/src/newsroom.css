@@ -3078,3 +3078,10 @@ body:has(.overlay-root),
   .topbar-rundown-select { max-width: 135px; }
   .topbar-tab-btn { padding: 5px 7px; font-size: 10px; }
 }
+
+.rundown-broadcast-settings { margin: 12px 0; padding: 12px; border: 1px solid #334155; border-radius: 6px; background: #111827; }
+.rundown-broadcast-settings summary { cursor: pointer; font-weight: 600; }
+.rundown-broadcast-settings .form-grid { margin-top: 12px; }
+.rundown-broadcast-settings p, .rundown-broadcast-settings small { color: #cbd5e1; font-size: 12px; }
+.rundown-broadcast-settings button { margin-top: 10px; }
+.rundown-broadcast-settings a { color: #7dd3fc; }

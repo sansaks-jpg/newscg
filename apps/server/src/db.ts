@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem } from "@newscg/shared";
-import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlayPatchSchema, masterOverlaySchema, normalizeHeadlineTopicFields, settingsPatchSchema } from "@newscg/shared";
+import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, emptyRundownTicker, rundownBroadcastSchema, rundownTickerSchema, getRundownTickerSpeed, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlaySchema, normalizeHeadlineTopicFields, settingsPatchSchema } from "@newscg/shared";
 import type { ZodType } from "zod";
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -58,16 +58,25 @@ db.transaction(() => {
 
 const json = <T>(value: string | null): T | null => value ? JSON.parse(value) as T : null;
 
+db.transaction(() => {
+  const columns = db.prepare("PRAGMA table_info(rundowns)").all() as Array<{ name: string }>;
+  if (!columns.some(column => column.name === "broadcast_schedule")) db.exec("ALTER TABLE rundowns ADD COLUMN broadcast_schedule TEXT");
+  if (!columns.some(column => column.name === "ticker")) db.exec("ALTER TABLE rundowns ADD COLUMN ticker TEXT");
+  // Legacy shared ticker remains in raw settings for recovery, but is never assigned to a rundown.
+  db.prepare("INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (3, datetime('now'))").run();
+})();
+
 export function getRundowns(): Rundown[] {
-  return (db.prepare("SELECT id, program_name, title, updated_at FROM rundowns ORDER BY updated_at DESC").all() as any[]).map(readRundownRow);
+  return (db.prepare("SELECT * FROM rundowns ORDER BY updated_at DESC").all() as any[]).map(readRundownRow);
 }
 export function getRundown(id: string): Rundown | null {
-  const row = db.prepare("SELECT id, program_name, title, updated_at FROM rundowns WHERE id = ?").get(id) as any;
+  const row = db.prepare("SELECT * FROM rundowns WHERE id = ?").get(id) as any;
   return row ? readRundownRow(row) : null;
 }
 function readRundownRow(row: any): Rundown {
   const items = (db.prepare("SELECT * FROM rundown_items WHERE rundown_id = ? ORDER BY sort_order, rowid").all(row.id) as any[]).map(readItemRow);
-  return { id: row.id, programName: row.program_name, title: row.title, updatedAt: row.updated_at, items };
+  return { id: row.id, programName: row.program_name, title: row.title, updatedAt: row.updated_at, items,
+    broadcastSchedule: json(row.broadcast_schedule), ticker: rundownTickerSchema.parse(json(row.ticker) ?? { ...emptyRundownTicker, sources: [] }) };
 }
 function readItemRow(row: any): RundownItem {
   const graphics = (db.prepare("SELECT * FROM graphic_items WHERE item_id = ? ORDER BY sort_order, rowid").all(row.id) as any[]).map(readGraphicRow);
@@ -78,23 +87,25 @@ export function getItem(id: string): RundownItem | null {
   return row ? readItemRow(row) : null;
 }
 function readGraphicRow(row: any): GraphicItem {
-  return { id: row.id, itemId: row.item_id, templateType: row.template_type, sortOrder: row.sort_order, draftFields: json(row.draft_fields) || {}, lastPushedFields: json(row.last_pushed_fields) };
+  const draftFields = normalizeHeadlineTopicFields(row.template_type, json<Record<string, string>>(row.draft_fields) || {});
+  return { id: row.id, itemId: row.item_id, templateType: row.template_type, sortOrder: row.sort_order, draftFields, lastPushedFields: json(row.last_pushed_fields) };
 }
 export function getGraphic(id: string): GraphicItem | null {
   const row = db.prepare("SELECT * FROM graphic_items WHERE id = ?").get(id) as any;
   return row ? readGraphicRow(row) : null;
 }
 
-export const createRundown = db.transaction((input: { id?: string; programName: string; title: string; items?: any[] }, options?: { regenerateIds?: boolean }) => {
+export const createRundown = db.transaction((input: { id?: string; programName: string; title: string; items?: any[]; broadcastSchedule?: Rundown["broadcastSchedule"]; ticker?: Rundown["ticker"] }, options?: { regenerateIds?: boolean }) => {
+  const broadcast = rundownBroadcastSchema.parse({ broadcastSchedule: input.broadcastSchedule ?? null, ticker: input.ticker ?? emptyRundownTicker });
   const id = (options?.regenerateIds || !input.id) ? `RD-${randomUUID().slice(0, 8).toUpperCase()}` : input.id;
   const now = new Date().toISOString();
-  db.prepare("INSERT INTO rundowns(id, program_name, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run(id, input.programName, input.title, now, now);
+  db.prepare("INSERT INTO rundowns(id, program_name, title, created_at, updated_at, broadcast_schedule, ticker) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, input.programName, input.title, now, now, JSON.stringify(broadcast.broadcastSchedule), JSON.stringify(broadcast.ticker));
   for (const item of input.items || []) {
     const itemId = (options?.regenerateIds || !item.id) ? randomUUID() : item.id;
     db.prepare("INSERT INTO rundown_items(id,rundown_id,slug,title,format,estimated_duration_seconds,sort_order,cg_required) VALUES (?,?,?,?,?,?,?,?)").run(itemId, id, item.slug, item.title, item.format, item.estimatedDurationSeconds, item.sortOrder, Number(item.cgRequired ?? item.format !== "LAINNYA"));
     for (const graphic of item.graphics || []) {
       const graphicId = (options?.regenerateIds || !graphic.id) ? randomUUID() : graphic.id;
-      db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?, ?, ?, ?, ?, NULL)").run(graphicId, itemId, graphic.templateType, graphic.sortOrder, JSON.stringify(graphic.draftFields));
+      db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?, ?, ?, ?, ?, NULL)").run(graphicId, itemId, graphic.templateType, graphic.sortOrder, JSON.stringify(normalizeHeadlineTopicFields(graphic.templateType, graphic.draftFields)));
     }
   }
   return getRundown(id)!;
@@ -111,7 +122,8 @@ export const reorderRundownItems = db.transaction((rundownId: string, itemIds: s
 
 export function updateRundown(id: string, patch: any) {
   const current = getRundown(id); if (!current) return null;
-  db.prepare("UPDATE rundowns SET program_name = ?, title = ?, updated_at = ? WHERE id = ?").run(patch.programName ?? current.programName, patch.title ?? current.title, new Date().toISOString(), id);
+  const broadcast = rundownBroadcastSchema.parse({ broadcastSchedule: patch.broadcastSchedule !== undefined ? patch.broadcastSchedule : current.broadcastSchedule ?? null, ticker: patch.ticker ?? current.ticker ?? emptyRundownTicker });
+  db.prepare("UPDATE rundowns SET program_name = ?, title = ?, updated_at = ?, broadcast_schedule = ?, ticker = ? WHERE id = ?").run(patch.programName ?? current.programName, patch.title ?? current.title, new Date().toISOString(), JSON.stringify(broadcast.broadcastSchedule), JSON.stringify(broadcast.ticker), id);
   return getRundown(id);
 }
 export function deleteRundown(id: string) { return db.prepare("DELETE FROM rundowns WHERE id = ?").run(id).changes > 0; }
@@ -131,14 +143,14 @@ export function deleteItem(id: string) {
 }
 export function createGraphic(itemId: string, input: any) {
   const id = input.id || randomUUID();
-  db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?, ?, ?, ?, ?, NULL)").run(id, itemId, input.templateType, input.sortOrder, JSON.stringify(input.draftFields));
+  db.prepare("INSERT INTO graphic_items(id,item_id,template_type,sort_order,draft_fields,last_pushed_fields) VALUES (?, ?, ?, ?, ?, NULL)").run(id, itemId, input.templateType, input.sortOrder, JSON.stringify(normalizeHeadlineTopicFields(input.templateType, input.draftFields)));
   return getGraphic(id)!;
 }
 export function updateGraphic(id: string, patch: any) {
   const current = getGraphic(id); if (!current) return null;
   const currentFields = normalizeHeadlineTopicFields(current.templateType, current.draftFields);
   const mergedFields = normalizeHeadlineTopicFields(patch.templateType ?? current.templateType,
-    patch.draftFields !== undefined ? { ...currentFields, ...patch.draftFields } : currentFields);
+    patch.draftFields !== undefined ? { ...currentFields, ...patch.draftFields } : currentFields, patch.draftFields);
   db.prepare("UPDATE graphic_items SET template_type=?,sort_order=?,draft_fields=? WHERE id=?").run(patch.templateType ?? current.templateType, patch.sortOrder ?? current.sortOrder, JSON.stringify(mergedFields), id);
   return getGraphic(id);
 }
@@ -243,15 +255,43 @@ export function saveOnAir(graphicId: string | null, inputGuid: string | null, ov
 }
 export function getOnAir() { const row = db.prepare("SELECT * FROM on_air_state WHERE singleton=1").get() as any; return row ? { graphicId: row.graphic_id, inputGuid: row.input_guid, overlayNumber: row.overlay_number, snapshot: json(row.snapshot), status: row.status, updatedAt: row.updated_at } : null; }
 
+// One broadcast state transition: never commit the master if Program reset fails.
+export const saveMasterAndClearOnAir = db.transaction((patch: Partial<MasterOverlayState>): MasterOverlayState => {
+  const master = saveMasterOverlay(patch);
+  saveOnAir(null, null, 1, null, "confirmed");
+  return master;
+});
+
 export function getMasterOverlay(): MasterOverlayState {
-  return masterOverlaySchema.parse({ ...defaultMasterOverlayState, ...readValidatedSettingsFields("master_overlay", masterOverlaySchema.shape) });
+  const master = masterOverlaySchema.parse({ ...defaultMasterOverlayState, ...readValidatedSettingsFields("master_overlay", masterOverlaySchema.shape) });
+  const tickerOwnerExists = master.tickerRundownId && db.prepare("SELECT 1 FROM rundowns WHERE id=?").get(master.tickerRundownId);
+  return tickerOwnerExists ? master : { ...master, tickerText: "", tickerRundownId: null, tickerForDate: null };
 }
 
 export const saveMasterOverlay = db.transaction((patch: Partial<MasterOverlayState>): MasterOverlayState => {
-  const parsed = masterOverlayPatchSchema.parse(patch);
+  const parsed = masterOverlaySchema.partial().parse(patch);
   const updated = masterOverlaySchema.parse({ ...getMasterOverlay(), ...parsed });
   writeSettingsObject("master_overlay", parsed);
   return updated;
+});
+
+export function rundownTickerSnapshot(rundownId: string, immediate = false): Partial<MasterOverlayState> {
+  const rundown = getRundown(rundownId);
+  if (!rundown) throw Object.assign(new Error("Rundown ticker tidak ditemukan"), { status: 404 });
+  const ticker = rundown.ticker ?? emptyRundownTicker;
+  rundownBroadcastSchema.parse({ broadcastSchedule: rundown.broadcastSchedule ?? null, ticker });
+  const current = getMasterOverlay();
+  const changedRundown = current.tickerRundownId !== rundown.id;
+  return { tickerText: ticker.text, tickerSpeed: getRundownTickerSpeed(ticker), tickerRundownId: rundown.id, tickerForDate: rundown.broadcastSchedule?.date ?? null,
+    tickerRevision: changedRundown || immediate ? (current.tickerRevision ?? 0) + 1 : current.tickerRevision ?? 0 };
+}
+
+export const saveProgramWithTicker = db.transaction((graphic: GraphicItem, fields: Record<string, string>) => {
+  const item = getItem(graphic.itemId);
+  if (!item) throw new Error("Berita rundown tidak ditemukan");
+  markGraphicPushed(graphic.id, fields);
+  saveOnAir(graphic.id, "web-overlay", 1, fields, "confirmed");
+  return saveMasterOverlay(rundownTickerSnapshot(item.rundownId));
 });
 
 export function getHeadlineDefaults(): HeadlineDefaults {

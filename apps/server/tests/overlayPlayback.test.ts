@@ -101,13 +101,82 @@ describe("output playback", () => {
     take("B", 2);
     expect(state().graphic?.id).toBe("B");
   });
+  it("treats a blank authoritative SYNC as an immediately empty output and accepts the next TAKE", () => {
+    const { player, take, state } = setup();
+    take("A", 10);
+    player.receive({ type: "SYNC", onAir: false, graphic: null, fields: null,
+      master: { ...master, showLogo: false, showTicker: false, showLiveBadge: false }, revision: 20 });
+    expect(state().blackout).toBe(true);
+    expect(state().graphic).toBeNull();
+    take("B", 21);
+    expect(state().blackout).toBe(false);
+    expect(state().graphic?.id).toBe("B");
+  });
+  it("applies the latest master when switching detail without an OUT phase", () => {
+    const { player, take, state } = setup();
+    take("A");
+    const updatedMaster = { ...master, tickerText: "TICKER SAAT GANTI DETAIL" };
+    player.receive({ type: "SWITCH_DETAIL", graphic: graphic("B"),
+      fields: { headline: "B" }, master: updatedMaster });
+    expect(state().graphic?.id).toBe("B");
+    expect(state().master.tickerText).toBe("TICKER SAAT GANTI DETAIL");
+  });
+  it("applies the switch master when restoring a missing prior graphic", () => {
+    const { player, state } = setup();
+    const incomingMaster = { ...master, tickerText: "MASTER BARU", showLiveBadge: true };
+    player.receive({ type: "SWITCH_DETAIL", graphic: graphic("B"),
+      fields: { headline: "B" }, master: incomingMaster });
+    expect(state().graphic?.id).toBe("B");
+    expect(state().master).toEqual(incomingMaster);
+  });
+  it("does not restore a stale master after the outgoing detail disappears", () => {
+    const { player, state } = setup();
+    player.receive({ type: "TAKE", graphic: graphic("A"),
+      fields: { headline: "A", layoutStyle: "sub", subline: "DETAIL LAMA" }, master });
+    player.receive({ type: "SWITCH_DETAIL", graphic: graphic("B"),
+      fields: { headline: "B", name: "Narasumber", contentMode: "sot" }, master });
+    const updatedMaster = { ...master, tickerText: "TICKER TERBARU", showLiveBadge: true };
+    player.receive({ type: "MASTER_UPDATE", master: updatedMaster });
+    vi.advanceTimersByTime(broadcastMotion.detailOutMs + 20);
+    expect(state().graphic?.id).toBe("B");
+    expect(state().master).toEqual(updatedMaster);
+  });
+  it("keeps UPDATE master and content while a detail switch is queued", () => {
+    const { player, state } = setup();
+    player.receive({ type: "TAKE", graphic: graphic("A"),
+      fields: { headline: "A", layoutStyle: "sub", subline: "DETAIL LAMA" }, master });
+    player.receive({ type: "SWITCH_DETAIL", graphic: graphic("B"), fields: { headline: "B" }, master });
+    const updatedMaster = { ...master, tickerText: "BERITA CEPAT" };
+    player.receive({ type: "UPDATE", graphicId: "B", fields: { headline: "B DIREVISI" }, master: updatedMaster });
+    vi.advanceTimersByTime(broadcastMotion.detailOutMs + 20);
+    expect(state().fields?.headline).toBe("B DIREVISI");
+    expect(state().master.tickerText).toBe("BERITA CEPAT");
+  });
+  it("waits for an ongoing TAKE OUT before applying a newer detail switch", () => {
+    const { player, take, state } = setup();
+    take("A", 10);
+    take("B", 11);
+    vi.advanceTimersByTime(180);
+    const newerMaster = { ...master, showLiveBadge: true, tickerText: "BERITA C" };
+    player.receive({ type: "SWITCH_DETAIL", graphic: graphic("C"),
+      fields: { headline: "C" }, master: newerMaster, revision: 12 });
+    player.receive({ type: "UPDATE", graphicId: "C",
+      fields: { headline: "C FINAL" }, master: newerMaster, revision: 13 });
+    expect(state().graphic?.id).toBe("A");
+    expect(state().exiting).toBe(true);
+    expect(state().master).toEqual(newerMaster);
+    vi.advanceTimersByTime(broadcastMotion.retainMs - 180);
+    expect(state().graphic?.id).toBe("C");
+    expect(state().fields?.headline).toBe("C FINAL");
+    expect(state().exiting).toBe(false);
+  });
 });
 
 describe("ticker canvas motion", () => {
-  it("rejects invalid master speeds and supports an urgent ticker revision", () => {
+  it("rejects invalid speeds and shared ticker writes through master PATCH", () => {
     expect(masterOverlayPatchSchema.safeParse({ tickerSpeed: 0 }).success).toBe(false);
     expect(masterOverlayPatchSchema.safeParse({ tickerSpeed: 251 }).success).toBe(false);
-    expect(masterOverlayPatchSchema.safeParse({ tickerSpeed: 85, tickerRevision: 42, tickerText: "Berita baru" }).success).toBe(true);
+    expect(masterOverlayPatchSchema.safeParse({ tickerSpeed: 85, tickerRevision: 42, tickerText: "Berita baru" }).success).toBe(false);
     expect(masterOverlayPatchSchema.safeParse({ outputFps: 25 }).success).toBe(true);
     expect(masterOverlayPatchSchema.safeParse({ outputFps: 30 }).success).toBe(true);
     expect(masterOverlayPatchSchema.safeParse({ outputFps: 60 }).success).toBe(true);

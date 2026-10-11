@@ -19,6 +19,7 @@ import {
 import { api, mutate } from "./api";
 import { BroadcastTemplateInfo } from "./VisualTemplatePicker";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
+import { RundownBroadcastEditor } from "./RundownBroadcastEditor";
 
 const duration = (seconds: number) =>
   `${seconds < 0 ? "+" : ""}${Math.floor(Math.abs(seconds) / 60)
@@ -53,12 +54,14 @@ type Props = {
 // =====================================================================
 export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSetup, master }: Props) {
   const [editing, setEditing] = useState<RundownItem | "new" | null>(null);
+  useEffect(() => setEditing(null), [rundown?.id]);
   const editingTrigger = useRef<HTMLButtonElement | null>(null);
   const closeEditor = () => {
     setEditing(null);
     requestAnimationFrame(() => editingTrigger.current?.focus());
   };
   const [pending, setPending] = useState(false);
+  const creatingRundown = useRef(false);
   const [search, setSearch] = useState("");
   const [renameTarget, setRenameTarget] = useState<Rundown | null>(null);
 
@@ -221,7 +224,11 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
 
           <button
             className="btn-prep-secondary"
+            disabled={pending}
             onClick={async () => {
+              if (pending || creatingRundown.current) return;
+              creatingRundown.current = true;
+              setPending(true);
               try {
                 const r = await mutate<Rundown>("/api/rundowns", "POST", {
                   programName: "Program Berita",
@@ -233,6 +240,9 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
                 toast("Rundown baru berhasil dibuat");
               } catch (e) {
                 toast((e as Error).message);
+              } finally {
+                creatingRundown.current = false;
+                setPending(false);
               }
             }}
           >
@@ -310,6 +320,7 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           </button>
         </div>
       </header>
+      {rundown && <RundownBroadcastEditor key={rundown.id} rundown={rundown} reload={reload} toast={toast} />}
 
       {/* Metrics Summary Strip */}
       {rundown && (
@@ -654,7 +665,10 @@ function StoryEditor({
   const titleEdited = useRef(false);
   const defaultSeedActive = useRef(!item);
   const editedSeedFields = useRef(new Set<string>());
+  const storyFieldsBeforeHighlight = useRef(new Map<number, Record<string, string>>());
   const [saving, setSaving] = useState(false);
+  const submitInFlight = useRef(false);
+  const savedStoryId = useRef(item?.id ?? null);
   const dialogRef = useRef<HTMLFormElement>(null);
   const onDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.key === "Escape" && !saving) {
@@ -771,6 +785,7 @@ function StoryEditor({
       if (!confirmed) return;
     }
     defaultSeedActive.current = false;
+    storyFieldsBeforeHighlight.current.clear();
     const headline = title.trim() || "HEADLINE BERITA";
     const baseLocation = graphics.find((g) => g.draftFields.location)?.draftFields.location || "";
     const baseSubline = graphics.find((g) => g.draftFields.subline)?.draftFields.subline || "";
@@ -855,15 +870,17 @@ function StoryEditor({
         onKeyDown={onDialogKeyDown}
         onSubmit={async (e) => {
           e.preventDefault();
+          if (submitInFlight.current) return;
           if (seconds < 1 || seconds > 21600) {
             setError("Durasi harus antara 00:01 dan 360:00.");
             return;
           }
+          submitInFlight.current = true;
           setSaving(true);
           setError("");
           try {
-            await mutate(`/api/rundowns/${rundown.id}/story`, "PUT", {
-              itemId: item?.id,
+            const saved = await mutate<RundownItem>(`/api/rundowns/${rundown.id}/story`, "PUT", {
+              itemId: savedStoryId.current,
               title,
               slug,
               format,
@@ -872,10 +889,12 @@ function StoryEditor({
               sortOrder: item?.sortOrder ?? rundown.items.length,
               graphics: graphics.map((g, i) => ({ ...g, sortOrder: i }))
             });
+            if (saved.id) savedStoryId.current = saved.id;
             await onSaved();
           } catch (err) {
             setError((err as Error).message);
           } finally {
+            submitInFlight.current = false;
             setSaving(false);
           }
         }}
@@ -1041,7 +1060,13 @@ function StoryEditor({
                         className="btn-remove-cue"
                         onClick={() => {
                           if (index === 0) defaultSeedActive.current = false;
+                          const remaining = new Map<number, Record<string, string>>();
+                          for (const [cueIndex, fields] of storyFieldsBeforeHighlight.current) {
+                            if (cueIndex !== index) remaining.set(cueIndex > index ? cueIndex - 1 : cueIndex, fields);
+                          }
+                          storyFieldsBeforeHighlight.current = remaining;
                           setGraphics((gs) => gs.filter((_, i) => i !== index));
+                          setPreviewIndex((current) => current > index ? current - 1 : current === index ? Math.max(0, current - 1) : current);
                         }}
                         title="Hapus materi CG ini"
                       >
@@ -1125,11 +1150,35 @@ function StoryEditor({
                                 const presentation = headlinePresentationSchema.parse(e.target.value);
                                 if (index === 0) defaultSeedActive.current = false;
                                 setPreviewIndex(index);
-                                setGraphics((gs) => gs.map((cue, i) => i === index ? {
-                                  ...cue, draftFields: { ...cue.draftFields,
-                                    ...(presentation === "bulletin" ? headlineBulletinPreset : {}),
-                                    headlinePresentation: presentation }
-                                } : cue));
+                                if (presentation === "bulletin" && g.draftFields.headlinePresentation !== "bulletin") {
+                                  storyFieldsBeforeHighlight.current.set(index, { ...g.draftFields });
+                                }
+                                const previousStoryFields = storyFieldsBeforeHighlight.current.get(index);
+                                if (presentation === "story") storyFieldsBeforeHighlight.current.delete(index);
+                                setGraphics((gs) => gs.map((cue, i) => {
+                                  if (i !== index) return cue;
+                                  const isDefaultHighlight = cue.draftFields.headlinePresentation === "bulletin" &&
+                                    cue.draftFields.kicker === headlineBulletinPreset.kicker;
+                                  const draftFields = presentation === "bulletin"
+                                    ? {
+                                        ...cue.draftFields,
+                                        ...headlineBulletinPreset,
+                                        kicker: cue.draftFields.kicker?.trim() || headlineBulletinPreset.kicker,
+                                        showKicker: "true"
+                                      }
+                                    : {
+                                        ...cue.draftFields,
+                                        headlinePresentation: "story",
+                                        ...Object.fromEntries((["contentMode", "layoutStyle", "showLocation", "showDetail", "visualTemplate"] as const)
+                                          .filter((field) => previousStoryFields?.[field] !== undefined)
+                                          .map((field) => [field, previousStoryFields![field]])),
+                                        ...(isDefaultHighlight ? {
+                                          kicker: previousStoryFields?.kicker || "",
+                                          showKicker: previousStoryFields?.showKicker ?? "false"
+                                        } : {})
+                                      };
+                                  return { ...cue, draftFields };
+                                }));
                               }}>
                               <option value="story">Judul berita biasa</option>
                               <option value="bulletin">Highlight / ringkasan berita</option>

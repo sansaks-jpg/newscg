@@ -21,7 +21,7 @@ import {
 import { mutate } from "./api";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
-import { getBroadcastColorTheme, getGraphicFieldLimit, normalizeHeadlineTopicFields, selectBroadcastColorTheme, tickerPresets } from "@newscg/shared";
+import { emptyRundownTicker, getBroadcastColorTheme, getGraphicFieldLimit, getRundownTickerSpeed, normalizeHeadlineTopicFields, selectBroadcastColorTheme } from "@newscg/shared";
 import { BroadcastColorThemePicker } from "./VisualTemplatePicker";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
 import "./simple-production.css";
@@ -61,6 +61,7 @@ export function SimpleProductionEditor({
   live,
   onUpdateMaster
 }: Props) {
+  const rundownTickerSpeed = useMemo(() => getRundownTickerSpeed(rundown?.ticker ?? emptyRundownTicker), [rundown?.ticker]);
   const [localCueFields, setLocalCueFields] = useState<Record<string, Record<string, string>>>({});
   const localCueFieldsRef = useRef(localCueFields);
   const items = useMemo(() => (rundown?.items || []).map((item) => {
@@ -182,8 +183,7 @@ export function SimpleProductionEditor({
     stagedMaster.showLogo !== master.showLogo ||
     stagedMaster.showTicker !== master.showTicker ||
     stagedMaster.showLiveBadge !== master.showLiveBadge ||
-    stagedMaster.tickerSpeed !== master.tickerSpeed ||
-    stagedMaster.tickerText !== master.tickerText ||
+    (rundown && stagedMaster.showTicker && (master.tickerRundownId !== rundown.id || master.tickerText !== (rundown.ticker?.text ?? "") || master.tickerSpeed !== rundownTickerSpeed)) ||
     getBroadcastColorTheme(stagedMaster.colorTheme).id !== getBroadcastColorTheme(master.colorTheme).id ||
     stagedMaster.brandText !== master.brandText ||
     stagedMaster.logoText !== master.logoText ||
@@ -487,11 +487,12 @@ export function SimpleProductionEditor({
     commandLock.current = true;
     setBusy(true);
     try {
-      await onUpdateMaster(urgent ? {
-        tickerText: stagedMaster.tickerText, tickerSpeed: stagedMaster.tickerSpeed, tickerRevision: Date.now()
-      } : { showLogo: stagedMaster.showLogo, showTicker: stagedMaster.showTicker,
-        showLiveBadge: stagedMaster.showLiveBadge, tickerSpeed: stagedMaster.tickerSpeed,
-        tickerText: stagedMaster.tickerText,
+      if (urgent || (stagedMaster.showTicker && rundown)) {
+        if (!rundown) throw new Error("Pilih rundown sebelum menerapkan ticker");
+        await mutate("/api/live/ticker", "POST", { rundownId: rundown.id, immediate: urgent }, true);
+      }
+      if (!urgent) await onUpdateMaster({ showLogo: stagedMaster.showLogo, showTicker: stagedMaster.showTicker,
+        showLiveBadge: stagedMaster.showLiveBadge,
         colorTheme: getBroadcastColorTheme(stagedMaster.colorTheme).id,
         brandText: stagedMaster.brandText, logoText: stagedMaster.logoText, logoSub: stagedMaster.logoSub });
       if (!urgent) isUserStagingMasterRef.current = false;
@@ -503,7 +504,7 @@ export function SimpleProductionEditor({
       commandLock.current = false;
       setBusy(false);
     }
-  }, [isMasterChanged, stagedMaster, onUpdateMaster, reload, toast]);
+  }, [isMasterChanged, stagedMaster, rundown, onUpdateMaster, reload, toast]);
 
   // OUT preserves the selected cue and any unsent draft.
   const executeClear = useCallback(async () => {
@@ -930,26 +931,16 @@ export function SimpleProductionEditor({
         </div>
         <details className="live-ticker-settings">
           <summary>Ticker & master · {master.showLogo ? "Logo aktif" : "Logo mati"} · {master.showTicker ? "Ticker aktif" : "Ticker mati"} · {master.showLiveBadge ? "Live aktif" : "Live mati"}</summary>
-          <label>Isi ticker berikutnya
-            <textarea rows={3} value={stagedMaster.tickerText} disabled={busy} onChange={(event) => {
-              isUserStagingMasterRef.current = true;
-              setStagedMaster((previous) => ({ ...previous, tickerText: event.target.value }));
-            }} />
+          <label>Ticker rundown · {rundown?.title || "Belum dipilih"}
+            <textarea rows={3} value={rundown?.ticker?.text ?? ""} readOnly />
           </label>
+          <small>{rundown?.broadcastSchedule ? `Tayang ${rundown.broadcastSchedule.date} ${rundown.broadcastSchedule.time} ${rundown.broadcastSchedule.timezone}` : "Jadwal belum diisi"} · Edit jadwal dan materi ticker di Rundown & CG.</small>
           <label>Kecepatan
-            <select value={stagedMaster.tickerSpeed || 85} disabled={busy} onChange={(event) => {
-              isUserStagingMasterRef.current = true;
-              setStagedMaster((previous) => ({ ...previous, tickerSpeed: Number(event.target.value) }));
-            }}>
-              <option value={tickerPresets.slow}>Lambat · 65 px/detik</option>
-              <option value={tickerPresets.normal}>Normal · 85 px/detik</option>
-              <option value={tickerPresets.fast}>Cepat · 105 px/detik</option>
-              {![65, 85, 105].includes(stagedMaster.tickerSpeed || 85) && <option value={stagedMaster.tickerSpeed}>{stagedMaster.tickerSpeed} px/detik (kustom)</option>}
-            </select>
+            <input readOnly value={`${rundownTickerSpeed} px/detik · ${rundown?.ticker?.speedMode === "manual" ? "Manual" : "Otomatis seimbang"}`} />
           </label>
           <button type="button" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER · M</button>
-          <button type="button" disabled={busy || !stagedMaster.showTicker || Boolean(live.onAirSnapshot?.ticker?.trim())} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
-          <small>Perubahan normal masuk saat segmen berikutnya. Ticker segera mengganti teks sekarang. Jika cue aktif memiliki ticker sendiri, ubah ticker pada cue tersebut; Ticker segera dinonaktifkan.</small>
+          <button type="button" disabled={busy || !stagedMaster.showTicker || !rundown} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
+          <small>TERAPKAN MASTER memakai ticker rundown yang dipilih. Ticker segera menerapkannya dan mereset guliran. Memilih atau menyunting rundown tidak mengubah Program.</small>
         </details>
 
         {/* Monitor Pratinjau Dual Deck (Standby Stage Preview + Mini Live Monitor) */}
@@ -967,7 +958,7 @@ export function SimpleProductionEditor({
             <BroadcastPreviewBox
               graphic={selectedCue}
               fields={effectivePreviewFields}
-              master={stagedMaster}
+              master={{ ...stagedMaster, tickerText: rundown?.ticker?.text ?? "", tickerSpeed: rundownTickerSpeed, tickerRundownId: rundown?.id ?? null }}
               emptyText="LAYAR BERSIH — TEKAN ↑ / ↓ UNTUK MEMILIH BERITA"
             />
           </div>
