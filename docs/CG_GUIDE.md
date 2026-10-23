@@ -2,6 +2,10 @@
 
 Highlight tersedia di **Rundown & CG → Tambah/Edit Berita → + Highlight Berita**. Label HIGHLIGHT memakai tab topik di atas judul, sehingga judul mendapat ruang penuh tanpa panel label samping. Warna mengikuti master CNN atau studio. Satu cue menampilkan satu judul. Tambahkan beberapa cue sesuai urutan untuk ringkasan awal bulletin, pilih di Produksi, kemudian TAKE. Pergantian judul dikendalikan operator; tidak ada rotasi atau penayangan otomatis.
 
+Pada template **Liputan7**, tab topik memakai bahasa visual template sendiri: latar **burgundy**, teks **ivory**, garis aksen **sand** di sisi kiri, tinggi 32 px, menempel di **kiri atas** panel headline (x=384). Bila cue juga menampilkan lokasi, tab topik bertumpuk di atas tab lokasi. Topik biasa (bukan HIGHLIGHT) memakai gaya tab yang sama. Contoh interaktif tersedia di galeri `/templates/liputan7` (pilihan “Highlight (tab topik)”) dan `/templates/cnn` (pilihan “Highlight (tab topik)”), tanpa koneksi SSE atau perintah live.
+
+Di panel Produksi, saat Preview menampilkan cue **HIGHLIGHT**, panah **→ / ←** berpindah antar judul highlight pada berita tersebut; Spasi/Enter tetap menjalankan TAKE/UPDATE. Pada cue biasa, **→** menjalankan TAKE/UPDATE dan **←** menjadi OUT. Navigasi narasumber SOT memakai `PageUp`/`PageDown`.
+
 ## Jenis grafis berita dan referensi CNN
 
 Riset diakses 10 Oktober 2026. Paket CNN berbeda menurut negara, program, dan periode. Uraian CNN 2023 di bawah merupakan referensi historis desain, bukan klaim bahwa seluruh siaran CNN hari ini memakai susunan yang identik. CNN Indonesia TV tidak berhasil diakses melalui alat riset pada sesi ini; kecocokan visual dengan siaran terbarunya belum diverifikasi.
@@ -31,6 +35,27 @@ Baris yang belum tersedia merupakan peta kebutuhan produksi, bukan fitur yang te
 
 Untuk liputan khusus, pembuat paket CNN Election, BIGSTAR, mendokumentasikan lower thirds/locators, peta, struktur data, dan toolkit animasi. Ini membuktikan bahwa kebutuhan paket berita dapat meluas ke grafis data serta paket acara, di luar teks overlay harian. [BIGSTAR — CNN Election Package](https://bgstr.com/work/project/cnn-election-package/).
 
+## News anchor default
+
+Nama anchor dapat disimpan sekali di **Pengaturan Default → Default News Anchor**.
+Di Produksi, **P** menyiapkan nama/jabatan tersebut di Preview; **Spasi/Enter**
+TAKE atau UPDATE ke Program. **P** lagi kembali ke cue berita tanpa mengubah
+Program; **Esc/C** menjalankan OUT. Berlaku untuk CNN, seluruh warna Studio,
+Liputan7, dan BCC News. Anchor default tidak ditambahkan ke daftar CG setiap berita dan
+bisa dipakai tanpa rundown. Detail penggunaan ada di [NEWS_ANCHOR_DEFAULT.md](NEWS_ANCHOR_DEFAULT.md).
+
+## Reporter lapangan default
+
+Nama reporter lapangan disimpan di **Pengaturan Default → Default Reporter Lapangan**
+(nama, jabatan bawaan `Reporter Lapangan`, dan lokasi liputan opsional). Di
+Produksi, **O** menyiapkan CG `REPORTER` dari default tersebut di Preview;
+**Spasi/→** menayangkan atau memperbarui, **O** lagi kembali ke cue, dan
+**Esc/C/←** menjalankan OUT. Fitur ini tidak membuat cue rundown dan tidak
+mengubah master/ticker. Berbeda dari cue `REPORTER` yang tersimpan pada berita
+tertentu; saat Preview reporter lapangan aktif, edit cue dan toggle
+lokasi/topik/detail dinonaktifkan sampai kembali ke cue. Detail ada di
+[REPORTER_LAPANGAN_DEFAULT.md](REPORTER_LAPANGAN_DEFAULT.md).
+
 ## Field dan cara mengoperasikan highlight
 
 Template tetap `HEADLINE`, sehingga rundown lama dan alur TAKE/UPDATE/CLEAR tetap kompatibel. Kontrak berada di `packages/shared/src/index.ts`:
@@ -47,11 +72,13 @@ Template tetap `HEADLINE`, sehingga rundown lama dan alur TAKE/UPDATE/CLEAR teta
 
 Jenis Headline dapat dipilih di editor berita. Label disunting lewat Sub Topik/Kicker; label dan judul juga tersedia di Edit Cepat Produksi. Topik memakai AutoSquishText dan animasi topik yang sama: judul selesai masuk sebelum topik masuk; topik keluar sebelum panel judul. Master logo/ticker tetap mandiri. Output tetap `/output`, canvas transparan 1920 × 1080. Mengubah teks melalui UPDATE mempertahankan panel yang sama tanpa mengulang IN; CLEAR memainkan OUT dan mempertahankan master.
 
+Tab topik mengikuti template: paket CNN/Studio memakai strip gelap dengan teks terang; paket Liputan7 memakai tab burgundy–ivory bergaris sand di kiri atas panel (sejajar x=384). Pada Liputan7, tab topik selalu rata kiri dan tidak memakai panel samping. Panah kanan/kiri di Produksi berpindah judul highlight; Spasi/Enter menayangkan judul yang sedang di Preview.
+
 `headlineLabel` (1–24 karakter) hanya diterima untuk kompatibilitas preset samping lama. Pada cue `bulletin`, label lama dipindahkan ke `kicker` bila topik belum terisi; label contoh `HEADLINE` menjadi `HIGHLIGHT`. Editor dan PATCH menormalisasi ke field topik tanpa mengubah data secara in-place. Semua materi baru menggunakan `kicker`/`showKicker`.
 
 ## Edit melalui agent
 
-Mulai `GET /api/agent`. `graphicPresets` menyediakan preset `headline-bulletin`; `links.cgGuide` menunjuk panduan ini dan OpenAPI mempublikasikan field/batasnya. Gabungkan preset dengan judul yang benar dari sumber:
+Mulai `GET /api/agent`. `graphicPresets` menyediakan preset `headline-bulletin`; `links.cgGuide` menunjuk panduan ini dan OpenAPI mempublikasikan field/batasnya. Preset yang sama dipakai oleh pilihan **Highlight (tab topik)** di galeri `/templates/liputan7` dan `/templates/cnn`. Gabungkan preset dengan judul yang benar dari sumber:
 
 ```json
 {

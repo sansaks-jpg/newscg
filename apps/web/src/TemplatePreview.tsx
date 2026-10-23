@@ -6,11 +6,12 @@ import { BroadcastColorThemePicker } from "./VisualTemplatePicker";
 import { createOverlayPlayback } from "./overlayPlayback";
 
 const examples = {
-  single: { label: "Headline tunggal", type: "HEADLINE" as const, headline: "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN", subline: "", kicker: "" },
-  detail: { label: "Headline + detail", type: "HEADLINE" as const, headline: "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN", subline: "Informasi dan perkembangan terbaru dari kampus", kicker: "" },
-  topic: { label: "Topik + headline", type: "HEADLINE" as const, headline: "INFORMASI TERBARU DARI POLIMEDIA", subline: "Laporan langsung tim redaksi", kicker: "KABAR KAMPUS" },
-  presenter: { label: "Nama pembawa berita", type: "REPORTER" as const, headline: "NAMA PEMBAWA BERITA", subline: "@akunnewsanda", kicker: "" },
-  sot: { label: "Nama narasumber / SOT", type: "SOT" as const, headline: "INFORMASI TERBARU DARI POLIMEDIA", subline: "Jabatan narasumber", kicker: "" }
+  single: { label: "Headline tunggal", type: "HEADLINE" as const, headline: "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN", subline: "", kicker: "", presentation: "story" as const },
+  detail: { label: "Headline + detail", type: "HEADLINE" as const, headline: "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN", subline: "Informasi dan perkembangan terbaru dari kampus", kicker: "", presentation: "story" as const },
+  topic: { label: "Topik + headline", type: "HEADLINE" as const, headline: "INFORMASI TERBARU DARI POLIMEDIA", subline: "Laporan langsung tim redaksi", kicker: "KABAR KAMPUS", presentation: "story" as const },
+  highlight: { label: "Highlight (tab topik)", type: "HEADLINE" as const, headline: "KEMARAU → HARGA SAYURAN", subline: "", kicker: "HIGHLIGHT", presentation: "bulletin" as const },
+  presenter: { label: "Nama pembawa berita", type: "REPORTER" as const, headline: "NAMA PEMBAWA BERITA", subline: "@akunnewsanda", kicker: "", presentation: "story" as const },
+  sot: { label: "Nama narasumber / SOT", type: "SOT" as const, headline: "INFORMASI TERBARU DARI POLIMEDIA", subline: "Jabatan narasumber", kicker: "", presentation: "story" as const }
 };
 
 function demoFields(example: (typeof examples)[keyof typeof examples]): Record<string, string> {
@@ -18,6 +19,7 @@ function demoFields(example: (typeof examples)[keyof typeof examples]): Record<s
     visualTemplate: "cnn", headline: example.headline, subline: example.subline,
     name: example.type === "SOT" ? "NAMA NARASUMBER" : example.headline,
     role: example.subline, socialHandle: example.subline, kicker: example.kicker,
+    headlinePresentation: example.presentation,
     contentMode: example.type === "REPORTER" ? "presenter" : example.type === "SOT" ? "sot" : "headline",
     layoutStyle: example.subline ? "sub" : "single",
     location: "Polimedia, Jakarta", showLocation: example.type === "REPORTER" ? "false" : "true",

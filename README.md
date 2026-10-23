@@ -15,7 +15,7 @@ Sistem ini beroperasi 100% berbasis web-native yang siap di-embed langsung ke be
 - **Perlindungan Idempotency & Antrean Aksi**: Dilengkapi proteksi klik ganda (*double-click protection*) dan antrean serial (*action queue*) untuk mencegah konflik status siaran.
 - **Templat Grafis Standar Siaran TV**:
   - **HEADLINE**: Kicker tab, judul utama, subline/lead, lokasi, running ticker, dan branding. Mendukung varian komposisi dinamis (toggle lokasi, toggle topik, toggle detail, dan clean headline).
-  - **HIGHLIGHT BERITA**: Label HIGHLIGHT pada tab topik di atas judul, tersedia lewat **+ Highlight Berita**. Label memakai field `kicker` dan kontrol topik T; satu judul besar per cue tanpa panel samping. Susun beberapa cue untuk ringkasan awal bulletin. Tetap menggunakan template HEADLINE dengan `headlinePresentation: "bulletin"`.
+  - **HIGHLIGHT BERITA**: Label HIGHLIGHT pada tab topik di atas judul, tersedia lewat **+ Highlight Berita**. Label memakai field `kicker` dan kontrol topik T; satu judul besar per cue tanpa panel samping. Susun beberapa cue untuk ringkasan awal bulletin. Tetap menggunakan template HEADLINE dengan `headlinePresentation: "bulletin"`. Warna tab mengikuti template: strip gelap pada paket CNN/Studio dan tab **burgundy–ivory bergaris sand di kiri atas panel** pada Liputan7. Saat Preview berupa HIGHLIGHT, panah **→ / ←** berpindah antar judul highlight.
   - **REPORTER**: Nama presenter/reporter, jabatan/role, lokasi, dan social media handle.
   - **SOT**: Headline berita, nama narasumber, dan jabatan/institusi.
   - **LOCATION**: Tag lokasi pojok kiri atas (*location bug*).
@@ -25,7 +25,8 @@ Sistem ini beroperasi 100% berbasis web-native yang siap di-embed langsung ke be
   - Live Bug & Jam Digital otomatis berbasis zona waktu (WIB, WITA, WIT, CUSTOM).
   - Running Ticker / Crawl Berita di bagian bawah layar dengan pengaturan kecepatan (px/detik) dan label program otomatis pas huruf (*auto-fit*).
 - **Auto-Squish Typography**: Algoritma cerdas yang otomatis menyesuaikan rasio kompresi font (*horizontal squish*) agar teks panjang tidak pernah meluber melewati batas *Safe Area* siaran.
-- **Keyboard Shortcuts Cepat**: Dukungan penuh shortcut keyboard (`Space`/`Enter` untuk TAKE/UPDATE, `U` untuk Update, `Esc`/`C` untuk OUT, `0` untuk ALL OUT (animasi), `M` untuk Terapkan Master, dll.).
+- **Keyboard Shortcuts Cepat**: Dukungan penuh shortcut keyboard (`Space`/`Enter`/`→` untuk TAKE/UPDATE, `←` untuk OUT, saat HIGHLIGHT `→`/`←` berpindah judul, `P` news anchor, `O` reporter lapangan, `U` untuk Update, `Esc`/`C` untuk OUT, `0` untuk ALL OUT (animasi), `M` untuk Terapkan Master, dll.).
+- **News Anchor & Reporter Lapangan Default**: Nama/jabatan anchor dan nama/jabatan/lokasi reporter lapangan disimpan di Pengaturan Default. `P` menyiapkan anchor, `O` menyiapkan reporter lapangan di Preview tanpa membuat cue rundown; Spasi/→ menayangkan. Data tersimpan di server dan tersedia lewat API.
 - **Impor & Ekspor Rundown**: Dukungan pencadangan dan pemindahan rundown siaran dalam format JSON.
 - **100% Offline & LAN-Ready**: Berjalan sepenuhnya di jaringan lokal tanpa ketergantungan koneksi internet publik.
 
@@ -44,6 +45,8 @@ Ketiganya memakai ukuran, susunan, serta animasi IN/UPDATE/OUT CNN yang sama. Wa
 Di panel Produksi, pilih **Warna template**, periksa Preview, lalu tekan **TERAPKAN MASTER / M**. Pilih warna saja belum mengubah Program. **TICKER SEGERA** hanya menerapkan teks/kecepatan ticker; pilihan warna yang masih di Preview tetap menunggu MASTER. Warna juga dapat dipilih di **Settings → Pengaturan Default Siaran & Ticker**, lalu diterapkan lewat **Simpan Default Master**.
 
 Galeri `/templates/studio` memperlihatkan CG di atas foto virtual set referensi, dengan kontrol variasi teks dan animasi. Galeri tidak terhubung ke output live. `/templates/cnn` tetap dapat dibuka. Pilihan warna disimpan pada master overlay sebagai `colorTheme` dan ikut dikirim dalam event SSE. Data lama tanpa pilihan warna tetap menggunakan CNN.
+
+Galeri `/templates/liputan7` menampilkan paket **Liputan7 · HOC TV** beserta contoh **HIGHLIGHT** (tab topik burgundy–ivory di kiri atas panel) dan variasi topik biasa (lihat [docs/LIPUTAN7_TEMPLATE.md](docs/LIPUTAN7_TEMPLATE.md)). Galeri `/templates/bcc` menampilkan paket **BCC News** (merah marun, krem, oranye, logo BCC di kiri, dan running text) dengan susunan dan timing animasi CNN (lihat panduan teknis di [docs/BCC_NEWS_TEMPLATE.md](docs/BCC_NEWS_TEMPLATE.md)). Seluruh galeri memakai renderer yang sama dengan `/output`, tidak membuka SSE, dan tidak mengirim perintah live.
 
 Logo upload yang disarankan: **PNG transparan 800 × 500 px**, ruang kosong sekitar **40 px** di setiap tepi, maksimal **2 MB**. SVG juga didukung. Logo ditempatkan secara proporsional tanpa dipotong. Saat memilih warna studio, identitas contoh CNN diganti menjadi teks sementara NEWS; nama kustom dan logo yang sudah diunggah tetap dipertahankan.
 
@@ -144,14 +147,17 @@ Server produksi terpadu akan melayani dashboard dan overlay di `http://localhost
 
 | Tombol | Aksi | Keterangan |
 |---|---|---|
-| `Space` / `Enter` | **TAKE / COMMIT** | Menayangkan grafis terpilih ke siaran live (atau perbarui live jika grafis yang sama sedang tayang) |
+| `Space` / `Enter` / `→` | **TAKE / COMMIT** | Menayangkan grafis terpilih ke siaran live (atau perbarui live jika grafis yang sama sedang tayang). Pada cue HIGHLIGHT, `→` berpindah ke judul highlight berikutnya. |
+| `←` | **OUT** | Menarik lower third yang sedang tayang dengan animasi keluar; master tetap tampil. Pada cue HIGHLIGHT, `←` berpindah ke judul highlight sebelumnya. |
 | `U` | **UPDATE LIVE** | Memperbarui teks/data pada grafis yang sedang tayang tanpa animasi ulang |
 | `Escape` / `C` | **CLEAR CG** | Menarik grafis lower third keluar dari siaran live dengan animasi transisi keluar |
 | `0` | **ALL OUT (ANIMASI)** | Menarik keluar seluruh grafis di layar (termasuk logo dan ticker) dengan transisi animasi halus. Untuk blackout instan darurat, gunakan tombol UI 'CLEAR ALL Darurat' |
 | `1` | **STAGE LOGO** | Toggle Logo di Preview (tekan `M` untuk menerapkan ke siaran live) |
 | `2` | **STAGE TICKER & LIVE** | Toggle Ticker dan badge LIVE di Preview (tekan `M` untuk menerapkan ke siaran live) |
 | `M` | **TERAPKAN MASTER** | Menerapkan perubahan staging logo / ticker / live badge ke siaran live |
-| `K` | **SOT NARASUMBER** | Buka/tutup LT SOT narasumber (`ArrowLeft`/`ArrowRight` untuk pilih narasumber) |
+| `P` | **NEWS ANCHOR** | Siapkan news anchor default di Preview (`Spasi`/`→` TAKE/UPDATE, `P` lagi kembali ke cue). |
+| `O` | **REPORTER LAPANGAN** | Siapkan reporter lapangan default (nama/jabatan/lokasi) di Preview (`Spasi`/`→` TAKE/UPDATE, `O` lagi kembali ke cue). |
+| `K` | **SOT NARASUMBER** | Buka/tutup LT SOT narasumber (`PageUp`/`PageDown` untuk pilih narasumber) |
 | `H` | **MODE HEADLINE** | Mengatur template ke mode Headline Bersih |
 | `L` | **TOGGLE LOKASI** | Menampilkan atau menyembunyikan elemen lokasi pada grafis |
 | `T` | **TOGGLE TOPIK** | Menampilkan atau menyembunyikan kicker / topik di atas headline |

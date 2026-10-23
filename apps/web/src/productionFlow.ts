@@ -1,9 +1,11 @@
-import type { LiveShortcut } from "@newscg/shared";
+import type { BroadcastTemplateId, LiveShortcut } from "@newscg/shared";
 export type { LiveShortcut } from "@newscg/shared";
 
 const shortcuts: Record<string, LiveShortcut> = {
   " ": "take",
   Enter: "take",
+  ArrowRight: "advance",
+  ArrowLeft: "back",
   u: "update",
   m: "master",
   Escape: "clear",
@@ -12,10 +14,12 @@ const shortcuts: Record<string, LiveShortcut> = {
   "1": "logo",
   "2": "full",
   h: "headline",
+  p: "news-anchor",
+  o: "reporter",
   l: "location",
   k: "sot",
-  ArrowLeft: "previous-sot",
-  ArrowRight: "next-sot",
+  PageUp: "previous-sot",
+  PageDown: "next-sot",
   t: "topic",
   d: "detail",
   ArrowUp: "previous",
@@ -25,6 +29,7 @@ const shortcuts: Record<string, LiveShortcut> = {
 export function liveShortcut(
   key: string,
   context: {
+    broadcastTemplate?: BroadcastTemplateId;
     disabled?: boolean;
     editing?: boolean;
     interactive?: boolean;
@@ -33,6 +38,7 @@ export function liveShortcut(
   }
 ): LiveShortcut | null {
   if (context.disabled || context.editing || context.repeat || context.modified) return null;
+  if (key === "3") return (context.broadcastTemplate === "liputan7" || context.broadcastTemplate === "bcc") ? "ticker" : null;
   if (context.interactive && (key === " " || key === "Enter")) return null;
   return shortcuts[key] || shortcuts[key.toLowerCase()] || null;
 }

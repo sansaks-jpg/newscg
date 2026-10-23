@@ -1,0 +1,110 @@
+[
+  {
+    "mode": "no-preference",
+    "reported": false,
+    "layers": [
+      {
+        "selector": ".l7-red-foundation",
+        "name": "l7-foundation-in",
+        "duration": "0.6s",
+        "delay": "0s"
+      },
+      {
+        "selector": ".l7-title-surface",
+        "name": "l7-plate-in",
+        "duration": "0.5s",
+        "delay": "0.2s"
+      },
+      {
+        "selector": ".l7-title-copy",
+        "name": "l7-copy-in",
+        "duration": "0.35s",
+        "delay": "0.4s"
+      },
+      {
+        "selector": ".l7-detail-surface",
+        "name": "l7-plate-in",
+        "duration": "0.4s",
+        "delay": "0.4s"
+      },
+      {
+        "selector": ".l7-location-surface",
+        "name": "l7-location-in",
+        "duration": "0.36s",
+        "delay": "0.7s"
+      },
+      {
+        "selector": ".l7-program",
+        "name": "l7-logo-in",
+        "duration": "0.48s",
+        "delay": "0s"
+      },
+      {
+        "selector": ".l7-tv-logo",
+        "name": "l7-logo-in",
+        "duration": "0.48s",
+        "delay": "0s"
+      },
+      {
+        "selector": ".l7-ticker",
+        "name": "l7-logo-in",
+        "duration": "0.48s",
+        "delay": "0s"
+      }
+    ]
+  },
+  {
+    "mode": "reduce",
+    "reported": true,
+    "layers": [
+      {
+        "selector": ".l7-red-foundation",
+        "name": "l7-foundation-in",
+        "duration": "1e-05s",
+        "delay": "0s"
+      },
+      {
+        "selector": ".l7-title-surface",
+        "name": "l7-plate-in",
+        "duration": "1e-05s",
+        "delay": "0.2s"
+      },
+      {
+        "selector": ".l7-title-copy",
+        "name": "l7-copy-in",
+        "duration": "1e-05s",
+        "delay": "0.4s"
+      },
+      {
+        "selector": ".l7-detail-surface",
+        "name": "l7-plate-in",
+        "duration": "1e-05s",
+        "delay": "0.4s"
+      },
+      {
+        "selector": ".l7-location-surface",
+        "name": "l7-location-in",
+        "duration": "1e-05s",
+        "delay": "0.7s"
+      },
+      {
+        "selector": ".l7-program",
+        "name": "l7-logo-in",
+        "duration": "1e-05s",
+        "delay": "0s"
+      },
+      {
+        "selector": ".l7-tv-logo",
+        "name": "l7-logo-in",
+        "duration": "1e-05s",
+        "delay": "0s"
+      },
+      {
+        "selector": ".l7-ticker",
+        "name": "l7-logo-in",
+        "duration": "1e-05s",
+        "delay": "0s"
+      }
+    ]
+  }
+]

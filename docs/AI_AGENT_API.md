@@ -19,7 +19,7 @@ API saat ini tidak memakai API key/token dan ditujukan untuk komputer lokal atau
 | `GET /api/agent/rundown-guide.md` | Panduan memasukkan rundown dari kiriman user. |
 | `GET /api/agent/cg-guide.md` | Jenis CG, referensi CNN, preset headline pembuka, dan cara edit. |
 
-Discovery juga menyediakan `graphicPresets`. Preset `headline-bulletin` (Highlight Berita) memakai template `HEADLINE` dengan `headlinePresentation: "bulletin"`, `kicker: "HIGHLIGHT"`, dan `showKicker: "true"`. Label berada pada tab topik di atas judul. Tambahkan `headline` dari sumber sebelum POST. Edit label melalui `kicker` (maksimal 60 karakter), sama seperti topik biasa. `headlineLabel` sudah deprecated dan hanya diterima untuk kompatibilitas data lama. Lihat [CG_GUIDE.md](CG_GUIDE.md) untuk contoh lengkap dan urutan highlight.
+Discovery juga menyediakan `graphicPresets`. Preset `headline-bulletin` (Highlight Berita) memakai template `HEADLINE` dengan `headlinePresentation: "bulletin"`, `kicker: "HIGHLIGHT"`, dan `showKicker: "true"`. Label berada pada tab topik di atas judul. Tambahkan `headline` dari sumber sebelum POST. Edit label melalui `kicker` (maksimal 60 karakter), sama seperti topik biasa. `headlineLabel` sudah deprecated dan hanya diterima untuk kompatibilitas data lama. Preset ini juga dipakai contoh **Highlight (tab topik)** di galeri `/templates/liputan7`, `/templates/cnn`, dan `/templates/bcc`; pada Liputan7 tab topik tampil di kiri atas dengan warna burgundy–ivory template, dan pada BCC News tampil dengan warna oranye bergaris miring. Di panel Produksi, panah →/← berpindah antar cue highlight saat Preview HIGHLIGHT, sedangkan pada cue biasa → menjalankan TAKE/UPDATE dan ← menjalankan OUT. Lihat [CG_GUIDE.md](CG_GUIDE.md) untuk contoh lengkap dan urutan highlight. Detail template BCC News tersedia di [BCC_NEWS_TEMPLATE.md](BCC_NEWS_TEMPLATE.md).
 
 Untuk revisi headline, mulai `GET /api/graphics/{graphicId}`, lalu `PATCH /api/graphics/{graphicId}` dengan `{"draftFields":{"headline":"JUDUL REVISI"}}`, kemudian GET kembali. Untuk judul edisi/program gunakan PATCH rundown; untuk judul berita gunakan PATCH item. Ketiganya data terpisah, sehingga mengganti headline tidak otomatis mengganti judul berita/edisi. Jika user meminta semuanya berubah, PATCH tiap entitas dan baca kembali. Seluruh perubahan materi tersebut tetap menunggu UPDATE/TAKE eksplisit untuk diterapkan ke Program.
 
@@ -171,6 +171,10 @@ Impor menerima objek rundown atau envelope `schemaVersion: 1`. Bila versi dicant
 | `PATCH /api/settings` | Hanya `outputMode: "web"`; key internal/master ditolak. |
 | `GET /api/settings/headline-defaults` | Nilai awal headline/lokasi/topik/detail. |
 | `PATCH /api/settings/headline-defaults` | Sebagian `headline`, `location`, `kicker`, `subline`; minimal satu field, field lain dipertahankan. |
+| `GET /api/settings/news-anchor-defaults` | Default global `{name,role}` untuk hotkey P di seluruh template; bukan cue rundown. |
+| `PATCH /api/settings/news-anchor-defaults` | Edit sebagian `name`/`role`; field lain dipertahankan. Tidak mengubah snapshot Program. |
+| `GET /api/settings/reporter-defaults` | Default global reporter lapangan `{name,role,location}` untuk hotkey O di seluruh template; bukan cue rundown. |
+| `PATCH /api/settings/reporter-defaults` | Edit sebagian `name`/`role`/`location`; field lain dipertahankan. Tidak mengubah snapshot Program. |
 | `POST /api/uploads/logo` | Binary gambar dengan Content-Type gambar; hasil `{url,width,height}`. |
 | `GET /api/live/master` | Baca master saat ini. |
 | `PATCH /api/live/master` | Terapkan sebagian master **langsung ke output**. |
@@ -279,6 +283,8 @@ Menambah/edit materi memberi izin menyimpan materi tersebut. Menjalankan TAKE/UP
 | `GET /api/live/state` | Baca pilihan cue, snapshot Program, koneksi, dan hasil perintah. |
 | `POST /api/live/prepare` | `{"graphicId":"ID-CG"}`; hanya pilih cue standby, tidak menayangkan. |
 | `POST /api/live/take` | `{"graphicId":"ID-CG"}`; `presentation:"clean"` opsional untuk headline bersih. Item dengan `cgRequired:false` tetap ditolak. |
+| `POST /api/live/news-anchor` | `{action:"take"}` atau `{action:"update",defaults:{name:"NAMA",role:"News Anchor"}}`. `action` default take; tanpa `defaults` membaca pengaturan server. Idempotency-Key berlaku. Tidak membuat cue atau mengganti ticker/master. UPDATE hanya saat anchor sedang Program. |
+| `POST /api/live/reporter` | `{action:"take"}` atau `{action:"update",defaults:{name:"NAMA",role:"Reporter Lapangan",location:"JAKARTA SELATAN"}}`. `action` default take; tanpa `defaults` membaca pengaturan server. Idempotency-Key berlaku. Tidak membuat cue atau mengganti ticker/master. UPDATE hanya saat reporter lapangan sedang Program. |
 | `POST /api/live/update` | `{"graphicId":"ID-CG","syncComposition":false}`; false/diabaikan mempertahankan lokasi/topik/layout live. true menerapkan komposisi tersimpan. |
 | `POST /api/live/variant` | `{"graphicId":"ID-CG","action":"toggle-kicker"}`; aksi: `clean-headline`, `toggle-location`, `toggle-kicker`, `toggle-detail`. |
 | `POST /api/live/clear` | Body opsional `{}`; lower third OUT, master tetap aktif. |

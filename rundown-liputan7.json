@@ -1,0 +1,711 @@
+{
+  "schemaVersion": 1,
+  "rundown": {
+    "programName": "LIPUTAN7",
+    "title": "Liputan7 2026-10-19",
+    "broadcastSchedule": {
+      "date": "2026-10-19",
+      "time": "13:00",
+      "timezone": "WIB"
+    },
+    "ticker": {
+      "text": "Pemprov DKI gelar Festival Cilung 2026 di Danau Sunter, 18.400 galon dan 47.000 botol plastik diubah jadi perahu hias • Kebakaran gudang kapal fiber di Pulau Panggang, Kepulauan Seribu, diduga korsleting listrik, kerugian Rp200 juta • Gerakan Literasi Lima Abad diluncurkan di Taman Ismail Marzuki menyambut 500 tahun Jakarta pada 2027 • Pendiri Ponpes Daarul Rahman Jakarta KH Syukron Ma'mun wafat di RSPI, dimakamkan di Jagakarsa • BMKG: Jakarta berawan tebal hingga cerah berawan Senin ini, hujan ringan berpotensi di Jakarta Selatan dan Jakarta Timur",
+      "forDate": "2026-10-19",
+      "sources": [
+        {
+          "headline": "Pemprov DKI gelar Festival Cilung 2026 di Danau Sunter, 18.400 galon dan 47.000 botol plastik diubah jadi perahu hias",
+          "sourceName": "ANTARA News",
+          "url": "https://www.antaranews.com/berita/5794625/pemprov-dki-edukasi-masyarakat-pilah-sampah-lewat-festival-cilung-2026",
+          "publishedAt": "2026-10-18T14:00:00+07:00",
+          "eventDate": "2026-10-18",
+          "accessedAt": "2026-10-19T07:54:33+07:00"
+        },
+        {
+          "headline": "Kebakaran gudang kapal fiber di Pulau Panggang, Kepulauan Seribu, diduga korsleting listrik, kerugian Rp200 juta",
+          "sourceName": "ANTARA News",
+          "url": "https://www.antaranews.com/berita/5794329/kebakaran-landa-gudang-pembuatan-kapal-di-kepulauan-seribu",
+          "publishedAt": "2026-10-18T09:30:00+07:00",
+          "eventDate": "2026-10-17",
+          "accessedAt": "2026-10-19T07:54:33+07:00"
+        },
+        {
+          "headline": "Gerakan Literasi Lima Abad diluncurkan di Taman Ismail Marzuki menyambut 500 tahun Jakarta pada 2027",
+          "sourceName": "ANTARA News",
+          "url": "https://www.antaranews.com/berita/5794441/gerakan-literasi-lima-abad-resmi-diluncurkan",
+          "publishedAt": "2026-10-18T12:00:00+07:00",
+          "eventDate": "2026-10-17",
+          "accessedAt": "2026-10-19T07:54:33+07:00"
+        },
+        {
+          "headline": "Pendiri Ponpes Daarul Rahman Jakarta KH Syukron Ma'mun wafat di RSPI, dimakamkan di Jagakarsa",
+          "sourceName": "ANTARA News",
+          "url": "https://www.antaranews.com/berita/5794465/pendiri-ponpes-daarul-rahman-jakarta-kh-syukron-mamun-wafat",
+          "publishedAt": "2026-10-18T12:10:00+07:00",
+          "eventDate": "2026-10-18",
+          "accessedAt": "2026-10-19T07:54:33+07:00"
+        },
+        {
+          "headline": "BMKG: Jakarta berawan tebal hingga cerah berawan Senin ini, hujan ringan berpotensi di Jakarta Selatan dan Jakarta Timur",
+          "sourceName": "ANTARA News",
+          "url": "https://www.antaranews.com/berita/5795425/dki-jakarta-diperkirakan-berawan-hingga-cerah-berawan-pada-senin",
+          "publishedAt": "2026-10-18T23:07:00+07:00",
+          "eventDate": null,
+          "accessedAt": "2026-10-19T07:54:33+07:00"
+        }
+      ],
+      "speedMode": "auto"
+    },
+    "items": [
+      {
+        "slug": "OPENING-01",
+        "title": "OPENING + HEADLINE",
+        "format": "LAINNYA",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 60,
+        "sortOrder": 0,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "KEMARAU → HARGA SAYURAN",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 1,
+            "draftFields": {
+              "headline": "DAMPAK KEMARAU TERHADAP WADUK",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 2,
+            "draftFields": {
+              "headline": "HARGA & PASOKAN PASAR LENTENG AGUNG",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 3,
+            "draftFields": {
+              "headline": "RELOKASI PEDAGANG PASAR MALAM KRAMAT JATI",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 4,
+            "draftFields": {
+              "headline": "KEMACETAN MT HARYONO",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 5,
+            "draftFields": {
+              "headline": "PARKIR LIAR LENTENG AGUNG",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 6,
+            "draftFields": {
+              "headline": "LAWAN ARAH LENTENG AGUNG",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 7,
+            "draftFields": {
+              "headline": "TRANSIT LRT–KRL MANGGARAI",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 8,
+            "draftFields": {
+              "headline": "LIVE (Bridging, Lapangan, Opini Publik)",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 9,
+            "draftFields": {
+              "headline": "OJOL SIMPANG CAWANG",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 10,
+            "draftFields": {
+              "headline": "OJOL STASIUN DUREN KALIBATA",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 11,
+            "draftFields": {
+              "headline": "FASILITAS JPO LENTENG AGUNG",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 12,
+            "draftFields": {
+              "headline": "PERBAIKAN JALAN BUNGSAN",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 13,
+            "draftFields": {
+              "headline": "GALIAN PAM TB SIMATUPANG",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 14,
+            "draftFields": {
+              "headline": "PARKIR LIAR CAFE INTERAKSI MARGONDA",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          },
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 15,
+            "draftFields": {
+              "headline": "KERUSAKAN LIFT POLIMEDIA",
+              "headlinePresentation": "bulletin",
+              "kicker": "HIGHLIGHT",
+              "contentMode": "headline",
+              "layoutStyle": "single",
+              "showLocation": "false",
+              "showKicker": "true",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "KEMARAU-SAYURAN",
+        "title": "KEMARAU → HARGA SAYURAN",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 75,
+        "sortOrder": 1,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "KEMARAU → HARGA SAYURAN",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "WADUK-KEMARAU",
+        "title": "DAMPAK KEMARAU TERHADAP WADUK",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 45,
+        "sortOrder": 2,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "DAMPAK KEMARAU TERHADAP WADUK",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "PASAR-LENTENG-AGUNG",
+        "title": "HARGA & PASOKAN PASAR LENTENG AGUNG",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 105,
+        "sortOrder": 3,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "HARGA & PASOKAN PASAR LENTENG AGUNG",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "RELOKASI-KRAMAT-JATI",
+        "title": "RELOKASI PEDAGANG PASAR MALAM KRAMAT JATI",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 60,
+        "sortOrder": 4,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "RELOKASI PEDAGANG PASAR MALAM KRAMAT JATI",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "MACET-MT-HARYONO",
+        "title": "KEMACETAN MT HARYONO",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 90,
+        "sortOrder": 5,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "KEMACETAN MT HARYONO",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "PARKIR-LENTENG-AGUNG",
+        "title": "PARKIR LIAR LENTENG AGUNG",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 75,
+        "sortOrder": 6,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "PARKIR LIAR LENTENG AGUNG",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "LAWAN-ARAH-LENTENG",
+        "title": "LAWAN ARAH LENTENG AGUNG",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 90,
+        "sortOrder": 7,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "LAWAN ARAH LENTENG AGUNG",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "LRT-KRL-MANGGARAI",
+        "title": "TRANSIT LRT–KRL MANGGARAI",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 60,
+        "sortOrder": 8,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "TRANSIT LRT–KRL MANGGARAI",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "LIVE-REPORT",
+        "title": "LIVE (Bridging, Lapangan, Opini Publik)",
+        "format": "LIVE",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 240,
+        "sortOrder": 9,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "LIVE (Bridging, Lapangan, Opini Publik)",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "OJOL-CAWANG",
+        "title": "OJOL SIMPANG CAWANG",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 45,
+        "sortOrder": 10,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "OJOL SIMPANG CAWANG",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "OJOL-KALIBATA",
+        "title": "OJOL STASIUN DUREN KALIBATA",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 75,
+        "sortOrder": 11,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "OJOL STASIUN DUREN KALIBATA",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "JPO-LENTENG-AGUNG",
+        "title": "FASILITAS JPO LENTENG AGUNG",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 60,
+        "sortOrder": 12,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "FASILITAS JPO LENTENG AGUNG",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "JALAN-BUNGSAN",
+        "title": "PERBAIKAN JALAN BUNGSAN",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 45,
+        "sortOrder": 13,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "PERBAIKAN JALAN BUNGSAN",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "GALIAN-PAM-SIMATUPANG",
+        "title": "GALIAN PAM TB SIMATUPANG",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 75,
+        "sortOrder": 14,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "GALIAN PAM TB SIMATUPANG",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "PARKIR-MARGONDA",
+        "title": "PARKIR LIAR CAFE INTERAKSI MARGONDA",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 60,
+        "sortOrder": 15,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "PARKIR LIAR CAFE INTERAKSI MARGONDA",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "LIFT-POLIMEDIA",
+        "title": "KERUSAKAN LIFT POLIMEDIA",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 60,
+        "sortOrder": 16,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "KERUSAKAN LIFT POLIMEDIA",
+              "headlinePresentation": "story",
+              "kicker": "",
+              "subline": "",
+              "location": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

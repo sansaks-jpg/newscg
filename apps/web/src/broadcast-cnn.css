@@ -121,7 +121,7 @@
 @keyframes cnn-text-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cnn-text-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(10px); } }
 @media (prefers-reduced-motion: reduce) {
-  .cnn-template, .cnn-template *, .cg-all-exit * { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .cnn-template, .cnn-template *, .cg-all-exit *:not(.liputan7-template, .liputan7-template *) { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
 
 /* Independent broadcast layers: ticker marquee engine */

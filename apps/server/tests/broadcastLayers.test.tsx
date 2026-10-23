@@ -383,4 +383,14 @@ describe("broadcast color selection", () => {
     await advance(broadcastMotion.logoOutMs + 20);
     expect(element(".cg-lower-third")).toBeNull();
   });
+
+  it("the studio gallery offers the HIGHLIGHT topic preset", async () => {
+    await act(async () => root.render(createElement(TemplatePreview)));
+    const select = element(".template-demo-controls select") as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.value)).toContain("highlight");
+    await act(async () => { select.value = "highlight"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await advance(broadcastMotion.retainMs + 1200);
+    expect(element(".cg-kicker-tab")?.textContent).toBe("HIGHLIGHT");
+    expect(element(".cg-headline-row, .cg-headline-row-single")?.textContent).toContain("KEMARAU");
+  });
 });

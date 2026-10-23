@@ -1,0 +1,118 @@
+/* Reference: K28tfy0LPIY 02:30–04:50. Geometry stays in a 1920×1080 stage.
+   A burgundy foundation extends from the program bug; ivory and blue follow.
+   All selectors are isolated from the existing CNN package. */
+@font-face { font-family: "Barlow News"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/barlow/BarlowSemiCondensed-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Barlow News"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/barlow/BarlowSemiCondensed-Medium.woff2") format("woff2"); }
+.liputan7-template { position: absolute; inset: 0; background: transparent; color: var(--l7-burgundy); font-family: "Barlow News", Arial, Helvetica, sans-serif; font-synthesis: none; pointer-events: none; }
+.liputan7-template * { box-sizing: border-box; }
+.l7-content { position: absolute; left: 384px; top: 826px; width: 1466px; height: 146px; }
+.l7-panel-viewport { position: absolute; inset: 0; overflow: hidden; }
+.l7-red-foundation { position: absolute; inset: 0; background: var(--l7-burgundy); animation: l7-foundation-in var(--l7-panelInMs) cubic-bezier(.4,0,.2,1) both; }
+.l7-title-plate { position: absolute; left: 0; top: 0; right: 20px; height: 92px; overflow: hidden; transition: height 300ms cubic-bezier(.4,0,.2,1); }
+.l7-title-surface { position: absolute; inset: 0; background: var(--l7-ivory); animation: l7-plate-in var(--l7-plateInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-plateDelayMs) both; }
+.l7-title-viewport { position: absolute; inset: 7px 16px; overflow: hidden; display: flex; align-items: center; }
+.l7-title-copy { width: 100%; height: 100%; min-width: 0; font-size: 76px; line-height: 1; font-weight: 500; letter-spacing: .2px; animation: l7-copy-in var(--l7-copyInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-copyDelayMs) both; }
+.l7-anchor .l7-title-copy { letter-spacing: .3px; }
+.l7-detail-plate { position: absolute; left: 0; top: 92px; right: 20px; height: 54px; padding: 0 16px; overflow: hidden; }
+.l7-detail-surface { position: absolute; inset: 0; background: var(--l7-blue); animation: l7-plate-in var(--l7-detailInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-detailDelayMs) both; }
+.l7-detail-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; }
+.l7-detail-copy { width: 100%; min-width: 0; font: 400 30px/1.2 Arial, Helvetica, sans-serif; letter-spacing: .1px; animation: l7-copy-in var(--l7-copyInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-copyDelayMs) both; }
+.l7-single .l7-title-plate { height: 146px; }
+.l7-single .l7-title-copy { font-size: 108px; }
+.l7-single .l7-detail-plate { display: none; }
+.l7-endcap { position: absolute; right: 0; top: 0; height: 146px; width: 20px; border-right: 4px solid var(--l7-sand); background: var(--l7-burgundy); }
+.l7-location { position: absolute; left: 384px; top: 794px; min-width: 220px; max-width: 610px; height: 32px; padding: 4px 18px; color: var(--l7-ivory); font-size: 20px; line-height: 24px; text-transform: uppercase; overflow: hidden; }
+.l7-location-surface { position: absolute; inset: 0; border-left: 7px solid var(--l7-sand); background: var(--l7-burgundy); animation: l7-location-in var(--l7-locationInMs) ease-out var(--l7-locationDelayMs) both; }
+.l7-location-copy { position: relative; max-width: 570px; animation: l7-location-copy-in var(--l7-locationCopyInMs) ease-out var(--l7-locationCopyDelayMs) both; }
+.l7-location-only { left: 192px; }
+/* Topic tab uses the template's own burgundy/ivory tab language, like the location tab. */
+.l7-topic { position: absolute; left: 0; bottom: 146px; max-width: 480px; height: 32px; display: flex; align-items: center; padding: 0 18px; background: var(--l7-burgundy); border-left: 7px solid var(--l7-sand); color: var(--l7-ivory); font-size: 20px; line-height: 1; letter-spacing: .4px; text-transform: uppercase; overflow: hidden; animation: l7-location-in var(--l7-locationInMs) ease-out var(--l7-locationDelayMs) both; }
+/* Keep both tabs readable when a location tag already fills the band above the headline. */
+.l7-content.l7-has-location .l7-topic { bottom: 178px; }
+.l7-program { position: absolute; left: 96px; top: 826px; width: 288px; height: 146px; overflow: hidden; background: var(--l7-burgundy); z-index: 3; }
+.l7-program-face { position: relative; height: 146px; width: 288px; z-index: 2; background: var(--l7-burgundy); transition: height var(--l7-weatherMorphMs) cubic-bezier(.22,1,.36,1); }
+.l7-program-wordmark { width: 100%; height: 100%; overflow: hidden; }
+.l7-program-wordmark img { display: block; width: 288px; height: 146px; object-fit: contain; transform: translateY(0); transition: transform var(--l7-weatherMorphMs) cubic-bezier(.45,0,.25,1); }
+.l7-weather-active .l7-program-face { height: 102px; }
+.l7-weather-active .l7-program-wordmark img { transform: translateY(-22px); }
+.l7-custom-program .l7-program-wordmark img { height: 100%; transform: none; }
+.l7-weather { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; background: var(--l7-blue); overflow: hidden; animation: l7-weather-in var(--l7-weatherMorphMs) cubic-bezier(.45,0,.25,1) both; }
+.l7-weather-row { display: flex; align-items: center; gap: 5px; height: 44px; padding: 0 10px; }
+.l7-city-in { animation: l7-city-enter var(--l7-weatherCityInMs) ease-out both; }
+.l7-city-out { animation: l7-city-leave var(--l7-weatherCityOutMs) ease-in both; }
+.l7-city-rise { --l7-city-x: 0px; --l7-city-y: 7px; }
+.l7-city-slide { --l7-city-x: 12px; --l7-city-y: 0px; }
+.l7-city-fade { --l7-city-x: 0px; --l7-city-y: 0px; }
+.l7-weather-place { flex: 1; min-width: 0; }
+.l7-weather-city { font: 400 19px/24px Arial, Helvetica, sans-serif; letter-spacing: 0; }
+.l7-weather-symbol { flex: 0 0 44px; width: 44px; height: 44px; object-fit: contain; }
+.l7-weather-temperature { flex: none; white-space: nowrap; font: 400 20px/1 Arial, Helvetica, sans-serif; font-variant-numeric: tabular-nums; }
+.l7-tv-logo { position: absolute; right: 116px; top: 54px; width: 190px; height: 121px; }
+.l7-tv-bug { width: 190px; height: 121px; overflow: hidden; border-radius: 5px; animation: l7-tv-refresh var(--l7-tvLoopMs) ease-in-out infinite; }
+.l7-tv-bug img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.l7-live { display: block; margin-top: 4px; text-align: center; color: var(--l7-ivory); text-shadow: 0 1px 2px var(--l7-burgundy); font-size: 16px; font-weight: 700; letter-spacing: 2px; animation: l7-logo-in var(--l7-logoInMs) both; }
+.l7-ticker { position: absolute; left: 0; right: 0; bottom: 0; height: 54px; display: flex; align-items: center; overflow: hidden; background: var(--l7-ivory); font-size: 31px; }
+.l7-clock { flex: 0 0 auto; width: max-content; align-self: stretch; display: flex; align-items: center; justify-content: center; padding: 0 22px; background: var(--l7-burgundy); color: var(--l7-ivory); font: 400 32px/1.1 Arial, Helvetica, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 2; }
+.l7-clock span { display: block; flex: none; font: inherit; letter-spacing: .1px; word-spacing: 5px; white-space: nowrap; transform: none; }
+.l7-ticker .cg-ticker-content { flex: 1; min-width: 0; height: 54px; overflow: hidden; display: flex; align-items: center; padding: 0; color: var(--l7-burgundy); font-size: 31px; }
+.l7-ticker .cg-ticker-track { display: flex; width: max-content; white-space: nowrap; will-change: transform; }
+.l7-ticker .cg-ticker-segment, .l7-ticker .cg-ticker-copy { display: inline-flex; align-items: center; white-space: nowrap; flex-shrink: 0; }
+.l7-ticker .cg-ticker-bullet { padding: 0 20px; color: var(--l7-burgundy); }
+.l7-ticker .cg-ticker-text { color: var(--l7-burgundy); font: 400 30px/1 Arial, Helvetica, sans-serif; letter-spacing: 0; }
+.l7-ghost { opacity: .35; }
+.l7-layer-in { animation: l7-logo-in var(--l7-logoInMs) cubic-bezier(.22,1,.36,1) both; }
+.l7-layer-out { animation: l7-logo-out var(--l7-logoOutMs) ease-in both; }
+.l7-weather-out { animation: l7-weather-out var(--l7-weatherMorphMs) cubic-bezier(.45,0,.25,1) both; }
+.l7-out .l7-title-copy, .l7-out .l7-detail-out .l7-detail-copy { animation: l7-copy-out var(--l7-copyOutMs) cubic-bezier(.42,0,.58,1) var(--l7-copyOutDelayMs) both; }
+.l7-detail-out .l7-detail-copy { animation: l7-copy-out var(--l7-copyOutMs) cubic-bezier(.42,0,.58,1) both; }
+.l7-out .l7-title-surface { animation: l7-plate-out var(--l7-plateOutMs) cubic-bezier(.42,0,.58,1) var(--l7-plateOutDelayMs) both; }
+.l7-out .l7-detail-surface { animation: l7-plate-out var(--l7-detailOutMs) cubic-bezier(.42,0,.58,1) var(--l7-detailOutDelayMs) both; }
+.l7-out .l7-red-foundation { animation: l7-foundation-out var(--l7-panelOutMs) cubic-bezier(.42,0,.58,1) var(--l7-panelOutDelayMs) both; }
+.l7-location.l7-out .l7-location-surface, .l7-location.l7-out .l7-location-copy, .l7-out .l7-topic { animation: l7-location-out var(--l7-locationOutMs) ease-in both; }
+@keyframes l7-foundation-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes l7-foundation-out { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes l7-plate-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes l7-plate-out { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes l7-cap-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes l7-cap-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes l7-copy-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes l7-copy-out { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes l7-location-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes l7-location-copy-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes l7-location-out { from { clip-path: inset(0); } to { clip-path: inset(0 100% 0 0); } }
+@keyframes l7-logo-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes l7-logo-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(6px); } }
+@keyframes l7-weather-in { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes l7-weather-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(10px); opacity: 0; } }
+@keyframes l7-city-enter { from { transform: translate(var(--l7-city-x), var(--l7-city-y)); opacity: 0; } to { transform: translate(0,0); opacity: 1; } }
+@keyframes l7-city-leave { from { transform: translate(0,0); opacity: 1; } to { transform: translate(calc(-1 * var(--l7-city-x)), calc(-1 * var(--l7-city-y))); opacity: 0; } }
+@keyframes l7-program-refresh { 0%, 85%, 100% { opacity: 1; transform: translateY(0); } 91% { opacity: .8; transform: translateY(-1px); } }
+@keyframes l7-tv-refresh { 0%, 85%, 100% { opacity: 1; } 92% { opacity: .82; } }
+
+/* Operator controls; these never appear in the transparent output. */
+.broadcast-template-select { display: grid; gap: 5px; min-width: 220px; font-size: 12px; }
+.broadcast-template-select select { width: 100%; padding: 8px; background: #141b26; color: #f5efe1; border: 1px solid #3a4658; border-radius: 4px; }
+.broadcast-template-select small { color: #9aa8ba; font-size: 11px; line-height: 1.5; }
+.l7-settings { min-width: 0; padding: 14px; margin: 16px 0; border: 1px solid #3a4658; border-radius: 5px; color: #d4deeb; font-size: 12px; }
+.l7-settings legend { padding: 0 7px; color: #e5d3af; font-weight: 700; }
+.l7-settings p, .l7-settings small { display: block; line-height: 1.6; }
+.l7-settings a, .l7-demo-downloads a { color: #aec4d4; text-decoration: underline; }
+.l7-settings [role="alert"] { color: #ffc1ba; }
+.l7-settings-logos { display: flex; align-items: center; gap: 16px; margin: 0 0 12px; }
+.l7-settings-logos img { width: 144px; height: 73px; object-fit: contain; }
+.l7-settings-logos img:last-child { width: 115px; }
+.l7-settings-toggles { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.l7-settings .l7-settings-toggles label { display: flex; align-items: center; gap: 7px; }
+.l7-settings .l7-settings-toggles input { width: 15px; height: 15px; accent-color: #790d16; margin: 0; }
+.l7-upload-label { display: grid; gap: 8px; margin-bottom: 12px; }
+.l7-weather-location { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 12px 0; }
+.l7-weather-location label { display: grid; flex: 1 1 150px; gap: 6px; }
+.l7-weather-location input { width: 100%; padding: 8px; color: #f5efe1; background: #101722; border: 1px solid #3a4658; border-radius: 4px; }
+.l7-settings button { border: 1px solid #52617a; background: #192335; color: #e7edf4; padding: 8px 12px; border-radius: 4px; }
+.l7-settings button:disabled { opacity: .4; }
+.l7-demo h1 span { font-size: .5em; color: #aec4d4; font-weight: 500; }
+.l7-palette { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+.l7-palette span { display: flex; align-items: center; gap: 8px; color: #d9e1e8; font-size: 12px; }
+.l7-palette i { width: 26px; height: 26px; border: 1px solid #596478; }
+.l7-demo .template-demo-actions { margin: 18px 0; }
+.l7-demo-downloads { font-size: 13px; }

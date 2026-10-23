@@ -1,0 +1,85 @@
+{
+  "errors": [],
+  "metrics": {
+    ".l7-clock": {
+      "text": "16:31 WIB",
+      "font": "700 29px / 43.5px \"Barlow News\", Arial, Helvetica, sans-serif",
+      "fontFamily": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "transform": "none",
+      "box": {
+        "x": 1,
+        "y": 1027,
+        "width": 220,
+        "height": 54,
+        "top": 1027,
+        "right": 221,
+        "bottom": 1081,
+        "left": 1
+      }
+    },
+    ".l7-clock span": {
+      "text": "16:31 WIB",
+      "font": "700 29px / 43.5px \"Barlow News\", Arial, Helvetica, sans-serif",
+      "fontFamily": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "transform": "none",
+      "box": {
+        "x": 25,
+        "y": 1032.25,
+        "width": 103.6875,
+        "height": 43.5,
+        "top": 1032.25,
+        "right": 128.6875,
+        "bottom": 1075.75,
+        "left": 25
+      }
+    },
+    ".l7-title-copy": {
+      "text": "CONTOH HEADLINE UTAMA LIPUTAN7",
+      "font": "500 58px / 66.12px \"Barlow News\", Arial, Helvetica, sans-serif",
+      "fontFamily": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "box": {
+        "x": 401,
+        "y": 839.9375,
+        "width": 1414,
+        "height": 66.109375,
+        "top": 839.9375,
+        "right": 1815,
+        "bottom": 906.046875,
+        "left": 401
+      }
+    },
+    ".l7-weather": {
+      "text": "KEMAYORAN29–35°CPRAKIRAAN · BMKG",
+      "font": "16px / 24px \"Barlow News\", Arial, Helvetica, sans-serif",
+      "fontFamily": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "box": {
+        "x": 97,
+        "y": 917,
+        "width": 288,
+        "height": 56,
+        "top": 917,
+        "right": 385,
+        "bottom": 973,
+        "left": 97
+      }
+    },
+    ".l7-program-face": {
+      "text": "",
+      "font": "16px / 24px \"Barlow News\", Arial, Helvetica, sans-serif",
+      "fontFamily": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "transform": "none",
+      "box": {
+        "x": 97,
+        "y": 827,
+        "width": 288,
+        "height": 90,
+        "top": 827,
+        "right": 385,
+        "bottom": 917,
+        "left": 97
+      }
+    }
+  }
+}

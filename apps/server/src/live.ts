@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { GraphicItem, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
-import { normalizeHeadlineTopicFields } from "@newscg/shared";
+import type { GraphicItem, LiveNewsAnchorInput, LiveReporterInput, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
+import { createFieldReporterGraphic, createNewsAnchorGraphic, fieldReporterGraphicId, newsAnchorDefaultsSchema, newsAnchorGraphicId, normalizeHeadlineTopicFields, reporterDefaultsSchema } from "@newscg/shared";
+import { getNewsAnchorDefaults, getReporterDefaults } from "./db.js";
 import { getGraphic, getItem, getMasterOverlay, getOnAir, logAction, markGraphicPushed, rundownTickerSnapshot, saveProgramWithTicker, saveMasterAndClearOnAir, saveMasterOverlay, saveOnAir } from "./db.js";
 
 let selectedGraphicId: string | null = null;
@@ -31,6 +32,18 @@ function effectiveOnAirFields(graphic: GraphicItem | null, fields: Record<string
   return fields ? normalizeHeadlineTopicFields(graphic?.templateType, fields) : null;
 }
 
+function getProgramGraphic(graphicId: string | null | undefined, snapshot?: unknown): GraphicItem | null {
+  if (graphicId === newsAnchorGraphicId) {
+    const defaults = newsAnchorDefaultsSchema.safeParse(snapshot);
+    return defaults.success && defaults.data.name ? createNewsAnchorGraphic(defaults.data) : null;
+  }
+  if (graphicId === fieldReporterGraphicId) {
+    const defaults = reporterDefaultsSchema.safeParse(snapshot);
+    return defaults.success && defaults.data.name ? createFieldReporterGraphic(defaults.data) : null;
+  }
+  return graphicId ? getGraphic(graphicId) : null;
+}
+
 export function addOverlaySubscriber(
   handler: (event: OverlayEvent) => void,
   role: OverlaySubscriberRole = "output"
@@ -38,7 +51,7 @@ export function addOverlaySubscriber(
   const id = randomUUID();
   subscribers.set(id, { id, role, handler });
   const current = getOnAir();
-  const graphic = current?.graphicId ? getGraphic(current.graphicId) : null;
+  const graphic = getProgramGraphic(current?.graphicId, current?.snapshot);
   const master = getMasterOverlay();
   handler({
     type: "SYNC",
@@ -108,7 +121,7 @@ function publicState(): LiveState {
     onAirGraphicId: persisted?.graphicId || null,
     actualOverlayInputGuid: persisted?.graphicId ? "web-overlay" : null,
     onAirSnapshot: effectiveOnAirFields(
-      persisted?.graphicId ? getGraphic(persisted.graphicId) : null,
+      getProgramGraphic(persisted?.graphicId, persisted?.snapshot),
       persisted?.snapshot as Record<string, string> | null
     )
   };
@@ -173,6 +186,67 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
       live = { ...live, commandStatus: "failed", error: e.message };
       logAction("TAKE", "failed", e.message, graphic?.id, requestId);
       return { requestId, commandStatus: "failed", actualOverlayInputGuid: null, timestamp: new Date().toISOString(), error: e.message, state: publicState() };
+    }
+  });
+}
+
+/** Default anchor is a Program snapshot, never a cue inserted into a rundown. */
+export function takeNewsAnchor(input: LiveNewsAnchorInput, idempotencyKey: string) {
+  return enqueue(idempotencyKey, `NEWS_ANCHOR:${JSON.stringify([input.action, input.defaults ?? null])}`, async () => {
+    const requestId = randomUUID();
+    try {
+      const defaults = input.defaults || getNewsAnchorDefaults();
+      if (!defaults.name.trim()) throw new Error("Isi Nama Anchor di Pengaturan Default News Anchor sebelum menayangkan.");
+      const graphic = createNewsAnchorGraphic(defaults);
+      const current = getOnAir();
+      const update = current?.graphicId === newsAnchorGraphicId;
+      if (input.action === "update" && !update) throw new Error("UPDATE diblokir: news anchor tidak sedang ON AIR.");
+      const fields = { ...graphic.draftFields };
+      saveOnAir(graphic.id, "web-overlay", 1, fields, "confirmed");
+      live = { ...live, commandStatus: "confirmed", onAirGraphicId: graphic.id, onAirSnapshot: fields,
+        actualOverlayInputGuid: "web-overlay", lastActionAt: new Date().toISOString(), error: null };
+      broadcastOverlayEvent(update
+        ? { type: "UPDATE", graphicId: graphic.id, fields, master: getMasterOverlay() }
+        : { type: "TAKE", graphic, fields, master: getMasterOverlay() });
+      logAction(update ? "UPDATE" : "TAKE", "confirmed", "News anchor default terkonfirmasi ON AIR", graphic.id, requestId);
+      return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: "web-overlay",
+        timestamp: new Date().toISOString(), error: null, state: publicState() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "News anchor gagal ditayangkan";
+      live = { ...live, commandStatus: "failed", error: message };
+      logAction(input.action === "update" ? "UPDATE" : "TAKE", "failed", message, newsAnchorGraphicId, requestId);
+      return { requestId, commandStatus: "failed", actualOverlayInputGuid: getOnAir()?.inputGuid || null,
+        timestamp: new Date().toISOString(), error: message, state: publicState() };
+    }
+  });
+}
+
+export function takeFieldReporter(input: LiveReporterInput, idempotencyKey: string) {
+  return enqueue(idempotencyKey, `FIELD_REPORTER:${JSON.stringify([input.action, input.defaults ?? null])}`, async () => {
+    const requestId = randomUUID();
+    try {
+      const defaults = input.defaults || getReporterDefaults();
+      if (!defaults.name.trim()) throw new Error("Isi Nama Reporter Lapangan di Pengaturan Default Reporter Lapangan sebelum menayangkan.");
+      const graphic = createFieldReporterGraphic(defaults);
+      const current = getOnAir();
+      const update = current?.graphicId === fieldReporterGraphicId;
+      if (input.action === "update" && !update) throw new Error("UPDATE diblokir: reporter lapangan tidak sedang ON AIR.");
+      const fields = { ...graphic.draftFields };
+      saveOnAir(graphic.id, "web-overlay", 1, fields, "confirmed");
+      live = { ...live, commandStatus: "confirmed", onAirGraphicId: graphic.id, onAirSnapshot: fields,
+        actualOverlayInputGuid: "web-overlay", lastActionAt: new Date().toISOString(), error: null };
+      broadcastOverlayEvent(update
+        ? { type: "UPDATE", graphicId: graphic.id, fields, master: getMasterOverlay() }
+        : { type: "TAKE", graphic, fields, master: getMasterOverlay() });
+      logAction(update ? "UPDATE" : "TAKE", "confirmed", "Reporter lapangan default terkonfirmasi ON AIR", graphic.id, requestId);
+      return { requestId, commandStatus: "confirmed", actualOverlayInputGuid: "web-overlay",
+        timestamp: new Date().toISOString(), error: null, state: publicState() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Reporter lapangan gagal ditayangkan";
+      live = { ...live, commandStatus: "failed", error: message };
+      logAction(input.action === "update" ? "UPDATE" : "TAKE", "failed", message, fieldReporterGraphicId, requestId);
+      return { requestId, commandStatus: "failed", actualOverlayInputGuid: getOnAir()?.inputGuid || null,
+        timestamp: new Date().toISOString(), error: message, state: publicState() };
     }
   });
 }
@@ -341,7 +415,7 @@ export function clearAllLive(idempotencyKey: string, options?: { immediate?: boo
     const requestId = randomUUID();
     try {
       live = { ...live, commandStatus: "pending", error: null };
-      saveMasterAndClearOnAir({ showLogo: false, showTicker: false, showLiveBadge: false, tickerText: "", tickerRundownId: null, tickerForDate: null });
+      saveMasterAndClearOnAir({ showLogo: false, showTicker: false, showLiveBadge: false, showProgramLogo: false, showWeather: false, tickerText: "", tickerRundownId: null, tickerForDate: null });
       live = { ...live, commandStatus: "confirmed", onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: new Date().toISOString(), error: null };
       const immediate = options?.immediate !== false;
       broadcastOverlayEvent(immediate ? { type: "CLEAR_ALL_IMMEDIATE" } : { type: "CLEAR_ALL_ANIMATED" });
@@ -360,7 +434,9 @@ export function setStage(mode: "empty" | "logo" | "full", idempotencyKey: string
   return enqueue(idempotencyKey, `STAGE:${mode}`, async () => {
     try {
       live = { ...live, commandStatus: "pending", error: null };
-      const master = saveMasterAndClearOnAir({ showLogo: mode !== "empty", showTicker: mode === "full", showLiveBadge: mode === "full" });
+      const liputan7 = getMasterOverlay().broadcastTemplate === "liputan7";
+      const master = saveMasterAndClearOnAir({ showLogo: mode !== "empty", showTicker: mode === "full", showLiveBadge: mode === "full",
+        showProgramLogo: liputan7 && mode !== "empty", showWeather: liputan7 && mode === "full" });
       live = { ...live, commandStatus: "confirmed", error: null, lastActionAt: new Date().toISOString() };
       broadcastOverlayEvent({ type: "SYNC", onAir: false, graphic: null, fields: null, master });
       logAction("STAGE", "confirmed", `Preset ${mode}`);

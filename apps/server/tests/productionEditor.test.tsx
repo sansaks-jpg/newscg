@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultMasterOverlayState } from "@newscg/shared";
+import { broadcastTemplateIds, defaultMasterOverlayState, fieldReporterGraphicId, newsAnchorGraphicId } from "@newscg/shared";
 import type { GraphicItem, LiveState, Rundown, TemplateType } from "@newscg/shared";
 import { SimpleProductionEditor } from "../../web/src/SimpleProductionEditor";
 
@@ -15,7 +15,7 @@ const reload = vi.fn(async () => {});
 const toast = vi.fn();
 const updateMaster = vi.fn(async () => {});
 const fetchMock = vi.fn<typeof fetch>();
-const master = { ...defaultMasterOverlayState, showLogo: false, showTicker: false, showLiveBadge: false };
+let master = { ...defaultMasterOverlayState, showLogo: false, showTicker: false, showLiveBadge: false };
 
 function cue(id: string, templateType: TemplateType = "HEADLINE", fields: Record<string, string> = {}): GraphicItem {
   return {
@@ -69,6 +69,7 @@ beforeEach(() => {
   sessionStorage.clear();
   reload.mockReset(); reload.mockImplementation(async () => {});
   toast.mockClear(); updateMaster.mockClear(); fetchMock.mockReset();
+  master = { ...defaultMasterOverlayState, showLogo: false, showTicker: false, showLiveBadge: false };
   live = { connection: "STANDALONE", commandStatus: "idle", selectedGraphicId: null, onAirGraphicId: null,
     actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: null, error: null, overlayClientsCount: 0 };
   rundown = { id: "R", programName: "NEWS", title: "EDISI", updatedAt: "2026-10-08T00:00:00Z",
@@ -78,6 +79,8 @@ beforeEach(() => {
   fetchMock.mockImplementation(async (url, options) => {
     const path = String(url);
     if (path.startsWith("/api/graphics/")) return storeGraphic(path, options);
+    if (path === "/api/settings/news-anchor-defaults") return new Response(JSON.stringify({ name: "Nadia Putri", role: "News Anchor" }));
+    if (path === "/api/settings/reporter-defaults") return new Response(JSON.stringify({ name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" }));
     if (path.startsWith("/api/live/")) return new Response(JSON.stringify({ commandStatus: "confirmed", state: live, error: null }));
     throw new Error(`Unexpected request: ${path}`);
   });
@@ -91,6 +94,139 @@ afterEach(async () => {
 });
 
 describe("production draft persistence", () => {
+  it.each(broadcastTemplateIds)("P stages a default anchor outside the rundown, then Space takes it in %s", async broadcastTemplate => {
+    await act(async () => root.render(createElement(SimpleProductionEditor, {
+      rundown, live, master: { ...master, broadcastTemplate }, reload, toast, onUpdateMaster: updateMaster
+    })));
+    const sidebars = host.querySelector(".cg-story-sidebar")!.textContent;
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "p", bubbles: true })); });
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("Nadia Putri");
+    expect(host.querySelector(".cg-story-sidebar")!.textContent).toBe(sidebars);
+    expect(graphicRequests()).toHaveLength(0);
+    expect(liveRequests()).toHaveLength(0);
+    expect(host.querySelector(".live-mini-screen-wrapper")?.textContent).not.toContain("Nadia Putri");
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); });
+    expect(liveRequests().map(([path]) => path)).toEqual(["/api/live/news-anchor"]);
+    expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toEqual({ action: "take", defaults: { name: "Nadia Putri", role: "News Anchor" } });
+    expect(new Headers(liveRequests()[0]![1]!.headers).get("Idempotency-Key")).toBeTruthy();
+    await click(action("P"));
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL A1");
+    expect(liveRequests()).toHaveLength(1);
+    expect(graphicRequests()).toHaveLength(0);
+  });
+
+  it("prepares the default anchor without any rundown and updates an anchor already on air", async () => {
+    const nextLive = { ...live, onAirGraphicId: newsAnchorGraphicId, onAirSnapshot: { name: "Nama lama", role: "Anchor" } };
+    await act(async () => root.render(createElement(SimpleProductionEditor, { live: nextLive, master, reload, toast, onUpdateMaster: updateMaster })));
+    await click(action("P"));
+    expect(host.querySelector(".primary-actions-deck button")?.textContent).toContain("UPDATE");
+    await click(host.querySelector<HTMLButtonElement>(".primary-actions-deck button")!);
+    expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toMatchObject({ action: "update", defaults: { name: "Nadia Putri" } });
+    expect(graphicRequests()).toHaveLength(0);
+  });
+
+  it("keeps the selected cue when default anchor data is empty or cannot be loaded", async () => {
+    await mount();
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ name: "", role: "News Anchor" })));
+    await click(action("P"));
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("Isi Nama Anchor"));
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL A1");
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Jaringan terputus" }), { status: 503 }));
+    await click(action("P"));
+    expect(toast).toHaveBeenLastCalledWith("Jaringan terputus");
+    expect(liveRequests()).toHaveLength(0);
+  });
+
+  it("O stages the field reporter default, takes it, and returns to the cue", async () => {
+    await mount();
+    await click(action("O"));
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("Raka Pratama");
+    expect(host.querySelector(".preview-meta-badge")?.textContent).toContain("REPORTER LAPANGAN");
+    expect(graphicRequests()).toHaveLength(0);
+    expect(liveRequests()).toHaveLength(0);
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); });
+    expect(liveRequests().map(([path]) => path)).toEqual(["/api/live/reporter"]);
+    expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toEqual({ action: "take",
+      defaults: { name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" } });
+    await click(action("O"));
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL A1");
+  });
+  it("blocks O with an empty reporter name and updates a live field reporter", async () => {
+    await mount();
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ name: "", role: "Reporter Lapangan", location: "" })));
+    await click(action("O"));
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("Isi Nama Reporter Lapangan"));
+    expect(liveRequests()).toHaveLength(0);
+    live = { ...live, onAirGraphicId: fieldReporterGraphicId,
+      onAirSnapshot: { name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" } };
+    await mount();
+    await click(action("O"));
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); });
+    expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toMatchObject({ action: "update" });
+  });
+  it("ignores P while typing, held, modified, or when hotkeys are disabled", async () => {
+    await mount(); await openEditor();
+    await act(async () => { input().dispatchEvent(new KeyboardEvent("keydown", { key: "p", bubbles: true })); });
+    await click(host.querySelector<HTMLButtonElement>(".quick-edit-close")!);
+    for (const options of [{ repeat: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }])
+      await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "p", bubbles: true, ...options })); });
+    await click(buttons().find(button => button.textContent?.includes("HOTKEYS: ON"))!);
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "P", bubbles: true })); });
+    expect(fetchMock.mock.calls).toHaveLength(0);
+  });
+  it("releases mouse-click focus so Space keeps driving TAKE", async () => {
+    await mount();
+    const control = host.querySelector<HTMLButtonElement>(".story-select-button")!;
+    control.focus();
+    expect(document.activeElement).toBe(control);
+    // A real mouse click has detail >= 1; keyboard clicks use detail 0.
+    await act(async () => { control.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })); });
+    expect(document.activeElement).not.toBe(control);
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); });
+    expect(liveRequests().map(([path]) => path)).toEqual(["/api/live/take"]);
+  });
+  it("keeps native Space activation for a control focused by the keyboard", async () => {
+    await mount();
+    const control = host.querySelector<HTMLButtonElement>(".story-select-button")!;
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })); });
+    control.focus();
+    await act(async () => { control.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true })); });
+    expect(liveRequests()).toHaveLength(0);
+  });
+  it("uses ArrowRight for TAKE/UPDATE and ArrowLeft for OUT on a normal cue", async () => {
+    await mount();
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); });
+    expect(liveRequests().map(([path]) => path)).toEqual(["/api/live/take"]);
+    expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toMatchObject({ graphicId: "A1" });
+    live = { ...live, onAirGraphicId: "A1", onAirSnapshot: { headline: "ORIGINAL A1" } };
+    await mount();
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); });
+    expect(liveRequests().map(([path]) => path)).toEqual(["/api/live/take", "/api/live/clear"]);
+    // ArrowLeft tidak navigasi berita saat cue biasa.
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL A1");
+  });
+  it("uses ArrowRight/ArrowLeft to move between HIGHLIGHT headlines without live commands", async () => {
+    const bulletinCue = (id: string, headline: string, sortOrder: number) => ({
+      id, itemId: "H1", templateType: "HEADLINE" as TemplateType, sortOrder, lastPushedFields: null,
+      draftFields: { headline, headlinePresentation: "bulletin", kicker: "HIGHLIGHT", showKicker: "true",
+        contentMode: "headline", layoutStyle: "single", showLocation: "false", showDetail: "false" }
+    });
+    const highlightRundown: Rundown = { id: "H", programName: "LIPUTAN7", title: "Edisi", updatedAt: "2026-10-19T00:00:00Z",
+      items: [{ id: "H1", rundownId: "H", title: "OPENING + HEADLINE", slug: "OPENING", format: "LAINNYA",
+        cgRequired: true, sortOrder: 0, estimatedDurationSeconds: 60,
+        graphics: [bulletinCue("HG1", "JUDUL SATU", 0), bulletinCue("HG2", "JUDUL DUA", 1), bulletinCue("HG3", "JUDUL TIGA", 2)] }] };
+    await mount(highlightRundown);
+    await click(host.querySelectorAll<HTMLButtonElement>(".cue-pill")[0]!);
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("JUDUL SATU");
+    const press = (key: string) => act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
+    await press("ArrowRight");
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("JUDUL DUA");
+    await press("ArrowRight");
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("JUDUL TIGA");
+    await press("ArrowLeft");
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("JUDUL DUA");
+    expect(liveRequests()).toHaveLength(0);
+  });
   it.each(["story", "cue"] as const)("saves both edits when switching %s by mouse before debounce", async (navigation) => {
     await mount(); await openEditor(); await change(input(), "EDIT A1");
     if (navigation === "story") await selectStory(1); else await selectCue("A2");
@@ -310,5 +446,29 @@ describe("template-specific quick editing", () => {
     expect(action("T").classList.contains("active")).toBe(true);
     expect(action("D").classList.contains("active")).toBe(true);
     expect(liveRequests()).toHaveLength(0);
+  });
+
+  it("key 0 toggles master layer off when active, and restores to output when pressed again", async () => {
+    master = { ...master, showLogo: true, showTicker: true, showLiveBadge: true };
+    await mount();
+
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true })); });
+    expect(updateMaster).toHaveBeenCalledWith(expect.objectContaining({
+      showLogo: false,
+      showTicker: false,
+      showLiveBadge: false,
+    }));
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("MASTER OUT"));
+
+    master = { ...master, showLogo: false, showTicker: false, showLiveBadge: false };
+    await act(async () => root.render(createElement(SimpleProductionEditor, { live, master, reload, toast, onUpdateMaster: updateMaster, rundown })));
+
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true })); });
+    expect(updateMaster).toHaveBeenLastCalledWith(expect.objectContaining({
+      showLogo: true,
+      showTicker: true,
+      showLiveBadge: true,
+    }));
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("MASTER IN"));
   });
 });

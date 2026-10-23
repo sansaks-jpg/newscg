@@ -1,0 +1,58 @@
+{
+  "browser": "145.0.7632.6",
+  "url": "http://localhost:3001/output",
+  "method": "Production bundle, real timers, isolated SSE and read-only captured source responses. No live mutations.",
+  "checks": [
+    {
+      "name": "Empty SYNC after 12 real seconds",
+      "weather": false,
+      "headline": false,
+      "active": false,
+      "logoHeight": 146
+    },
+    {
+      "name": "TAKE at 9.5 seconds",
+      "weather": false,
+      "headline": true,
+      "active": false,
+      "logoHeight": 146
+    },
+    {
+      "name": "TAKE after opening",
+      "weather": true,
+      "headline": true,
+      "active": true,
+      "logoHeight": 102
+    },
+    {
+      "name": "CLEAR completed",
+      "weather": false,
+      "headline": false,
+      "active": false,
+      "logoHeight": 146
+    },
+    {
+      "name": "Empty after CLEAR for 11 seconds",
+      "weather": false,
+      "headline": false,
+      "active": false,
+      "logoHeight": 146
+    },
+    {
+      "name": "Second TAKE restarts full wait",
+      "weather": false,
+      "headline": true,
+      "active": false,
+      "logoHeight": 146
+    },
+    {
+      "name": "Second TAKE weather opens again",
+      "weather": true,
+      "headline": true,
+      "active": true,
+      "logoHeight": 102
+    }
+  ],
+  "errors": [],
+  "writes": []
+}

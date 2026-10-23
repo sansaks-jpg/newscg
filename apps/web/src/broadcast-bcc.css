@@ -1,0 +1,492 @@
+/* =====================================================================
+   BCC NEWS BROADCAST TEMPLATE
+   Desain visual berbasis referensi BCC News (Marun, Krem, Oranye).
+   Geometri, susunan, dan animasi diturunkan identik dari template CNN.
+   ===================================================================== */
+
+:root {
+  --bcc-maroon: #6B0908;
+  --bcc-maroon-dark: #4A0706;
+  --bcc-maroon-deep: #360505;
+  --bcc-cream: #F6D2A7;
+  --bcc-cream-logo: #F6D5A9;
+  --bcc-orange: #FF6115;
+  --bcc-text-light: #FFFFFF;
+  --bcc-text-dark: #1A1A1A;
+  --bcc-logo-width: 192px;
+}
+
+/* 1. Lower Third Container */
+.bcc-template.cg-lower-third {
+  position: absolute;
+  left: 70px;
+  right: 70px;
+  bottom: 30px;
+  min-height: 208px;
+  padding-bottom: 62px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+  filter: none;
+}
+
+/* 2. Content Layer Container (Logo di kiri, Bar di kanan) */
+.bcc-template .cg-content-layer {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+/* 3. Logo Box di Kiri */
+.bcc-template .cg-logo-box-left {
+  width: var(--bcc-logo-width);
+  min-width: var(--bcc-logo-width);
+  height: 188px;
+  background: var(--bcc-cream-logo);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  z-index: 5;
+  animation: bcc-brand-in 420ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-logo-box-left.cg-layer-out {
+  animation: bcc-brand-out 420ms cubic-bezier(.65,0,.8,.2) both;
+}
+
+/* Spacer transparan di content layer agar bar headline pas berdampingan dengan logo master */
+.bcc-template .cg-logo-space {
+  width: var(--bcc-logo-width);
+  min-width: var(--bcc-logo-width);
+  height: 188px;
+  flex-shrink: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.bcc-template .bcc-brand-logo-img {
+  width: 172px;
+  height: 172px;
+  object-fit: contain;
+}
+
+.bcc-template .bcc-brand-logo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
+.bcc-template .bcc-logo-head {
+  font-family: "Arial Black", Impact, "Roboto Condensed", Arial, sans-serif;
+  font-size: 72px;
+  line-height: 0.95;
+  font-weight: 900;
+  letter-spacing: -2px;
+  color: var(--bcc-maroon);
+}
+
+.bcc-template .bcc-logo-sub {
+  font-family: "Arial Black", Impact, "Roboto Condensed", Arial, sans-serif;
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: var(--bcc-maroon-dark);
+  margin-top: 4px;
+}
+
+/* 4. Live Badge di Atas Kotak Logo */
+.bcc-template .cg-live-badge-top {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: var(--bcc-logo-width);
+  height: 52px;
+  background: var(--bcc-orange);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 32px/1 Arial, sans-serif;
+  letter-spacing: 3px;
+  z-index: 6;
+  animation: bcc-brand-in 420ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-live-badge-top.solo {
+  bottom: 0;
+}
+
+.bcc-template .cg-live-badge-top.cg-layer-out {
+  animation: bcc-brand-out 420ms cubic-bezier(.65,0,.8,.2) both;
+}
+
+/* 5. Main Content Wrapper (Menempel di samping logo box) */
+.bcc-template .cg-main-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* 6. Kicker Tab di Atas Bar Judul */
+.bcc-template .cg-kicker-tab {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  max-width: calc(100% - 100px);
+  min-width: 0;
+  height: 52px;
+  padding: 0 32px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--bcc-orange);
+  color: #ffffff;
+  font: italic 700 34px/1.1 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+  z-index: 2;
+  animation: bcc-panel-in 400ms 100ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-kicker-tab.cg-kicker-out {
+  animation: bcc-panel-out 280ms 70ms ease-in both;
+}
+
+.bcc-template.breaking .cg-kicker-tab {
+  background: #D71920;
+}
+
+/* 7. Bar Judul Merah Marun (Upper Headline Plate) */
+.bcc-template .cg-headline-plate {
+  height: 106px;
+  background: var(--bcc-maroon);
+  color: var(--bcc-text-light);
+  display: flex;
+  align-items: center;
+  padding: 6px 32px;
+  box-sizing: border-box;
+  animation: bcc-panel-in var(--panel-in, 520ms) cubic-bezier(.16,1,.3,1) both;
+  transition: height 260ms cubic-bezier(.16,1,.3,1);
+}
+
+.bcc-template .cg-headline-plate.single-layout {
+  height: 188px;
+}
+
+.bcc-template .cg-headline-row,
+.bcc-template .cg-headline-row-single,
+.bcc-template .cg-presenter-row,
+.bcc-template .cg-paragraph-row {
+  font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -1px;
+  color: #ffffff;
+  text-transform: uppercase;
+  width: 100%;
+  animation: bcc-text-in 360ms 160ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-headline-row-single {
+  font-size: 72px;
+}
+
+/* 8. Bar Subline / Narasumber Krem (Lower Plate) */
+.bcc-template .cg-subline-plate {
+  height: 82px;
+  background: var(--bcc-cream);
+  color: var(--bcc-text-dark);
+  display: flex;
+  align-items: center;
+  padding: 4px 32px;
+  box-sizing: border-box;
+  animation: bcc-panel-in var(--panel-in, 520ms) cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-subline-plate.cg-detail-out {
+  animation: bcc-panel-out var(--cg-detailOutMs, 220ms) cubic-bezier(.7,0,.84,0) both;
+}
+
+.bcc-template .cg-subline-row,
+.bcc-template .cg-social-row,
+.bcc-template .cg-sot-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--bcc-text-dark);
+  animation: bcc-text-in 340ms 240ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-subline-plate.cg-detail-out .cg-subline-row,
+.bcc-template .cg-subline-plate.cg-detail-out .cg-social-row,
+.bcc-template .cg-subline-plate.cg-detail-out .cg-sot-name-row,
+.bcc-template .cg-subline-row.cg-detail-out,
+.bcc-template .cg-social-row.cg-detail-out,
+.bcc-template .cg-sot-name-row.cg-detail-out {
+  animation: bcc-text-out var(--cg-detailOutMs, 180ms) ease-in both;
+}
+
+.bcc-template .cg-sot-divider {
+  width: 3px;
+  min-width: 3px;
+  height: 32px;
+  background: var(--bcc-maroon);
+  margin: 0 4px;
+}
+
+.bcc-template .cg-sot-role-text {
+  font-weight: 400;
+  color: #331A15;
+}
+
+/* 9. Location Tag di Pojok Kiri Atas */
+.bcc-template.cg-location-tag {
+  position: absolute;
+  top: 76px;
+  left: 70px;
+  max-width: 1400px;
+  padding: 8px 30px;
+  font: italic 700 32px/1.2 Arial, Helvetica, sans-serif;
+  letter-spacing: 0.5px;
+  background: var(--bcc-orange);
+  color: #ffffff;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+  animation: bcc-panel-in 360ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template.cg-location-tag.cg-exit {
+  animation: bcc-panel-out 320ms ease-in both !important;
+}
+
+/* 10. Ticker Bar Bawah */
+.bcc-template .cg-ticker-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  background: var(--bcc-maroon-dark);
+  color: #ffffff;
+  opacity: 1 !important;
+  z-index: 10;
+}
+
+.bcc-template .cg-ticker-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  will-change: transform;
+  animation: none !important;
+}
+
+.bcc-template .cg-ticker-segment {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bcc-template .cg-ticker-copy {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 18px;
+}
+
+.bcc-template .cg-ticker-badge {
+  width: max-content;
+  max-width: 520px;
+  min-width: 0;
+  padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bcc-orange);
+  color: #ffffff;
+  font: 800 28px/1 "Arial Narrow", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.bcc-template .cg-ticker-content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+.bcc-template .cg-ticker-text {
+  display: inline-block;
+  white-space: nowrap;
+  font: 400 34px/1.1 "Arial Narrow", Arial, sans-serif;
+  color: #ffffff;
+}
+
+.bcc-template .cg-ticker-bullet {
+  color: var(--bcc-orange);
+  font-size: 15px;
+  margin-left: 20px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.bcc-template .cg-ticker-clock {
+  width: var(--bcc-logo-width);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bcc-maroon-deep);
+  color: #ffffff;
+  font: 700 36px/1 Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+/* 11. Exit Animations (Animasi Keluar) */
+.bcc-template .cg-content-layer.cg-exit {
+  animation: none !important;
+}
+
+.bcc-template .cg-exit .cg-headline-plate,
+.bcc-template .cg-exit .cg-subline-plate {
+  animation: bcc-panel-out var(--panel-out, 360ms) var(--panel-out-delay, 140ms) cubic-bezier(.7,0,.84,0) both;
+}
+
+.bcc-template .cg-exit .cg-kicker-tab {
+  animation: bcc-panel-out 280ms 70ms ease-in both;
+}
+
+.bcc-template .cg-exit .cg-headline-row,
+.bcc-template .cg-exit .cg-headline-row-single,
+.bcc-template .cg-exit .cg-presenter-row,
+.bcc-template .cg-exit .cg-paragraph-row,
+.bcc-template .cg-exit .cg-subline-row,
+.bcc-template .cg-exit .cg-social-row,
+.bcc-template .cg-exit .cg-sot-name-row {
+  animation: bcc-text-out 160ms ease-in both;
+}
+
+.bcc-template .cg-ticker-bar.cg-ticker-in {
+  animation: bcc-bar-in 480ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.bcc-template .cg-ticker-bar.cg-ticker-out {
+  animation: bcc-bar-out 480ms cubic-bezier(.65,0,.8,.2) both;
+}
+
+@keyframes bcc-bar-in {
+  from { clip-path: inset(0 100% 0 0); transform: translateY(8px); opacity: 1; }
+  to { clip-path: inset(0); transform: translateY(0); opacity: 1; }
+}
+
+@keyframes bcc-bar-out {
+  from { clip-path: inset(0); transform: translateY(0); opacity: 1; }
+  to { clip-path: inset(0 100% 0 0); transform: translateY(8px); opacity: 0; }
+}
+
+/* Keyframes identik dengan CNN */
+@keyframes bcc-panel-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+
+@keyframes bcc-panel-out {
+  from { clip-path: inset(0); }
+  to { clip-path: inset(0 100% 0 0); }
+}
+
+@keyframes bcc-text-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bcc-text-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes bcc-brand-in {
+  from { clip-path: inset(100% 0 0); transform: translateY(12px); opacity: 0; }
+  to { clip-path: inset(0); transform: translateY(0); opacity: 1; }
+}
+
+@keyframes bcc-brand-out {
+  from { clip-path: inset(0); transform: translateY(0); opacity: 1; }
+  to { clip-path: inset(100% 0 0); transform: translateY(12px); opacity: 0; }
+}
+
+@keyframes bcc-bar-in {
+  from { clip-path: inset(0 100% 0 0); transform: translateY(8px); }
+  to { clip-path: inset(0); transform: translateY(0); }
+}
+
+@keyframes bcc-bar-out {
+  from { clip-path: inset(0); transform: translateY(0); }
+  to { clip-path: inset(0 0 0 100%); transform: translateY(8px); }
+}
+
+/* Standalone / Persistent Master (Logo kiri & Live badge selalu stabil) */
+.bcc-template .cg-standalone-master-wrap {
+  position: absolute;
+  left: 0;
+  bottom: 62px;
+  width: var(--bcc-logo-width);
+  height: 188px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.bcc-template.no-ticker .cg-standalone-master-wrap {
+  bottom: 0;
+}
+
+.cg-all-exit .bcc-template .cg-standalone-master-wrap,
+.cg-all-exit .bcc-template .cg-ticker-bar {
+  animation: bcc-text-out 360ms 100ms ease-in both;
+}
+
+/* Ghost elements */
+.bcc-template.cg-location-tag.cg-ghost-element,
+.bcc-template .cg-kicker-tab.cg-ghost-element {
+  background: rgba(107, 9, 8, 0.72) !important;
+  border: 2px dashed rgba(246, 210, 167, 0.75) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  animation: none !important;
+}
+
+.bcc-template .cg-subline-plate.cg-ghost-element {
+  opacity: 0.6;
+  border-top: 2px dashed rgba(107, 9, 8, 0.5) !important;
+}

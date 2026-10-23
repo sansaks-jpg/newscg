@@ -1,0 +1,52 @@
+{
+  "browser": "145.0.7632.6",
+  "fixture": "Production bundle; actual HTTP and SSE with a disposable SQLite database on an ephemeral loopback port. Settings saved through UI; real P/Space/Escape keyboard input. Canonical user database and Program untouched.",
+  "rows": [
+    {
+      "broadcastTemplate": "cnn",
+      "colorTheme": "cnn",
+      "name": "cnn",
+      "reconnectName": "NADIA PUTRI",
+      "keptSidebar": true,
+      "previewDidNotChangeProgram": true,
+      "clearWorks": true
+    },
+    {
+      "broadcastTemplate": "cnn",
+      "colorTheme": "studio-navy",
+      "name": "studio-navy",
+      "reconnectName": "NADIA PUTRI",
+      "keptSidebar": true,
+      "previewDidNotChangeProgram": true,
+      "clearWorks": true
+    },
+    {
+      "broadcastTemplate": "cnn",
+      "colorTheme": "studio-graphite",
+      "name": "studio-graphite",
+      "reconnectName": "NADIA PUTRI",
+      "keptSidebar": true,
+      "previewDidNotChangeProgram": true,
+      "clearWorks": true
+    },
+    {
+      "broadcastTemplate": "cnn",
+      "colorTheme": "studio-copper",
+      "name": "studio-copper",
+      "reconnectName": "NADIA PUTRI",
+      "keptSidebar": true,
+      "previewDidNotChangeProgram": true,
+      "clearWorks": true
+    },
+    {
+      "broadcastTemplate": "liputan7",
+      "colorTheme": "cnn",
+      "name": "liputan7",
+      "reconnectName": "NADIA PUTRI",
+      "keptSidebar": true,
+      "previewDidNotChangeProgram": true,
+      "clearWorks": true
+    }
+  ],
+  "errors": []
+}

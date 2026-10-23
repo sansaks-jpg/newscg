@@ -82,6 +82,10 @@ beforeEach(() => {
       defaults = JSON.parse(options!.body as string);
       return response(defaults);
     }
+    if (path === "/api/settings/news-anchor-defaults") return response(method === "GET"
+      ? { name: "Nadia Putri", role: "News Anchor" } : JSON.parse(options!.body as string));
+    if (path === "/api/settings/reporter-defaults") return response(method === "GET"
+      ? { name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" } : JSON.parse(options!.body as string));
     if (path === "/api/uploads/logo") return uploadFetch();
     if (path === "/api/rundowns") return response([rundownA, rundownB]);
     if (path === "/api/settings") return response({ outputMode: "web" });
@@ -107,6 +111,45 @@ afterEach(async () => {
 });
 
 describe("settings/default editor safety", () => {
+  it("saves the default anchor independently without changing Program or adding rundown cues", async () => {
+    await openSettings();
+    expect(field("Nama Anchor").value).toBe("Nadia Putri");
+    await change(field("Nama Anchor"), "Nama Anchor Baru");
+    await change(field("Jabatan Anchor"), "Pembawa Berita");
+    await click("Simpan Default News Anchor");
+    expect(bodyOf("/api/settings/news-anchor-defaults", "PATCH")).toEqual({ name: "Nama Anchor Baru", role: "Pembawa Berita" });
+    expect(requests("/api/live/master", "PATCH")).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url, options]) => String(url).startsWith("/api/rundowns") && options?.method !== undefined)).toHaveLength(0);
+  });
+
+  it("saves the default field reporter independently without changing Program", async () => {
+    await openSettings();
+    expect(field("Nama Reporter").value).toBe("Raka Pratama");
+    expect(field("Lokasi Liputan").value).toBe("Jakarta Selatan");
+    await change(field("Nama Reporter"), "Reporter Baru");
+    await change(field("Lokasi Liputan"), "Depok");
+    await click("Simpan Default Reporter Lapangan");
+    expect(bodyOf("/api/settings/reporter-defaults", "PATCH")).toEqual({ name: "Reporter Baru", role: "Reporter Lapangan", location: "Depok" });
+    expect(requests("/api/live/master", "PATCH")).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url, options]) => String(url).startsWith("/api/rundowns") && options?.method !== undefined)).toHaveLength(0);
+  });
+
+  it("reports a failed anchor load and keeps edited names when retry data arrives", async () => {
+    const implementation = fetchMock.getMockImplementation()!;
+    let failed = true;
+    fetchMock.mockImplementation((input, options) => String(input) === "/api/settings/news-anchor-defaults" && failed
+      ? Promise.resolve(response({ error: "Anchor belum tersedia" }, 503)) : implementation(input, options));
+    await openSettings();
+    expect(button("Simpan Semua").disabled).toBe(true);
+    expect(button("Simpan Default News Anchor").disabled).toBe(true);
+    await change(field("Nama Anchor"), "Nama Edit Operator");
+    failed = false;
+    await click("Muat ulang news anchor");
+    expect(field("Nama Anchor").value).toBe("Nama Edit Operator");
+    expect(field("Jabatan Anchor").value).toBe("News Anchor");
+    expect(button("Simpan Semua").disabled).toBe(false);
+  });
+
   it("reports failed defaults, blocks saves, and retries without replacing a user's draft", async () => {
     defaultsFetch.mockResolvedValueOnce(response({ error: "Server default tidak tersedia" }, 503));
     await openSettings();

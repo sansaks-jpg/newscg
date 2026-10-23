@@ -1076,7 +1076,7 @@ function StoryEditor({
                   </div>
 
                   <div className="cue-editor-body">
-                    <BroadcastTemplateInfo colorTheme={master?.colorTheme} />
+                    <BroadcastTemplateInfo colorTheme={master?.colorTheme} broadcastTemplate={master?.broadcastTemplate} />
                     {g.templateType === "SOT" ? (
                       <div className="cue-fields-grid">
                         <label className="field-full">

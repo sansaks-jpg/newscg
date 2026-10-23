@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "rundown": {
+    "programName": "RUNDOWN TV",
+    "title": "Rundown Siaran 12:00",
+    "broadcastSchedule": null,
+    "ticker": {
+      "text": "",
+      "forDate": null,
+      "sources": []
+    },
+    "items": [
+      {
+        "slug": "STATION-ID-01",
+        "title": "STATION ID - OPENING ST ID PROGRAM",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 23,
+        "sortOrder": 0,
+        "graphics": []
+      },
+      {
+        "slug": "OPENING-01",
+        "title": "OPENING 1 - ANCHOR, CG NEWS ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 8,
+        "sortOrder": 1,
+        "graphics": []
+      },
+      {
+        "slug": "STATION-ID-02",
+        "title": "STATION ID - OPENING ST ID PROGRAM",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 2,
+        "graphics": []
+      },
+      {
+        "slug": "PKG-MANGGARAI-WFH",
+        "title": "SUASANA STASIUN MANGGARAI DI HARI PERTAMA WFH",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 105,
+        "sortOrder": 3,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "SUASANA STASIUN MANGGARAI DI HARI PERTAMA WFH",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "PKG-POLIMEDIA-MABA",
+        "title": "ANGKA PENDAFTAR MAHASISWA BARU POLIMEDIA TAHUN 2026 MENGALAMI PENURUNAN",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 83,
+        "sortOrder": 4,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "ANGKA PENDAFTAR MAHASISWA BARU POLIMEDIA TAHUN 2026 MENGALAMI PENURUNAN",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "VO-MACET-MARGONDA",
+        "title": "KEMACETAN PADA HARI RAYA PASKAH MEMICU PELANGGARAN LALU LINTAS DI MARGONDA DEPOK",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 62,
+        "sortOrder": 5,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "KEMACETAN PADA HARI RAYA PASKAH MEMICU PELANGGARAN LALU LINTAS DI MARGONDA DEPOK",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "CLOSING-01",
+        "title": "CLOSING 1 - ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 5,
+        "sortOrder": 6,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-OUT-01",
+        "title": "BUMPER OUT SEGMENT - CLOSING BUMPER SEGMEN",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 7,
+        "graphics": []
+      },
+      {
+        "slug": "BREAK-01",
+        "title": "BREAK",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 229,
+        "sortOrder": 8,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-IN-02",
+        "title": "BUMPER IN SEGMENT - OPENING BUMPER PROGRAM",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 9,
+        "graphics": []
+      },
+      {
+        "slug": "OPENING-02",
+        "title": "OPENING 2 - ANCHOR, CG NEWS ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 5,
+        "sortOrder": 10,
+        "graphics": []
+      },
+      {
+        "slug": "PKG-POLIMEDIA-LISTRIK",
+        "title": "LANGKAH CEPAT PENANGANAN SAAT POLIMEDIA MATI LISTRIK",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 80,
+        "sortOrder": 11,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "LANGKAH CEPAT PENANGANAN SAAT POLIMEDIA MATI LISTRIK",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "PKG-SETU-BABAKAN",
+        "title": "JALAN RUSAK MENUJU AKSES WISATA SETU BABAKAN",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 105,
+        "sortOrder": 12,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "JALAN RUSAK MENUJU AKSES WISATA SETU BABAKAN",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "VO-SAMPAH-KRAMAT-JATI",
+        "title": "KRISIS PENGELOLAAN SAMPAH DI TPS KRAMAT JATI JAKARTA TIMUR",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 45,
+        "sortOrder": 13,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "KRISIS PENGELOLAAN SAMPAH DI TPS KRAMAT JATI JAKARTA TIMUR",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "CLOSING-02",
+        "title": "CLOSING 2 - ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 8,
+        "sortOrder": 14,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-OUT-02",
+        "title": "BUMPER OUT SEGMENT - CLOSING BUMPER SEGMEN",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 15,
+        "graphics": []
+      },
+      {
+        "slug": "BREAK-02",
+        "title": "BREAK",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 225,
+        "sortOrder": 16,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-IN-03",
+        "title": "BUMPER IN SEGMENT - OPENING BUMPER PROGRAM",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 17,
+        "graphics": []
+      },
+      {
+        "slug": "OPENING-03",
+        "title": "OPENING 3 - ANCHOR, CG NEWS ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 5,
+        "sortOrder": 18,
+        "graphics": []
+      },
+      {
+        "slug": "PKG-KRL-DEPOK-BARU",
+        "title": "PENGGUNA KRL KELUHKAN MINIMNYA FASILITAS RAMAH DISABILITAS DI STASIUN DEPOK BARU",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 93,
+        "sortOrder": 19,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "PENGGUNA KRL KELUHKAN MINIMNYA FASILITAS RAMAH DISABILITAS DI STASIUN DEPOK BARU",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "VO-MACET-GONG-SI-BOLONG",
+        "title": "PELEBARAN JALAN TAK SURUTKAN KEMACETAN DI TUGU GONG SI BOLONG",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 76,
+        "sortOrder": 20,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "PELEBARAN JALAN TAK SURUTKAN KEMACETAN DI TUGU GONG SI BOLONG",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "VO-POHON-TUMBANG-JKT",
+        "title": "ANTISIPASI POHON TUMBANG DI JAKARTA",
+        "format": "VO",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 62,
+        "sortOrder": 21,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "ANTISIPASI POHON TUMBANG DI JAKARTA",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "CLOSING-03",
+        "title": "CLOSING 3 - ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 5,
+        "sortOrder": 22,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-OUT-03",
+        "title": "BUMPER OUT SEGMENT - CLOSING BUMPER SEGMEN",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 23,
+        "graphics": []
+      },
+      {
+        "slug": "BREAK-03",
+        "title": "BREAK",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 235,
+        "sortOrder": 24,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-IN-04",
+        "title": "BUMPER IN SEGMENT - OPENING BUMPER PROGRAM",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 6,
+        "sortOrder": 25,
+        "graphics": []
+      },
+      {
+        "slug": "OPENING-04",
+        "title": "OPENING 4 - ANCHOR, CG NEWS ANCHOR",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 5,
+        "sortOrder": 26,
+        "graphics": []
+      },
+      {
+        "slug": "PKG-MATCHA-DEPOK",
+        "title": "VIBE NOSTALGIA, INTIP KEUNIKAN TOKO MATCHA DI DEPOK YANG TENGAH VIRAL",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 163,
+        "sortOrder": 27,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "VIBE NOSTALGIA, INTIP KEUNIKAN TOKO MATCHA DI DEPOK YANG TENGAH VIRAL",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "PKG-LAUNDRY-SELF",
+        "title": "LAUNDRY SELF SERVICE, SOLUSI PRAKTIS IBU RUMAH TANGGA",
+        "format": "PKG",
+        "cgRequired": true,
+        "estimatedDurationSeconds": 123,
+        "sortOrder": 28,
+        "graphics": [
+          {
+            "templateType": "HEADLINE",
+            "sortOrder": 0,
+            "draftFields": {
+              "headline": "LAUNDRY SELF SERVICE, SOLUSI PRAKTIS IBU RUMAH TANGGA",
+              "kicker": "",
+              "location": "",
+              "subline": "",
+              "layoutStyle": "single",
+              "contentMode": "headline",
+              "showKicker": "false",
+              "showLocation": "false",
+              "showDetail": "false"
+            }
+          }
+        ]
+      },
+      {
+        "slug": "CLOSING-04",
+        "title": "CLOSING 4 - ANCHOR, CT MASUK",
+        "format": "LIVE",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 14,
+        "sortOrder": 29,
+        "graphics": []
+      },
+      {
+        "slug": "BUMPER-OUT-04",
+        "title": "BUMPER OUT SEGMENT - CLOSING BUMPER SEGMEN",
+        "format": "LAINNYA",
+        "cgRequired": false,
+        "estimatedDurationSeconds": 30,
+        "sortOrder": 30,
+        "graphics": []
+      }
+    ]
+  }
+}

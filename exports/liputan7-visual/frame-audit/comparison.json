@@ -1,0 +1,18 @@
+{
+  "sourceFramesReviewed": 198,
+  "renderFramesReviewed": 280,
+  "titleCopyOpacity": 1,
+  "profiles": {
+    "in": {
+      "sampleCount": 72,
+      "meanAbsoluteWidthDifference": 0.010723734141456262,
+      "sourceStartSeconds": 173.6
+    },
+    "out": {
+      "sampleCount": 67,
+      "meanAbsoluteWidthDifference": 0.021165005410570082,
+      "sourceStartSeconds": 182.35
+    }
+  },
+  "note": "Width is normalized; Liputan7 intentionally extends to x1850 instead of reference x1548. All source/render frames are retained in the local frame-audit directory."
+}

@@ -1,0 +1,105 @@
+{
+  "url": "http://localhost:3001/output",
+  "browser": "145.0.7632.6",
+  "fixture": "Browser-only SSE SYNC/UPDATE; real production bundle, no live connection or server writes",
+  "errors": [],
+  "writes": [],
+  "metrics": {
+    "backgrounds": [
+      {
+        "selector": "html",
+        "color": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": "body",
+        "color": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": "#root",
+        "color": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": ".overlay-root",
+        "color": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": ".overlay-stage-1080",
+        "color": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": ".liputan7-template",
+        "color": "rgba(0, 0, 0, 0)"
+      }
+    ],
+    "text": [
+      {
+        "selector": ".l7-title-copy span",
+        "transform": "matrix(0.721429, 0, 0, 1.45, 0, -5.075)",
+        "font": "500 56.5581px / 56.5581px \"Barlow News\", Arial, Helvetica, sans-serif",
+        "objectFit": "fill",
+        "rect": {
+          "x": 147.0833282470703,
+          "y": 315.062255859375,
+          "width": 519.9188232421875,
+          "height": 30.157806396484375,
+          "top": 315.062255859375,
+          "right": 667.0021514892578,
+          "bottom": 345.2200622558594,
+          "left": 147.0833282470703
+        }
+      },
+      {
+        "selector": ".l7-clock span",
+        "transform": "none",
+        "font": "",
+        "objectFit": "fill",
+        "rect": {
+          "x": 8.089583396911621,
+          "y": 382.1650085449219,
+          "width": 57.10969543457031,
+          "height": 12.938720703125,
+          "top": 382.1650085449219,
+          "right": 65.19927883148193,
+          "bottom": 395.1037292480469,
+          "left": 8.089583396911621
+        }
+      },
+      {
+        "selector": ".l7-program img",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "font": "16px / 24px \"Barlow News\", Arial, Helvetica, sans-serif",
+        "objectFit": "contain",
+        "rect": {
+          "x": 35.29999923706055,
+          "y": 305.1645812988281,
+          "width": 105.89999389648438,
+          "height": 53.6854248046875,
+          "top": 305.1645812988281,
+          "right": 141.19999313354492,
+          "bottom": 358.8500061035156,
+          "left": 35.29999923706055
+        }
+      },
+      {
+        "selector": ".l7-tv-logo img",
+        "transform": "none",
+        "font": "16px / 24px \"Barlow News\", Arial, Helvetica, sans-serif",
+        "objectFit": "contain",
+        "rect": {
+          "x": 593.4812622070312,
+          "y": 21.29374885559082,
+          "width": 69.86456298828125,
+          "height": 44.492706298828125,
+          "top": 21.29374885559082,
+          "right": 663.3458251953125,
+          "bottom": 65.78645515441895,
+          "left": 593.4812622070312
+        }
+      }
+    ],
+    "viewport": {
+      "width": 706,
+      "height": 400
+    }
+  }
+}

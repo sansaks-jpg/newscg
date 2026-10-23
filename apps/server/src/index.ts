@@ -16,17 +16,43 @@ import { LogoUploadError, validateLogoImage } from "./logoUpload.js";
 import { agentApiDiscovery, agentOpenApi } from "./agentApi.js";
 import { liveTickerInputSchema, rundownBroadcastSchema } from "@newscg/shared";
 import { applyRundownTicker } from "./live.js";
+import { weatherLocationSchema } from "@newscg/shared";
+import { getWeatherForecast } from "./weather.js";
+import { liveNewsAnchorInputSchema, liveReporterInputSchema, newsAnchorDefaultsPatchSchema, reporterDefaultsPatchSchema } from "@newscg/shared";
+import { getNewsAnchorDefaults, getReporterDefaults, saveNewsAnchorDefaults, saveReporterDefaults } from "./db.js";
+import { takeFieldReporter, takeNewsAnchor } from "./live.js";
 
 seedIfEmpty();
 const app=express(); const port=Number(process.env.PORT||3001);
 const serverDir = dirname(fileURLToPath(import.meta.url));
 const uploadsDir = resolve(serverDir, process.env.UPLOADS_PATH || "../data/uploads");
 mkdirSync(uploadsDir, { recursive: true });
-app.use(cors({origin:process.env.WEB_ORIGIN||"http://localhost:5173"}));
+const configuredOrigin = process.env.WEB_ORIGIN;
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (configuredOrigin) {
+      if (configuredOrigin === "*") return callback(null, true);
+      const allowed = configuredOrigin.split(",").map(o => o.trim());
+      if (allowed.includes(origin)) return callback(null, true);
+    }
+    const isLocalOrLan = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+    if (isLocalOrLan) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: true
+}));
+
 app.use("/uploads", express.static(uploadsDir));
 app.use(express.json({limit:"2mb"}));
 
 app.get("/api/agent", (_req, res) => res.json(agentApiDiscovery));
+app.get("/api/weather", async (req, res) => {
+  const parsed = weatherLocationSchema.shape.adm4.safeParse(req.query.adm4);
+  if (!parsed.success) return res.status(400).json({ error: "Pilih kode wilayah cuaca BMKG yang valid, misalnya 31.71.03.1001." });
+  try { return res.json(await getWeatherForecast(parsed.data)); }
+  catch (error) { return res.status(503).json({ error: error instanceof Error ? error.message : "Prakiraan BMKG belum tersedia" }); }
+});
 app.get("/api/agent/openapi.json", (_req, res) => res.json(agentOpenApi));
 app.get("/api/agent/guide.md", (_req, res) => {
   res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/AI_AGENT_API.md", import.meta.url)));
@@ -139,10 +165,22 @@ app.post("/api/rundowns/import",(req,res)=>{const parsed=rundownImportInputSchem
 app.get("/api/settings",(_req,res)=>res.json(getSettings()));
 app.patch("/api/settings",(req,res)=>{const parsed=settingsPatchSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data pengaturan tidak valid",details:parsed.error.issues});return res.json(saveSettings(parsed.data));});
 app.get("/api/settings/headline-defaults",(_req,res)=>res.json(getHeadlineDefaults()));
+app.get("/api/settings/news-anchor-defaults", (_req, res) => res.json(getNewsAnchorDefaults()));
+app.patch("/api/settings/news-anchor-defaults", (req, res) => {
+  const parsed = newsAnchorDefaultsPatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Default news anchor tidak valid.", details: parsed.error.issues });
+  return res.json(saveNewsAnchorDefaults(parsed.data));
+});
+app.get("/api/settings/reporter-defaults", (_req, res) => res.json(getReporterDefaults()));
+app.patch("/api/settings/reporter-defaults", (req, res) => {
+  const parsed = reporterDefaultsPatchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Default reporter lapangan tidak valid.", details: parsed.error.issues });
+  return res.json(saveReporterDefaults(parsed.data));
+});
 app.patch("/api/settings/headline-defaults",(req,res)=>{const parsed=headlineDefaultsPatchSchema.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:"Data default headline tidak valid. Sertakan minimal satu field.",details:parsed.error.issues});return res.json(saveHeadlineDefaults(parsed.data));});
 app.get("/api/live/state",(_req,res)=>res.json(getLiveState()));
 // Apply the same key constraints to headers as to the shared live request bodies.
-app.use(["/api/live/take", "/api/live/update", "/api/live/variant", "/api/live/clear", "/api/live/clear-all", "/api/live/stage", "/api/live/ticker"], (req, res, next) => {
+app.use(["/api/live/news-anchor", "/api/live/reporter", "/api/live/take", "/api/live/update", "/api/live/variant", "/api/live/clear", "/api/live/clear-all", "/api/live/stage", "/api/live/ticker"], (req, res, next) => {
   if (req.method !== "POST") return next();
   const header = req.get("Idempotency-Key");
   if (header === undefined) return next();
@@ -164,6 +202,16 @@ app.post("/api/live/take", asyncRoute(async (req:any, res:any) => {
   const parsed = liveTakeInputSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Data TAKE tidak valid", details: parsed.error.issues });
   return res.json(await take(parsed.data.graphicId, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID(), { presentation: parsed.data.presentation }));
+}));
+app.post("/api/live/news-anchor", asyncRoute(async (req: express.Request, res: express.Response) => {
+  const parsed = liveNewsAnchorInputSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Perintah news anchor tidak valid.", details: parsed.error.issues });
+  return res.json(await takeNewsAnchor(parsed.data, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID()));
+}));
+app.post("/api/live/reporter", asyncRoute(async (req: express.Request, res: express.Response) => {
+  const parsed = liveReporterInputSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Perintah reporter lapangan tidak valid.", details: parsed.error.issues });
+  return res.json(await takeFieldReporter(parsed.data, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID()));
 }));
 app.post("/api/live/variant", asyncRoute(async (req:any, res:any) => {
   const parsed = liveVariantInputSchema.safeParse(req.body);

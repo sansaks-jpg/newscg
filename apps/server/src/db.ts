@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, Rundown, RundownItem } from "@newscg/shared";
+import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, NewsAnchorDefaults, ReporterDefaults, Rundown, RundownItem } from "@newscg/shared";
+import { defaultNewsAnchorDefaults, defaultReporterDefaults, newsAnchorDefaultsPatchSchema, newsAnchorDefaultsSchema, reporterDefaultsPatchSchema, reporterDefaultsSchema } from "@newscg/shared";
 import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, emptyRundownTicker, rundownBroadcastSchema, rundownTickerSchema, getRundownTickerSpeed, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlaySchema, normalizeHeadlineTopicFields, settingsPatchSchema } from "@newscg/shared";
 import type { ZodType } from "zod";
 
@@ -302,6 +303,26 @@ export const saveHeadlineDefaults = db.transaction((patch: Partial<HeadlineDefau
   const parsed = headlineDefaultsPatchSchema.parse(patch);
   const updated = headlineDefaultsSchema.parse({ ...getHeadlineDefaults(), ...parsed });
   writeSettingsObject("headline_defaults", parsed);
+  return updated;
+});
+
+export function getNewsAnchorDefaults(): NewsAnchorDefaults {
+  return newsAnchorDefaultsSchema.parse({ ...defaultNewsAnchorDefaults, ...readValidatedSettingsFields("news_anchor_defaults", newsAnchorDefaultsSchema.shape) });
+}
+export const saveNewsAnchorDefaults = db.transaction((patch: Partial<NewsAnchorDefaults>): NewsAnchorDefaults => {
+  const parsed = newsAnchorDefaultsPatchSchema.parse(patch);
+  const updated = newsAnchorDefaultsSchema.parse({ ...getNewsAnchorDefaults(), ...parsed });
+  writeSettingsObject("news_anchor_defaults", parsed);
+  return updated;
+});
+
+export function getReporterDefaults(): ReporterDefaults {
+  return reporterDefaultsSchema.parse({ ...defaultReporterDefaults, ...readValidatedSettingsFields("reporter_defaults", reporterDefaultsSchema.shape) });
+}
+export const saveReporterDefaults = db.transaction((patch: Partial<ReporterDefaults>): ReporterDefaults => {
+  const parsed = reporterDefaultsPatchSchema.parse(patch);
+  const updated = reporterDefaultsSchema.parse({ ...getReporterDefaults(), ...parsed });
+  writeSettingsObject("reporter_defaults", parsed);
   return updated;
 });
 

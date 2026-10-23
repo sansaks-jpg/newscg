@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import type { Server } from "node:http";
 import type { OverlayEvent, OverlayPlaybackState } from "@newscg/shared";
+import { broadcastTemplateIds, emptyRundownTicker, fieldReporterGraphicId, newsAnchorGraphicId } from "@newscg/shared";
 import { createOverlayPlayback } from "../../web/src/overlayPlayback";
 
 let temporaryDirectory: string;
@@ -72,6 +73,134 @@ afterAll(async () => {
 });
 
 describe("operator to output through real HTTP, SQLite and SSE", () => {
+  it.each(broadcastTemplateIds)("persists a default anchor snapshot, keeps the rundown/ticker, and restores it on %s reconnect", async broadcastTemplate => {
+    await request("/api/live/clear-all", "POST", { immediate: true });
+    const rundown = await request("/api/rundowns", "POST", { programName: "TES ANCHOR", title: "TES DEFAULT",
+      broadcastSchedule: { date: "2026-10-15", time: "19:00", timezone: "WIB" },
+      ticker: { ...emptyRundownTicker, text: "TICKER RUNDOWN TETAP", forDate: "2026-10-15" }, items: [] });
+    await request("/api/live/ticker", "POST", { rundownId: rundown.id });
+    await request("/api/live/master", "PATCH", { broadcastTemplate, showLogo: true, showTicker: true,
+      showProgramLogo: broadcastTemplate === "liputan7" });
+    const beforeRundowns = await request("/api/rundowns");
+    const beforeMaster = await request("/api/live/master");
+    await request("/api/settings/news-anchor-defaults", "PATCH", { name: "Nadia Putri", role: "News Anchor" });
+    const partial = await request("/api/settings/news-anchor-defaults", "PATCH", { role: "Pembawa Berita" });
+    expect(partial).toEqual({ name: "Nadia Putri", role: "Pembawa Berita" });
+    expect(await request("/api/settings/news-anchor-defaults")).toEqual(partial);
+    const abort = new AbortController();
+    try {
+      const stream = await fetch(`${baseUrl}/api/live/stream?role=monitor`, { signal: abort.signal });
+      const next = readEvents(stream.body!.getReader()); await next();
+      const key = randomUUID();
+      const send = () => fetch(`${baseUrl}/api/live/news-anchor`, { method: "POST", headers: {
+        "Content-Type": "application/json", "Idempotency-Key": key }, body: "{}" }).then(response => response.json());
+      const taken = await send();
+      expect(taken).toMatchObject({ commandStatus: "confirmed", state: { onAirGraphicId: newsAnchorGraphicId,
+        onAirSnapshot: { name: "Nadia Putri", role: "Pembawa Berita" } } });
+      expect(await send()).toEqual(taken);
+      expect(await next()).toMatchObject({ type: "TAKE", graphic: { id: newsAnchorGraphicId, templateType: "REPORTER" },
+        fields: { name: "Nadia Putri", role: "Pembawa Berita" }, master: beforeMaster });
+      await request("/api/settings/news-anchor-defaults", "PATCH", { name: "Nama Default Baru" });
+      expect((await request("/api/live/state")).onAirSnapshot.name).toBe("Nadia Putri");
+      const reconnectAbort = new AbortController();
+      try {
+        const reconnect = await fetch(`${baseUrl}/api/live/stream?role=monitor`, { signal: reconnectAbort.signal });
+        expect(await readEvents(reconnect.body!.getReader())()).toMatchObject({ type: "SYNC", onAir: true,
+          graphic: { id: newsAnchorGraphicId, templateType: "REPORTER", draftFields: { name: "Nadia Putri" } },
+          fields: { name: "Nadia Putri" } });
+      } finally { reconnectAbort.abort(); }
+      await request("/api/live/news-anchor", "POST", { action: "update", defaults: { name: "Nama Preview", role: "Anchor" } });
+      expect(await next()).toMatchObject({ type: "UPDATE", graphicId: newsAnchorGraphicId, fields: { name: "Nama Preview" } });
+      expect(await request("/api/rundowns")).toEqual(beforeRundowns);
+      expect(await request("/api/live/master")).toEqual(beforeMaster);
+      await request("/api/live/clear", "POST");
+      expect(await next()).toMatchObject({ type: "CLEAR" });
+      expect((await request("/api/live/state")).onAirGraphicId).toBeNull();
+    } finally { abort.abort(); }
+  });
+
+  it("validates anchor data and blocks a missing name or an UPDATE without a live anchor", async () => {
+    await request("/api/live/clear-all", "POST", { immediate: true });
+    await request("/api/settings/news-anchor-defaults", "PATCH", { name: "" });
+    expect(await request("/api/live/news-anchor", "POST", {})).toMatchObject({ commandStatus: "failed", error: expect.stringContaining("Isi Nama Anchor") });
+    expect(await request("/api/live/news-anchor", "POST", { action: "update", defaults: { name: "Nadia Putri", role: "Anchor" } }))
+      .toMatchObject({ commandStatus: "failed", error: expect.stringContaining("tidak sedang ON AIR") });
+    const invalid = await fetch(`${baseUrl}/api/settings/news-anchor-defaults`, { method: "PATCH",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "N".repeat(1000) }) });
+    expect(invalid.status).toBe(400);
+    const badKey = await fetch(`${baseUrl}/api/live/news-anchor`, { method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "K".repeat(201) }, body: "{}" });
+    expect(badKey.status).toBe(400);
+  });
+
+  it("takes, updates and restores the field reporter default through HTTP and SSE", async () => {
+    await request("/api/live/clear-all", "POST", { immediate: true });
+    expect(await request("/api/settings/reporter-defaults", "PATCH",
+      { name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" }))
+      .toEqual({ name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" });
+    const beforeRundowns = await request("/api/rundowns");
+    const beforeMaster = await request("/api/live/master");
+    const abort = new AbortController();
+    try {
+      const stream = await fetch(`${baseUrl}/api/live/stream?role=monitor`, { signal: abort.signal });
+      const next = readEvents(stream.body!.getReader()); await next();
+      const taken = await request("/api/live/reporter", "POST", {});
+      expect(taken).toMatchObject({ commandStatus: "confirmed", state: { onAirGraphicId: fieldReporterGraphicId,
+        onAirSnapshot: { name: "Raka Pratama", role: "Reporter Lapangan", location: "Jakarta Selatan" } } });
+      expect(await next()).toMatchObject({ type: "TAKE", graphic: { id: fieldReporterGraphicId, templateType: "REPORTER" },
+        fields: { name: "Raka Pratama", location: "Jakarta Selatan" }, master: beforeMaster });
+      const reconnectAbort = new AbortController();
+      try {
+        const reconnect = await fetch(`${baseUrl}/api/live/stream?role=monitor`, { signal: reconnectAbort.signal });
+        expect(await readEvents(reconnect.body!.getReader())()).toMatchObject({ type: "SYNC", onAir: true,
+          graphic: { id: fieldReporterGraphicId, templateType: "REPORTER", draftFields: { name: "Raka Pratama" } },
+          fields: { name: "Raka Pratama", location: "Jakarta Selatan" } });
+      } finally { reconnectAbort.abort(); }
+      await request("/api/live/reporter", "POST", { action: "update", defaults: { name: "Reporter Preview", role: "Reporter", location: "" } });
+      expect(await next()).toMatchObject({ type: "UPDATE", graphicId: fieldReporterGraphicId, fields: { name: "Reporter Preview" } });
+      expect(await request("/api/rundowns")).toEqual(beforeRundowns);
+      expect(await request("/api/live/master")).toEqual(beforeMaster);
+      await request("/api/live/clear", "POST");
+      expect(await next()).toMatchObject({ type: "CLEAR" });
+      expect((await request("/api/live/state")).onAirGraphicId).toBeNull();
+    } finally { abort.abort(); }
+  });
+
+  it("validates field reporter data and blocks UPDATE without a live reporter", async () => {
+    await request("/api/live/clear-all", "POST", { immediate: true });
+    await request("/api/settings/reporter-defaults", "PATCH", { name: "" });
+    expect(await request("/api/live/reporter", "POST", {}))
+      .toMatchObject({ commandStatus: "failed", error: expect.stringContaining("Isi Nama Reporter Lapangan") });
+    expect(await request("/api/live/reporter", "POST", { action: "update", defaults: { name: "Raka", role: "Reporter", location: "" } }))
+      .toMatchObject({ commandStatus: "failed", error: expect.stringContaining("tidak sedang ON AIR") });
+    const invalid = await fetch(`${baseUrl}/api/settings/reporter-defaults`, { method: "PATCH",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "L".repeat(1000) }) });
+    expect(invalid.status).toBe(400);
+    const badKey = await fetch(`${baseUrl}/api/live/reporter`, { method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "K".repeat(201) }, body: "{}" });
+    expect(badKey.status).toBe(400);
+  });
+
+  it("persists Liputan7 separately from color themes and keeps new master layers off after blackout/reconnect", async () => {
+    const edited = await request("/api/live/master", "PATCH", {
+      broadcastTemplate: "liputan7", showLogo: true, showProgramLogo: true, showWeather: true,
+      weatherLocations: [{ adm4: "31.71.03.1001", label: "KEMAYORAN" }]
+    });
+    expect(edited).toMatchObject({ broadcastTemplate: "liputan7", showProgramLogo: true, showWeather: true });
+    expect(await request("/api/live/master")).toEqual(edited);
+    const abort = new AbortController();
+    try {
+      const stream = await fetch(`${baseUrl}/api/live/stream?role=monitor`, { signal: abort.signal });
+      const next = readEvents(stream.body!.getReader());
+      expect(await next()).toMatchObject({ type: "SYNC", master: { broadcastTemplate: "liputan7", showProgramLogo: true, showWeather: true } });
+      expect((await request("/api/live/clear-all", "POST", { immediate: false })).commandStatus).toBe("confirmed");
+      expect(await next()).toMatchObject({ type: "CLEAR_ALL_ANIMATED" });
+      expect(await request("/api/live/master")).toMatchObject({ showLogo: false, showProgramLogo: false, showWeather: false });
+      await request("/api/live/master", "PATCH", { brandText: "LIPUTAN7" });
+      expect(await next()).toMatchObject({ type: "MASTER_UPDATE", master: { showProgramLogo: false, showWeather: false } });
+    } finally { abort.abort(); }
+  });
+
   it("isolates a draft, updates Program explicitly, and clears the output via SSE", async () => {
     const rundown = await request("/api/rundowns", "POST", {
       programName: "PROGRAM TES", title: "Edisi tes", items: [{

@@ -3,6 +3,7 @@ import type {
   GraphicItem,
   LiveState,
   MasterOverlayState,
+  NewsAnchorDefaults,
   Rundown,
   RundownItem
 } from "@newscg/shared";
@@ -18,11 +19,14 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import { mutate } from "./api";
+import { api, mutate } from "./api";
+import { createNewsAnchorGraphic, newsAnchorDefaultsSchema } from "@newscg/shared";
+import { createFieldReporterGraphic, fieldReporterGraphicId, reporterDefaultsSchema, type ReporterDefaults } from "@newscg/shared";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
-import { emptyRundownTicker, getBroadcastColorTheme, getGraphicFieldLimit, getRundownTickerSpeed, normalizeHeadlineTopicFields, selectBroadcastColorTheme } from "@newscg/shared";
-import { BroadcastColorThemePicker } from "./VisualTemplatePicker";
+import { broadcastTemplates, emptyRundownTicker, getBroadcastColorTheme, getGraphicFieldLimit, getRundownTickerSpeed, hasVisibleMasterLayers, masterControlPatch, normalizeHeadlineTopicFields, selectBroadcastColorTheme, selectBroadcastTemplate } from "@newscg/shared";
+import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemplatePicker";
+import { Liputan7Settings } from "./Liputan7Settings";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
 import "./simple-production.css";
 
@@ -95,6 +99,9 @@ export function SimpleProductionEditor({
        selectedItem.graphics[0] ||
        null)
     : null;
+  const [anchorPreview, setAnchorPreview] = useState<GraphicItem | null>(null);
+  const [reporterPreview, setReporterPreview] = useState<GraphicItem | null>(null);
+  const previewCue = reporterPreview || anchorPreview || selectedCue;
 
   useEffect(() => {
     if (!rundown?.id) return;
@@ -104,6 +111,8 @@ export function SimpleProductionEditor({
     setSelectedItemId(valid);
     const savedCue = sessionStorage.getItem(`simple-cued-cue-${rundown.id}`);
     setSelectedCueId(savedCue || null);
+    setAnchorPreview(null);
+    setReporterPreview(null);
   }, [rundown?.id]);
 
   useEffect(() => {
@@ -127,13 +136,17 @@ export function SimpleProductionEditor({
   // Status On-Air berita
   const onAirGraphicId = live.onAirGraphicId;
   const isSelectedOnAir = Boolean(
-    selectedCue && onAirGraphicId && selectedCue.id === onAirGraphicId
+    !reporterPreview && !anchorPreview && selectedCue && onAirGraphicId && selectedCue.id === onAirGraphicId
   );
   const onAirCueInStory = selectedItem?.graphics.find((graphic) => graphic.id === onAirGraphicId);
   const canSwitchDetail = Boolean(selectedCue && onAirCueInStory && selectedCue.id !== onAirCueInStory.id &&
     ["HEADLINE", "SOT"].includes(selectedCue.templateType) &&
     ["HEADLINE", "SOT"].includes(onAirCueInStory.templateType));
-  const canUpdate = isSelectedOnAir || canSwitchDetail;
+  const canUpdate = reporterPreview
+    ? onAirGraphicId === reporterPreview.id
+    : anchorPreview
+    ? onAirGraphicId === anchorPreview.id
+    : isSelectedOnAir || canSwitchDetail;
 
   // Cari apakah berita tertentu sedang ON AIR
   const isItemOnAir = useCallback(
@@ -180,6 +193,10 @@ export function SimpleProductionEditor({
   }, [master]);
 
   const isMasterChanged =
+    stagedMaster.broadcastTemplate !== master.broadcastTemplate ||
+    stagedMaster.showProgramLogo !== master.showProgramLogo || stagedMaster.showWeather !== master.showWeather ||
+    stagedMaster.programLogoImage !== master.programLogoImage ||
+    JSON.stringify(stagedMaster.weatherLocations) !== JSON.stringify(master.weatherLocations) ||
     stagedMaster.showLogo !== master.showLogo ||
     stagedMaster.showTicker !== master.showTicker ||
     stagedMaster.showLiveBadge !== master.showLiveBadge ||
@@ -351,6 +368,8 @@ export function SimpleProductionEditor({
 
   const selectCue = useCallback((storyId: string, cueId: string | null) => {
     void flushPendingDraft();
+    setAnchorPreview(null);
+    setReporterPreview(null);
     setSelectedItemId(storyId);
     setSelectedCueId(cueId);
   }, [flushPendingDraft]);
@@ -461,15 +480,33 @@ export function SimpleProductionEditor({
   );
 
   const executeGraphic = useCallback(async (action: "take" | "update") => {
-    if (commandLock.current || !selectedCue) return;
-    if ((action === "take" && isSelectedOnAir) || (action === "update" && !canUpdate)) return;
+    if (commandLock.current || !previewCue) return;
+    if ((action === "take" && onAirGraphicId === previewCue.id) || (action === "update" && !canUpdate)) return;
     commandLock.current = true;
     setBusy(true);
     try {
+      if (reporterPreview) {
+        await sendLiveCommand("/api/live/reporter", { action,
+          defaults: {
+            name: reporterPreview.draftFields.name,
+            role: reporterPreview.draftFields.role,
+            location: reporterPreview.draftFields.location
+          } });
+        await reload();
+        toast(action === "take" ? "Reporter lapangan ditayangkan" : "Reporter lapangan diperbarui");
+        return;
+      }
+      if (anchorPreview) {
+        await sendLiveCommand("/api/live/news-anchor", { action,
+          defaults: { name: anchorPreview.draftFields.name, role: anchorPreview.draftFields.role } });
+        await reload();
+        toast(action === "take" ? "News anchor ditayangkan" : "News anchor diperbarui");
+        return;
+      }
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
       if (!await flushSaveDraft(miniDraft, composition)) return;
-      await sendLiveCommand(`/api/live/${action}`, { graphicId: selectedCue.id, syncComposition: true });
+      await sendLiveCommand(`/api/live/${action}`, { graphicId: previewCue.id, syncComposition: true });
       await reload();
       toast(action === "take" ? "TAKE diterima server NewsCG" : "UPDATE diterima server NewsCG");
     } catch (error: any) {
@@ -478,7 +515,7 @@ export function SimpleProductionEditor({
       commandLock.current = false;
       setBusy(false);
     }
-  }, [selectedCue, isSelectedOnAir, canUpdate, flushSaveDraft, miniDraft, composition, sendLiveCommand, reload, toast]);
+  }, [previewCue, anchorPreview, onAirGraphicId, canUpdate, flushSaveDraft, miniDraft, composition, sendLiveCommand, reload, toast]);
   const executeUpdate = useCallback(() => executeGraphic("update"), [executeGraphic]);
   const executePrimary = useCallback(() => executeGraphic(primaryGraphicAction(canUpdate)), [executeGraphic, canUpdate]);
 
@@ -487,14 +524,12 @@ export function SimpleProductionEditor({
     commandLock.current = true;
     setBusy(true);
     try {
+      const masterPatch = urgent ? null : masterControlPatch(stagedMaster);
       if (urgent || (stagedMaster.showTicker && rundown)) {
         if (!rundown) throw new Error("Pilih rundown sebelum menerapkan ticker");
         await mutate("/api/live/ticker", "POST", { rundownId: rundown.id, immediate: urgent }, true);
       }
-      if (!urgent) await onUpdateMaster({ showLogo: stagedMaster.showLogo, showTicker: stagedMaster.showTicker,
-        showLiveBadge: stagedMaster.showLiveBadge,
-        colorTheme: getBroadcastColorTheme(stagedMaster.colorTheme).id,
-        brandText: stagedMaster.brandText, logoText: stagedMaster.logoText, logoSub: stagedMaster.logoSub });
+      if (masterPatch) await onUpdateMaster(masterPatch);
       if (!urgent) isUserStagingMasterRef.current = false;
       await reload();
       toast(urgent ? "Ticker diterapkan segera" : "Master diterapkan; isi ticker baru masuk pada batas segmen");
@@ -530,7 +565,7 @@ export function SimpleProductionEditor({
     try {
       await sendLiveCommand("/api/live/clear-all", { immediate });
       isUserStagingMasterRef.current = false;
-      setStagedMaster((previous) => ({ ...previous, showLogo: false, showTicker: false, showLiveBadge: false }));
+      setStagedMaster((previous) => ({ ...previous, showLogo: false, showTicker: false, showLiveBadge: false, showProgramLogo: false, showWeather: false }));
       await reload();
       toast(immediate ? "CLEAR ALL — Seluruh layer dihapus segera" : "ALL OUT — Seluruh layer keluar beranimasi");
     } catch (error: any) {
@@ -555,6 +590,27 @@ export function SimpleProductionEditor({
     });
   }, [toast]);
 
+  const toggleMasterProgram = useCallback(() => {
+    isUserStagingMasterRef.current = true;
+    setStagedMaster(previous => ({ ...previous, showProgramLogo: !previous.showProgramLogo }));
+    toast("Preview: Logo Program diubah (Tekan M untuk terapkan master)");
+  }, [toast]);
+
+  const toggleMasterTicker = useCallback(() => {
+    isUserStagingMasterRef.current = true;
+    setStagedMaster(previous => ({ ...previous, showTicker: !previous.showTicker }));
+    toast("Preview: Ticker diubah (Tekan M untuk terapkan master)");
+  }, [toast]);
+
+  const toggleMasterLive = useCallback(() => {
+    isUserStagingMasterRef.current = true;
+    setStagedMaster(previous => {
+      const nextVal = !previous.showLiveBadge;
+      toast(nextVal ? "Preview: LIVE AKTIF (Tekan M untuk terapkan master)" : "Preview: LIVE NONAKTIF (Tekan M untuk terapkan master)");
+      return { ...previous, showLiveBadge: nextVal };
+    });
+  }, [toast]);
+
   // Aksi Master 2: Toggle Ticker + Live di Preview (Safety: Tekan M untuk kirim ke ON AIR)
   const toggleMasterTickerLive = useCallback(() => {
     isUserStagingMasterRef.current = true;
@@ -574,7 +630,41 @@ export function SimpleProductionEditor({
   }, [toast]);
 
   // Aksi Quick Action Headline (H) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
+  const actionNewsAnchor = useCallback(async () => {
+    if (commandLock.current) return;
+    if (anchorPreview) { setAnchorPreview(null); return; }
+    commandLock.current = true;
+    setBusy(true);
+    try {
+      const defaults = newsAnchorDefaultsSchema.parse(await api<NewsAnchorDefaults>("/api/settings/news-anchor-defaults"));
+      if (!defaults.name) throw new Error("Isi Nama Anchor di Pengaturan Default News Anchor terlebih dahulu.");
+      setReporterPreview(null);
+      setAnchorPreview(createNewsAnchorGraphic(defaults));
+      toast("Preview: News Anchor (Spasi untuk TAKE atau UPDATE; P untuk kembali ke cue)");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Default news anchor gagal dimuat");
+    } finally { commandLock.current = false; setBusy(false); }
+  }, [anchorPreview, toast]);
+
+  const actionReporter = useCallback(async () => {
+    if (commandLock.current) return;
+    if (reporterPreview) { setReporterPreview(null); return; }
+    commandLock.current = true;
+    setBusy(true);
+    try {
+      const defaults = reporterDefaultsSchema.parse(await api<ReporterDefaults>("/api/settings/reporter-defaults"));
+      if (!defaults.name) throw new Error("Isi Nama Reporter Lapangan di Pengaturan Default terlebih dahulu.");
+      setAnchorPreview(null);
+      setReporterPreview(createFieldReporterGraphic(defaults));
+      toast("Preview: Reporter Lapangan (Spasi untuk TAKE atau UPDATE; O untuk kembali ke cue)");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Default reporter lapangan gagal dimuat");
+    } finally { commandLock.current = false; setBusy(false); }
+  }, [reporterPreview, toast]);
+
   const actionHeadline = useCallback(() => {
+    setAnchorPreview(null);
+    setReporterPreview(null);
     if (!selectedCue) return;
     const nextComp = { showLocation: false, showKicker: false, showDetail: false };
     setComposition(nextComp);
@@ -584,6 +674,7 @@ export function SimpleProductionEditor({
 
   // Aksi Quick Action Lokasi (L) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
   const actionToggleLocation = useCallback(() => {
+    if (anchorPreview) return;
     if (!selectedCue) return;
     const hasLoc = Boolean(miniDraft.location.trim());
     if (!hasLoc) {
@@ -599,10 +690,11 @@ export function SimpleProductionEditor({
         ? "Preview: Lokasi AKTIF (Spasi untuk TAKE atau UPDATE)"
         : "Preview: Lokasi NONAKTIF (Spasi untuk TAKE atau UPDATE)"
     );
-  }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
+  }, [anchorPreview, selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
   // Aksi Quick Action Topik (T) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
   const actionToggleTopic = useCallback(() => {
+    if (anchorPreview) return;
     if (!selectedCue) return;
     const hasKicker = Boolean(miniDraft.kicker.trim());
     if (!hasKicker) {
@@ -618,10 +710,11 @@ export function SimpleProductionEditor({
         ? "Preview: Topik AKTIF (Spasi untuk TAKE atau UPDATE)"
         : "Preview: Topik NONAKTIF (Spasi untuk TAKE atau UPDATE)"
     );
-  }, [selectedCue, miniDraft, composition, flushSaveDraft, toast]);
+  }, [anchorPreview, selectedCue, miniDraft, composition, flushSaveDraft, toast]);
 
   // Aksi Quick Action Detail (D) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
   const actionToggleDetail = useCallback(() => {
+    if (anchorPreview) return;
     if (selectedCue?.templateType === "SOT") {
       const headline = selectedItem?.graphics.find((graphic) => graphic.id === sotReturnRef.current?.cueId) ||
         selectedItem?.graphics.find((graphic) => graphic.templateType === "HEADLINE");
@@ -648,18 +741,30 @@ export function SimpleProductionEditor({
         ? "Preview: Detail AKTIF (Spasi untuk TAKE atau UPDATE)"
         : "Preview: Detail NONAKTIF (Spasi untuk TAKE atau UPDATE)"
     );
-  }, [selectedCue, selectedItem, miniDraft, composition, flushSaveDraft, selectCue, toast]);
+  }, [anchorPreview, selectedCue, selectedItem, miniDraft, composition, flushSaveDraft, selectCue, toast]);
+
+  // Mouse click blur so Space key always drives live commands
+  useEffect(() => {
+    const handleMouseClick = (e: MouseEvent) => {
+      if (e.detail >= 1 && document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+      }
+    };
+    window.addEventListener("click", handleMouseClick);
+    return () => window.removeEventListener("click", handleMouseClick);
+  }, []);
 
   // Keyboard Shortcuts Listener
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
+      const target = event.target instanceof Element ? event.target : null;
       const isEditing = Boolean(
-        target?.closest("input,textarea,select,[contenteditable=true],[role=dialog]")
+        target && typeof target.closest === "function" && target.closest("input,textarea,select,[contenteditable=true],[role=dialog]")
       );
-      const isInteractive = Boolean(target?.closest("button,a,summary,[role=button]"));
+      const isInteractive = Boolean(target && typeof target.closest === "function" && target.closest("button,a,summary,[role=button]"));
 
       const action = liveShortcut(event.key, {
+        broadcastTemplate: stagedMaster.broadcastTemplate,
         disabled: !shortcutsEnabled || busy || quickEditOpen,
         editing: isEditing,
         interactive: isInteractive,
@@ -678,13 +783,53 @@ export function SimpleProductionEditor({
           navigateStory(1);
           break;
         case "logo":
-          void toggleMasterLogo();
+          if (stagedMaster.broadcastTemplate === "liputan7") toggleMasterProgram();
+          else toggleMasterLogo();
           break;
         case "full":
-          void toggleMasterTickerLive();
+          if (stagedMaster.broadcastTemplate === "liputan7") toggleMasterLogo();
+          else if (stagedMaster.broadcastTemplate === "bcc") toggleMasterLive();
+          else toggleMasterTickerLive();
+          break;
+        case "reporter":
+          void actionReporter();
+          break;
+        case "advance": {
+          const isHighlight = selectedCue?.draftFields.headlinePresentation === "bulletin";
+          if (isHighlight && selectedItem) {
+            const highlightCues = selectedItem.graphics.filter(g => g.draftFields.headlinePresentation === "bulletin");
+            const currentIdx = highlightCues.findIndex(g => g.id === selectedCue?.id);
+            const nextCue = currentIdx >= 0 ? highlightCues[currentIdx + 1] : undefined;
+            if (nextCue) {
+              selectCue(selectedItem.id, nextCue.id);
+            }
+          } else {
+            void executePrimary();
+          }
+          break;
+        }
+        case "back": {
+          const isHighlight = selectedCue?.draftFields.headlinePresentation === "bulletin";
+          if (isHighlight && selectedItem) {
+            const highlightCues = selectedItem.graphics.filter(g => g.draftFields.headlinePresentation === "bulletin");
+            const currentIdx = highlightCues.findIndex(g => g.id === selectedCue?.id);
+            const prevCue = currentIdx > 0 ? highlightCues[currentIdx - 1] : undefined;
+            if (prevCue) {
+              selectCue(selectedItem.id, prevCue.id);
+            }
+          } else {
+            void executeClear();
+          }
+          break;
+        }
+        case "ticker":
+          toggleMasterTicker();
           break;
         case "headline":
           void actionHeadline();
+          break;
+        case "news-anchor":
+          void actionNewsAnchor();
           break;
         case "location":
           void actionToggleLocation();
@@ -716,9 +861,29 @@ export function SimpleProductionEditor({
         case "clear":
           void executeClear();
           break;
-        case "clear-all":
-          void executeClearAll(false);
+        case "clear-all": {
+          const hasActive = hasVisibleMasterLayers(master);
+          if (hasActive) {
+            void onUpdateMaster({
+              showLogo: false,
+              showTicker: false,
+              showLiveBadge: false,
+              showProgramLogo: false,
+              showWeather: false
+            });
+            toast("MASTER OUT — Seluruh layer master dimatikan");
+          } else {
+            void onUpdateMaster({
+              showLogo: true,
+              showTicker: true,
+              showLiveBadge: true,
+              showProgramLogo: stagedMaster.broadcastTemplate === "liputan7",
+              showWeather: false
+            });
+            toast("MASTER IN — Layer master diaktifkan");
+          }
           break;
+        }
       }
     };
 
@@ -730,8 +895,12 @@ export function SimpleProductionEditor({
     quickEditOpen,
     navigateStory,
     toggleMasterLogo,
+    toggleMasterProgram,
+    toggleMasterTicker,
+    stagedMaster.broadcastTemplate,
     toggleMasterTickerLive,
     actionHeadline,
+    actionNewsAnchor,
     actionToggleLocation,
     navigateSot,
     selectedCue,
@@ -745,7 +914,7 @@ export function SimpleProductionEditor({
   ]);
 
   // Efektif preview field yang dikirim ke renderer
-  const effectivePreviewFields: Record<string, string> | null = selectedCue
+  const effectivePreviewFields: Record<string, string> | null = reporterPreview ? reporterPreview.draftFields : anchorPreview ? anchorPreview.draftFields : selectedCue
     ? {
         ...(selectedCue.draftFields || {}),
         headline: selectedCue.templateType === "SOT" ? (selectedCue.draftFields.headline || "") : miniDraft.headline,
@@ -872,7 +1041,7 @@ export function SimpleProductionEditor({
           </div>
 
           <div className="header-actions-group">
-            <button ref={quickEditButtonRef} type="button" className="shortcut-toggle-btn" disabled={!selectedCue} onClick={() => setQuickEditOpen(true)} title="Edit teks cue terpilih tanpa meninggalkan kontrol siaran">
+            <button ref={quickEditButtonRef} type="button" className="shortcut-toggle-btn" disabled={busy || Boolean(anchorPreview || reporterPreview) || !selectedCue} onClick={() => setQuickEditOpen(true)} title="Edit teks cue terpilih tanpa meninggalkan kontrol siaran">
               <FileText size={13} /> Edit teks
             </button>
             <button
@@ -892,6 +1061,74 @@ export function SimpleProductionEditor({
           <span className="master-label">MASTER LAYER:</span>
           <div className="master-btn-group">
             <button type="button" className="master-btn" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER <kbd>M</kbd></button>
+            {stagedMaster.broadcastTemplate === "bcc" ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Logo"
+                  aria-pressed={stagedMaster.showLogo}
+                  className={`master-btn ${stagedMaster.showLogo ? "active" : ""} ${stagedMaster.showLogo !== master.showLogo ? "staged-pending" : ""}`}
+                  disabled={busy}
+                  onClick={toggleMasterLogo}
+                  title="Siapkan logo di Preview (1), lalu terapkan MASTER (M)"
+                >
+                  <span className="btn-kbd">1</span>
+                  <span>LOGO · {master.showLogo ? "TAYANG" : "MATI"}</span>
+                  <span className={`indicator-dot ${stagedMaster.showLogo ? "on" : ""}`} />
+                  {stagedMaster.showLogo !== master.showLogo && <span className="staged-pill">STAGE</span>}
+                </button>
+                <button
+                  type="button"
+                  aria-label="Live Badge"
+                  aria-pressed={stagedMaster.showLiveBadge}
+                  className={`master-btn ${stagedMaster.showLiveBadge ? "active" : ""} ${stagedMaster.showLiveBadge !== master.showLiveBadge ? "staged-pending" : ""}`}
+                  disabled={busy}
+                  onClick={toggleMasterLive}
+                  title="Siapkan live badge di Preview (2), lalu terapkan MASTER (M)"
+                >
+                  <span className="btn-kbd">2</span>
+                  <span>LIVE · {master.showLiveBadge ? "TAYANG" : "MATI"}</span>
+                  <span className={`indicator-dot ${stagedMaster.showLiveBadge ? "on" : ""}`} />
+                  {stagedMaster.showLiveBadge !== master.showLiveBadge && <span className="staged-pill">STAGE</span>}
+                </button>
+                <button
+                  type="button"
+                  aria-label="Ticker"
+                  aria-pressed={stagedMaster.showTicker}
+                  className={`master-btn ${stagedMaster.showTicker ? "active" : ""} ${stagedMaster.showTicker !== master.showTicker ? "staged-pending" : ""}`}
+                  disabled={busy}
+                  onClick={toggleMasterTicker}
+                  title="Siapkan ticker di Preview (3), lalu terapkan MASTER (M)"
+                >
+                  <span className="btn-kbd">3</span>
+                  <span>TICKER · {master.showTicker ? "TAYANG" : "MATI"}</span>
+                  <span className={`indicator-dot ${stagedMaster.showTicker ? "on" : ""}`} />
+                  {stagedMaster.showTicker !== master.showTicker && <span className="staged-pill">STAGE</span>}
+                </button>
+              </>
+            ) : stagedMaster.broadcastTemplate === "liputan7" ? <>
+              <button type="button" aria-label="Logo Program" aria-pressed={Boolean(stagedMaster.showProgramLogo)}
+                className={`master-btn ${stagedMaster.showProgramLogo ? "active" : ""} ${stagedMaster.showProgramLogo !== master.showProgramLogo ? "staged-pending" : ""}`}
+                disabled={busy} onClick={toggleMasterProgram} title="Siapkan logo program dan cuacanya di Preview (1), lalu terapkan MASTER (M)">
+                <span className="btn-kbd">1</span><span>LOGO PROGRAM · {master.showProgramLogo ? "TAYANG" : "MATI"}</span>
+                <span className={`indicator-dot ${stagedMaster.showProgramLogo ? "on" : ""}`} />
+                {stagedMaster.showProgramLogo !== master.showProgramLogo && <span className="staged-pill">STAGE</span>}
+              </button>
+              <button type="button" aria-label="Logo TV" aria-pressed={stagedMaster.showLogo}
+                className={`master-btn ${stagedMaster.showLogo ? "active" : ""} ${stagedMaster.showLogo !== master.showLogo ? "staged-pending" : ""}`}
+                disabled={busy} onClick={toggleMasterLogo} title="Siapkan logo TV di Preview (2), lalu terapkan MASTER (M)">
+                <span className="btn-kbd">2</span><span>LOGO TV · {master.showLogo ? "TAYANG" : "MATI"}</span>
+                <span className={`indicator-dot ${stagedMaster.showLogo ? "on" : ""}`} />
+                {stagedMaster.showLogo !== master.showLogo && <span className="staged-pill">STAGE</span>}
+              </button>
+              <button type="button" aria-label="Ticker" aria-pressed={stagedMaster.showTicker}
+                className={`master-btn ${stagedMaster.showTicker ? "active" : ""} ${stagedMaster.showTicker !== master.showTicker ? "staged-pending" : ""}`}
+                disabled={busy} onClick={toggleMasterTicker} title="Siapkan ticker dan jam di Preview (3), lalu terapkan MASTER (M)">
+                <span className="btn-kbd">3</span><span>TICKER · {master.showTicker ? "TAYANG" : "MATI"}</span>
+                <span className={`indicator-dot ${stagedMaster.showTicker ? "on" : ""}`} />
+                {stagedMaster.showTicker !== master.showTicker && <span className="staged-pill">STAGE</span>}
+              </button>
+            </> : <>
             <button
               type="button"
               className={`master-btn ${stagedMaster.showLogo ? "active" : ""} ${stagedMaster.showLogo !== master.showLogo ? "staged-pending" : ""}`}
@@ -919,18 +1156,26 @@ export function SimpleProductionEditor({
               />
               {(stagedMaster.showTicker !== master.showTicker || stagedMaster.showLiveBadge !== master.showLiveBadge) && <span className="staged-pill">STAGE</span>}
             </button>
+            </>}
           </div>
         </div>
 
         <div className="production-color-theme">
-          <BroadcastColorThemePicker compact value={stagedMaster.colorTheme} disabled={busy} onChange={(colorTheme) => {
+          <BroadcastTemplatePicker value={stagedMaster.broadcastTemplate} disabled={busy} onChange={value => {
+            isUserStagingMasterRef.current = true;
+            setStagedMaster(previous => selectBroadcastTemplate(previous, value));
+          }} />
+          {stagedMaster.broadcastTemplate !== "liputan7" && <BroadcastColorThemePicker compact value={stagedMaster.colorTheme} disabled={busy} onChange={(colorTheme) => {
             isUserStagingMasterRef.current = true;
             setStagedMaster((previous) => selectBroadcastColorTheme(previous, colorTheme));
-          }} />
-          <small>{isMasterChanged ? "Perubahan di Preview · terapkan dengan M" : `Siaran: ${getBroadcastColorTheme(master.colorTheme).label}`}</small>
+          }} />}
+          <small>{isMasterChanged ? "Perubahan di Preview · terapkan dengan M" : `Siaran: ${master.broadcastTemplate === "liputan7" ? broadcastTemplates.liputan7.label : getBroadcastColorTheme(master.colorTheme).label}`}</small>
         </div>
         <details className="live-ticker-settings">
-          <summary>Ticker & master · {master.showLogo ? "Logo aktif" : "Logo mati"} · {master.showTicker ? "Ticker aktif" : "Ticker mati"} · {master.showLiveBadge ? "Live aktif" : "Live mati"}</summary>
+          <summary>{stagedMaster.broadcastTemplate === "liputan7"
+            ? `Master · Program ${master.showProgramLogo ? "aktif" : "mati"} · TV ${master.showLogo ? "aktif" : "mati"} · Ticker ${master.showTicker ? "aktif" : "mati"}`
+            : `Ticker & master · ${master.showLogo ? "Logo aktif" : "Logo mati"} · ${master.showTicker ? "Ticker aktif" : "Ticker mati"} · ${master.showLiveBadge ? "Live aktif" : "Live mati"}`}</summary>
+          <Liputan7Settings master={stagedMaster} disabled={busy} onBusyChange={value => { commandLock.current = value; setBusy(value); }} onChange={next => { isUserStagingMasterRef.current = true; setStagedMaster(next); }} />
           <label>Ticker rundown · {rundown?.title || "Belum dipilih"}
             <textarea rows={3} value={rundown?.ticker?.text ?? ""} readOnly />
           </label>
@@ -950,13 +1195,13 @@ export function SimpleProductionEditor({
             <div className="preview-meta-badge">
               <span className="stage-tag">PREVIEW</span>
               <span className="cue-name">
-                {selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "TIDAK ADA BERITA TERPILIH"}
+                {reporterPreview ? "REPORTER LAPANGAN · DEFAULT" : anchorPreview ? "NEWS ANCHOR · DEFAULT" : selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "TIDAK ADA BERITA TERPILIH"}
               </span>
-              <span className="cue-type">{selectedCue?.templateType || "OFF"}</span>
+              <span className="cue-type">{previewCue?.templateType || "OFF"}</span>
             </div>
 
             <BroadcastPreviewBox
-              graphic={selectedCue}
+              graphic={previewCue}
               fields={effectivePreviewFields}
               master={{ ...stagedMaster, tickerText: rundown?.ticker?.text ?? "", tickerSpeed: rundownTickerSpeed, tickerRundownId: rundown?.id ?? null }}
               emptyText="LAYAR BERSIH — TEKAN ↑ / ↓ UNTUK MEMILIH BERITA"
@@ -989,7 +1234,7 @@ export function SimpleProductionEditor({
 
             <div className="live-mini-footer">
               <span className="live-mini-title" title={onAirTitle || "Tidak ada grafis tayang"}>
-                {onAirTitle || (master.showLogo || master.showTicker || master.showLiveBadge ? "MASTER AKTIF" : "OUTPUT KOSONG")}
+                {onAirTitle || (hasVisibleMasterLayers(master) ? "MASTER AKTIF" : "OUTPUT KOSONG")}
               </span>
               <span className={`live-mini-status ${live.onAirGraphicId ? "" : "off"}`}>
                 STATUS APLIKASI
@@ -999,7 +1244,7 @@ export function SimpleProductionEditor({
         </div>
 
         <div className="primary-actions-deck" aria-label="Perintah siaran">
-          <button type="button" className={`action-btn ${canUpdate ? "btn-update" : "btn-take"}`} disabled={busy || !selectedCue} onClick={executePrimary}>
+          <button type="button" className={`action-btn ${canUpdate ? "btn-update" : "btn-take"}`} disabled={busy || !previewCue} onClick={executePrimary}>
             <span className="btn-inner">{canUpdate ? <RefreshCw size={16} /> : <Play size={16} />}<span className="btn-title">{canUpdate ? "UPDATE" : "TAKE"}</span></span><kbd>SPACE / ENTER</kbd>
           </button>
           <button type="button" className="action-btn btn-clear" disabled={busy || !live.onAirGraphicId} onClick={executeClear}>
@@ -1007,7 +1252,7 @@ export function SimpleProductionEditor({
           </button>
         </div>
         <div className="live-change-summary" role="status">
-          {busy ? "Mengirim perintah…" : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown."}
+          {busy ? "Memproses…" : reporterPreview ? `Reporter Lapangan: ${reporterPreview.draftFields.name}. Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"}; O untuk kembali ke cue.` : anchorPreview ? `News Anchor: ${anchorPreview.draftFields.name}. Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"}; P untuk kembali ke cue.` : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown atau tekan P/O untuk default."}
           {isMasterChanged && " Perubahan master belum diterapkan (M)."}
           {isSelectedOnAir && <small>{pendingChanges.length ? `Belum diterapkan: ${pendingChanges.join(", ")}.` : "Isi Preview sama dengan snapshot Program."}</small>}
           <small>{live.overlayClientsCount} klien output terhubung · Program ini adalah monitor internal NewsCG, bukan pembacaan switcher.</small>
@@ -1016,6 +1261,14 @@ export function SimpleProductionEditor({
         {/* Quick Actions (H, K, L, T, D) - Menyiapkan cue Preview sebelum TAKE / UPDATE */}
         <div className="quick-actions-bar">
           <div className="quick-action-btns">
+            <button type="button" className={`qa-btn ${anchorPreview ? "active" : ""}`} disabled={busy}
+              onClick={() => void actionNewsAnchor()} title="P: siapkan news anchor dari default; Spasi untuk TAKE / UPDATE. P lagi kembali ke cue.">
+              <span className="qa-kbd">P</span><span className="qa-text">NEWS ANCHOR</span>
+            </button>
+            <button type="button" className={`qa-btn ${reporterPreview ? "active" : ""}`} disabled={busy}
+              onClick={() => void actionReporter()} title="O: siapkan reporter lapangan dari default; Spasi untuk TAKE / UPDATE. O lagi kembali ke cue.">
+              <span className="qa-kbd">O</span><span className="qa-text">REPORTER LAPANGAN</span>
+            </button>
             <button
               type="button"
               className="qa-btn"
@@ -1030,7 +1283,7 @@ export function SimpleProductionEditor({
             <button
               type="button"
               className={`qa-btn ${composition.showLocation ? "active" : ""} ${!miniDraft.location.trim() ? "disabled" : ""}`}
-              disabled={busy || !miniDraft.location.trim()}
+              disabled={busy || Boolean(anchorPreview || reporterPreview) || !miniDraft.location.trim()}
               onClick={actionToggleLocation}
               title="Toggle Lokasi di preview (Hotkey: L, lalu TAKE atau UPDATE)"
             >
@@ -1053,7 +1306,7 @@ export function SimpleProductionEditor({
             <button
               type="button"
               className={`qa-btn ${composition.showKicker ? "active" : ""} ${!miniDraft.kicker.trim() ? "disabled" : ""}`}
-              disabled={busy || !miniDraft.kicker.trim()}
+              disabled={busy || Boolean(anchorPreview || reporterPreview) || !miniDraft.kicker.trim()}
               onClick={actionToggleTopic}
               title="Toggle Topik di preview (Hotkey: T, lalu TAKE atau UPDATE)"
             >
@@ -1065,7 +1318,7 @@ export function SimpleProductionEditor({
             <button
               type="button"
               className={`qa-btn ${composition.showDetail ? "active" : ""} ${!canShowDetail ? "disabled" : ""}`}
-              disabled={busy || !canShowDetail}
+              disabled={busy || Boolean(anchorPreview || reporterPreview) || !canShowDetail}
               onClick={actionToggleDetail}
               title="Toggle Detail Headline di preview (Hotkey: D, lalu TAKE atau UPDATE)"
             >

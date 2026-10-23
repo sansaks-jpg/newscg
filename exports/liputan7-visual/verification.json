@@ -1,0 +1,363 @@
+{
+  "browser": "145.0.7632.6",
+  "marks": {
+    "outSingle": 4.998,
+    "inSingle": 6.173,
+    "out": 8.599,
+    "outEnd": 9.753,
+    "in": 9.753,
+    "inEnd": 11,
+    "weather": 18.2,
+    "weather-JAKARTA": 19.348,
+    "weather-BANDUNG": 24.348,
+    "weather-SURABAYA": 29.361,
+    "weather-MEDAN": 34.362,
+    "weather-SEMARANG": 39.371,
+    "weather-DENPASAR": 44.362,
+    "weather-MAKASSAR": 49.368
+  },
+  "shots": [
+    "headline-user-single",
+    "headline-detail",
+    "headline-single",
+    "headline-long",
+    "anchor",
+    "weather-jakarta",
+    "weather-bandung",
+    "weather-surabaya",
+    "weather-medan",
+    "weather-semarang",
+    "weather-denpasar",
+    "weather-makassar"
+  ],
+  "titleCases": {
+    "headline-user-single": {
+      "text": "ANGKA PENDAFTAR MAHASISWA BARU POLIMEDIA TAHUN 2026 MENGALAMI PENURUNAN",
+      "spans": 1,
+      "fontSize": "40.5827px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1410.4375,
+      "availableWidth": 1414
+    },
+    "headline-detail": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "headline-single": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4482px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1412.09375,
+      "availableWidth": 1414
+    },
+    "headline-long": {
+      "text": "PENDAFTARAN MAHASISWA BARU POLIMEDIA TAHUN AKADEMIK 2026 DIBUKA SECARA RESMI UNTUK SELURUH CALON MAHASISWA INDONESIA",
+      "spans": 1,
+      "fontSize": "25.176px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1409.046875,
+      "availableWidth": 1414
+    },
+    "anchor": {
+      "text": "Nama Pembawa Berita",
+      "spans": 1,
+      "fontSize": "76px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 678.84375,
+      "availableWidth": 1414
+    },
+    "weather-jakarta": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "weather-bandung": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "weather-surabaya": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "weather-medan": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "weather-semarang": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "weather-denpasar": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    },
+    "weather-makassar": {
+      "text": "INDONESIA PERKUAT KETAHANAN PANGAN NASIONAL",
+      "spans": 1,
+      "fontSize": "67.4396px",
+      "font": "\"Barlow News\", Arial, Helvetica, sans-serif",
+      "whiteSpace": "nowrap",
+      "scaleX": 1,
+      "scaleY": 1,
+      "width": 1411.890625,
+      "availableWidth": 1414
+    }
+  },
+  "errors": [],
+  "responses": [
+    {
+      "url": "http://localhost:5173/api/weather?adm4=31.71.03.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=32.73.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=35.78.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=12.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=33.74.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=51.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=73.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=31.71.03.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=32.73.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=35.78.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=12.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=33.74.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=51.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=73.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=31.71.03.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=32.73.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=35.78.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=12.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=33.74.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=51.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=73.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=31.71.03.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=32.73.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=35.78.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=12.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=33.74.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=51.71.01.1001",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/api/weather?adm4=73.71.01.1001",
+      "status": 200
+    }
+  ],
+  "metrics": {
+    "clock": {
+      "box": {
+        "x": 1,
+        "y": 1027,
+        "width": 118.09375,
+        "height": 54,
+        "top": 1027,
+        "right": 119.09375,
+        "bottom": 1081,
+        "left": 1
+      },
+      "textBox": {
+        "x": 15,
+        "y": 1036,
+        "width": 90.09375,
+        "height": 36,
+        "top": 1036,
+        "right": 105.09375,
+        "bottom": 1072,
+        "left": 15
+      },
+      "text": "16:57",
+      "fontFamily": "Arial, Helvetica, sans-serif",
+      "transform": "none"
+    },
+    "headline": {
+      "box": {
+        "x": 385,
+        "y": 827,
+        "width": 1466,
+        "height": 146,
+        "top": 827,
+        "right": 1851,
+        "bottom": 973,
+        "left": 385
+      },
+      "viewport": {
+        "x": 401,
+        "y": 834,
+        "width": 1414,
+        "height": 78,
+        "top": 834,
+        "right": 1815,
+        "bottom": 912,
+        "left": 401
+      },
+      "textTransform": "none"
+    },
+    "programLogo": {
+      "box": {
+        "x": 97,
+        "y": 805,
+        "width": 288,
+        "height": 146,
+        "top": 805,
+        "right": 385,
+        "bottom": 951,
+        "left": 97
+      },
+      "transform": "matrix(1, 0, 0, 1, 0, -22)"
+    },
+    "weather": {
+      "box": {
+        "x": 97,
+        "y": 929,
+        "width": 288,
+        "height": 44,
+        "top": 929,
+        "right": 385,
+        "bottom": 973,
+        "left": 97
+      },
+      "city": "MAKASSAR"
+    },
+    "ticker": {
+      "font": "30px / 30px Arial, Helvetica, sans-serif",
+      "color": "rgb(121, 13, 22)"
+    }
+  },
+  "weatherData": "Live BMKG via local API; no weather fixtures"
+}

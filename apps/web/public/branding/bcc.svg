@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="BCC NEWS">
+  <defs>
+    <linearGradient id="bccGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#80120b" />
+      <stop offset="100%" stop-color="#550300" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="#F6D4A7" />
+  <!-- BCC Text -->
+  <text x="100" y="96" text-anchor="middle" font-family="'Arial Black', 'Impact', 'Montserrat', Arial, sans-serif" font-weight="900" font-size="76" letter-spacing="-2" fill="url(#bccGrad)">BCC</text>
+  <!-- NEWS Text -->
+  <text x="100" y="152" text-anchor="middle" font-family="'Arial Black', 'Impact', 'Montserrat', Arial, sans-serif" font-weight="900" font-size="52" letter-spacing="-1" fill="url(#bccGrad)">NEWS</text>
+</svg>

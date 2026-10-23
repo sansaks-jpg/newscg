@@ -68,15 +68,15 @@ Jika durasi PKG dalam kiriman sudah mencakup SOT, jangan menambahkan durasi SOT 
 | Template | Kapan dibuat | Data minimum |
 |---|---|---|
 | `HEADLINE` | Judul/topik berita utama | `headline`, maksimal 120 karakter. |
-| `HEADLINE` + `headlinePresentation: "bulletin"` | Highlight/ringkasan yang diminta user | `headline`; `kicker: "HIGHLIGHT"`, `showKicker: "true"` untuk label topik di atas. Satu judul per cue. |
-| `REPORTER` | Identitas presenter/reporter | `name` maksimal 60; `role` maksimal 60; lokasi jika tersedia maksimal 50. |
+| `HEADLINE` + `headlinePresentation: "bulletin"` | Highlight/ringkasan yang diminta user | `headline`; `kicker: "HIGHLIGHT"`, `showKicker: "true"` untuk label topik di atas. Satu judul per cue. Pada Liputan7, label tampil sebagai tab burgundy–ivory di kiri atas panel; operator berpindah cue dengan panah →/← saat Preview HIGHLIGHT. |
+| `REPORTER` | Identitas presenter/reporter | `name` maksimal 60; `role` maksimal 60; lokasi jika tersedia maksimal 50. Untuk reporter di lapangan, operator dapat memakai hotkey `O` dengan **Default Reporter Lapangan** (tanpa cue rundown); jangan membuat cue REPORTER hanya karena user menyebut hotkey O. |
 | `SOT` | Identitas narasumber dalam berita | `headline` maksimal 120; `name` maksimal 80; `role` jika tersedia maksimal 100. |
 | `LOCATION` | Tag lokasi mandiri yang memang diminta | `location`, 1–50 karakter. Jangan membuatnya jika lokasi belum diketahui. |
 | `BREAKING` | User/sumber secara eksplisit menyebut breaking news | `headline`; jangan menetapkan status breaking dari dugaan AI. |
 
 Untuk HEADLINE/BREAKING, field opsional utama adalah `kicker` (60), `subline` (160), dan `location` (60). Ambil batas aktual dari shared; tabel ini harus diperbarui jika kontrak berubah.
 
-Untuk headline pembuka gunakan preset `headline-bulletin` dari `GET /api/agent` (lihat [CG_GUIDE.md](CG_GUIDE.md)). Susun judul menurut urutan sumber dengan `sortOrder`. Jangan menambahkan segmen pembuka atau menduplikasi durasi berita bila tidak diminta. Rundown/CG yang sudah ada dapat direvisi melalui PATCH: baca dahulu ID/data, PATCH hanya field yang diminta, lalu GET untuk memastikan isi dan urutan. PUT story mengganti daftar CG; pertahankan semua cue beserta ID yang masih diperlukan. Edit rundown dan headline tidak menjalankan perintah live.
+Untuk headline pembuka gunakan preset `headline-bulletin` dari `GET /api/agent` (lihat [CG_GUIDE.md](CG_GUIDE.md)). Susun judul menurut urutan sumber dengan `sortOrder`. Jangan menambahkan segmen pembuka atau menduplikasi durasi berita bila tidak diminta. Contoh HIGHLIGHT untuk kedua paket tersedia di galeri `/templates/liputan7` dan `/templates/cnn` (pilihan “Highlight (tab topik)”), tanpa SSE atau perintah live. Rundown/CG yang sudah ada dapat direvisi melalui PATCH: baca dahulu ID/data, PATCH hanya field yang diminta, lalu GET untuk memastikan isi dan urutan. PUT story mengganti daftar CG; pertahankan semua cue beserta ID yang masih diperlukan. Edit rundown dan headline tidak menjalankan perintah live.
 
 Satu baris SOT di rundown biasanya menjadi cue tambahan pada berita induknya, bukan berita baru yang menduplikasi headline/durasi. Jika user jelas meminta SOT sebagai segmen tersendiri, pertahankan struktur tersebut dan gunakan format item yang sesuai kontrak.
 

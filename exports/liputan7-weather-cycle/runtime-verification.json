@@ -1,0 +1,244 @@
+{
+  "browser": "145.0.7632.6",
+  "url": "http://localhost:3001/output",
+  "fixture": "Actual production bundle, real clock and requestAnimationFrame, prefers-reduced-motion=reduce. Browser-only SSE and recently captured/verified real forecast responses; no server mutations.",
+  "sourceCheckedAt": "2026-10-15T12:29:01.983Z",
+  "marks": [
+    {
+      "elapsed": 14.099999994039536,
+      "phase": "logo",
+      "city": "",
+      "strip": false,
+      "faceHeight": 146,
+      "rowAnimation": null,
+      "sourceText": false
+    },
+    {
+      "elapsed": 10050.09999999404,
+      "phase": "opening",
+      "city": "JAKARTA",
+      "strip": true,
+      "faceHeight": 146,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 10745.59999999404,
+      "phase": "hold",
+      "city": "JAKARTA",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 13749.09999999404,
+      "phase": "out",
+      "city": "JAKARTA",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-in both l7-city-leave",
+      "sourceText": false
+    },
+    {
+      "elapsed": 14046,
+      "phase": "in",
+      "city": "BANDUNG",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-out both l7-city-enter",
+      "sourceText": false
+    },
+    {
+      "elapsed": 14345.59999999404,
+      "phase": "hold",
+      "city": "BANDUNG",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 17345.89999999106,
+      "phase": "out",
+      "city": "BANDUNG",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-in both l7-city-leave",
+      "sourceText": false
+    },
+    {
+      "elapsed": 17664.39999999106,
+      "phase": "in",
+      "city": "SURABAYA",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-out both l7-city-enter",
+      "sourceText": false
+    },
+    {
+      "elapsed": 17945.09999999404,
+      "phase": "hold",
+      "city": "SURABAYA",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 20944.89999999106,
+      "phase": "out",
+      "city": "SURABAYA",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-in both l7-city-leave",
+      "sourceText": false
+    },
+    {
+      "elapsed": 21246.39999999106,
+      "phase": "in",
+      "city": "MEDAN",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-out both l7-city-enter",
+      "sourceText": false
+    },
+    {
+      "elapsed": 21544.89999999106,
+      "phase": "hold",
+      "city": "MEDAN",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 24544.70000000298,
+      "phase": "out",
+      "city": "MEDAN",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-in both l7-city-leave",
+      "sourceText": false
+    },
+    {
+      "elapsed": 24845.5,
+      "phase": "in",
+      "city": "SEMARANG",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-out both l7-city-enter",
+      "sourceText": false
+    },
+    {
+      "elapsed": 25163.89999999106,
+      "phase": "hold",
+      "city": "SEMARANG",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 28145.59999999404,
+      "phase": "out",
+      "city": "SEMARANG",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-in both l7-city-leave",
+      "sourceText": false
+    },
+    {
+      "elapsed": 28445,
+      "phase": "in",
+      "city": "DENPASAR",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-out both l7-city-enter",
+      "sourceText": false
+    },
+    {
+      "elapsed": 28744.5,
+      "phase": "hold",
+      "city": "DENPASAR",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 31745.29999999702,
+      "phase": "out",
+      "city": "DENPASAR",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-in both l7-city-leave",
+      "sourceText": false
+    },
+    {
+      "elapsed": 32049.39999999106,
+      "phase": "in",
+      "city": "MAKASSAR",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "0.3s ease-out both l7-city-enter",
+      "sourceText": false
+    },
+    {
+      "elapsed": 32353.20000000298,
+      "phase": "hold",
+      "city": "MAKASSAR",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 35344.20000000298,
+      "phase": "closing",
+      "city": "MAKASSAR",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 36061.89999999106,
+      "phase": "logo",
+      "city": "MAKASSAR",
+      "strip": true,
+      "faceHeight": 146,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 36080.39999999106,
+      "phase": "logo",
+      "city": "",
+      "strip": false,
+      "faceHeight": 146,
+      "rowAnimation": null,
+      "sourceText": false
+    },
+    {
+      "elapsed": 46043.89999999106,
+      "phase": "opening",
+      "city": "JAKARTA",
+      "strip": true,
+      "faceHeight": 146,
+      "rowAnimation": "none",
+      "sourceText": false
+    },
+    {
+      "elapsed": 46745.29999999702,
+      "phase": "hold",
+      "city": "JAKARTA",
+      "strip": true,
+      "faceHeight": 102,
+      "rowAnimation": "none",
+      "sourceText": false
+    }
+  ],
+  "errors": [],
+  "writes": []
+}
