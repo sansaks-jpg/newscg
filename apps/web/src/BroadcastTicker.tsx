@@ -20,7 +20,7 @@ export function BroadcastTicker({ text, speed = tickerPresets.normal, revision =
   useLayoutEffect(() => {
     const previousText = latest.current.text;
     latest.current = { text: normalized, speed };
-    if (revisionRef.current !== revision || !previousText || !normalized) {
+    if (revisionRef.current !== revision || previousText !== normalized || !previousText || !normalized) {
       revisionRef.current = revision;
       position.current = 0;
       setSegments([normalized, normalized]);

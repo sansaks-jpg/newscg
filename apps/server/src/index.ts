@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { actionLogLimitSchema, broadcastLogoMimeTypeSchema, broadcastLogoUploadSpec, liveStageInputSchema, storySaveInputSchema, masterOverlayPatchSchema, livePrepareInputSchema, liveTakeInputSchema, liveUpdateInputSchema, liveVariantInputSchema, liveClearInputSchema, liveClearAllInputSchema, rundownReorderInputSchema, rundownImportInputSchema } from "@newscg/shared";
+import { actionLogLimitSchema, bccMasterOverlayPatchSchema, broadcastLogoMimeTypeSchema, broadcastLogoUploadSpec, liveStageInputSchema, storySaveInputSchema, masterOverlayPatchSchema, livePrepareInputSchema, liveTakeInputSchema, liveUpdateInputSchema, liveVariantInputSchema, liveClearInputSchema, liveClearAllInputSchema, rundownReorderInputSchema, rundownImportInputSchema } from "@newscg/shared";
 import { saveStory } from "./db.js";
 import { setStage } from "./live.js";
 import cors from "cors";
@@ -63,6 +63,16 @@ app.get("/api/agent/rundown-guide.md", (_req, res) => {
 app.get("/api/agent/cg-guide.md", (_req, res) => {
   res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/CG_GUIDE.md", import.meta.url)));
 });
+app.get("/api/agent/AGENTS.md", (_req, res) => {
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../AGENTS.md", import.meta.url)));
+});
+const sendAgentsMd = (_req: any, res: any) => {
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../AGENTS.md", import.meta.url)));
+};
+app.get('/api/agent/agents.md', sendAgentsMd);
+app.get('/api/AGENTS.md', sendAgentsMd);
+app.get('/api/agents.md', sendAgentsMd);
+app.get('/AGENTS.md', sendAgentsMd);
 
 app.post("/api/uploads/logo", (req, res, next) => {
   const contentType = req.get("Content-Type")?.toLowerCase().split(";")[0]?.trim();
@@ -245,8 +255,14 @@ app.post("/api/live/ticker", asyncRoute(async (req:any,res:any) => {
   return res.json(await applyRundownTicker(parsed.data.rundownId, res.locals.idempotencyKey || randomUUID(), parsed.data.immediate));
 }));
 app.patch("/api/live/master", asyncRoute(async (req:any, res:any) => {
-  const parsed = masterOverlayPatchSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Pengaturan master tidak valid. Teks dan kecepatan ticker diatur melalui rundown.", details: parsed.error.issues });
+  const current = getMasterOverlay();
+  const isBcc = req.body?.broadcastTemplate === "bcc" || (!req.body?.broadcastTemplate && current.broadcastTemplate === "bcc");
+  const schema = isBcc ? bccMasterOverlayPatchSchema : masterOverlayPatchSchema;
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    const error = isBcc ? "Pengaturan master BCC tidak valid." : "Pengaturan master tidak valid. Teks dan kecepatan ticker diatur melalui rundown.";
+    return res.status(400).json({ error, details: parsed.error.issues });
+  }
   return res.json(await updateMasterState(parsed.data));
 }));
 app.get("/api/live/stream", (req, res) => {

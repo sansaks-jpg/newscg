@@ -1,83 +1,83 @@
 # BCC News Broadcast Template
 
-Template siaran **BCC News** terintegrasi di NewsCG bersama template **CNN / Studio** dan **Liputan7 · HOC TV**. Template ini mengadopsi struktur geometri dan timing animasi broadcast standar TV dari CNN dengan identitas visual, logo resmi, dan palet warna BCC News.
+The **BCC News** broadcast template is integrated into NewsCG alongside the **CNN / Studio** and **Liputan7 · HOC TV** templates. It adopts standard television broadcast geometry and animation timings inspired by CNN, tailored with BCC News visual identity, official branding, and color palette.
 
 ---
 
-## 1. Identitas Visual & Palet Warna
+## 1. Visual Identity & Color Palette
 
-Berdasarkan referensi visual siaran BCC News:
-- **Bar Judul Utama (Headline Plate)**:
-  - Latar Belakang: Merah Marun Tua pekat (`#6B0908` / `#4A0706`)
-  - Warna Teks: Putih (`#FFFFFF`), huruf kapital tebal (Arial Narrow / Roboto Condensed / Arial)
-  - Tinggi: 106 px (188 px pada mode single headline bersih)
-  - Transisi Tinggi: `transition: height 260ms cubic-bezier(.16,1,.3,1)` halus saat detail masuk atau keluar
-- **Bar Subline / Narasumber / Detail (Subline Plate)**:
-  - Latar Belakang: Krem Hangat / Peach Beige (`#F6D2A7`)
-  - Warna Teks: Hitam / Dark Maroon (`#1A1A1A`), font Arial normal
-  - Divider SOT: Garis vertikal marun (`#6B0908`) pemisah nama narasumber dan peran/instansi
-  - Tinggi: 82 px
-- **Tab Topik / Kicker / Lokasi**:
-  - Latar Belakang: Oranye Terang (`#FF6115`)
-  - Warna Teks: Putih (`#FFFFFF`), huruf miring (*italic*) tebal
-  - Bentuk: Sudut miring kanan atas (*chamfered polygon tab*)
-  - Tinggi: 52 px, sejajar di atas bar judul marun
-- **Kotak Logo Master Permanen (Logo Box)**:
-  - Posisi: Sisi **kiri** menyatu sejajar dengan bar judul dan subline
-  - Latar Belakang: Krem Hangat (`#F6D5A9`), persis menyatu dengan piksel latar logo
-  - Dimensi: 192 × 188 px
-  - Logo Resmi: "BCC NEWS" (`/branding/bcc.png` / `/branding/bcc.webp`) berwarna merah marun (`#720F0A` – `#5B0400`)
-  - **Sifat Master**: Kotak logo bersifat permanen di layarnya, tidak di-unmount atau di-reanimate ketika headline masuk (TAKE) maupun keluar (CLEAR).
-- **Badge LIVE**:
-  - Posisi: Tepat di atas kotak logo kiri (`bottom: 100%`)
-  - Dimensi: 192 × 52 px (ketinggian sama persis dengan tab kicker di sampingnya)
-  - Latar Belakang: Oranye (`#FF6115`), teks putih tebal "LIVE"
-  - **Persistensi**: Tetap aktif dan stabil mendampingi kotak logo sebelum, saat, dan sesudah headline tayang.
-- **Ticker Bar (Bawah)**:
-  - Latar Belakang: Marun Gelap (`#4A0706` / `#360505`)
-  - Tinggi: 56 px
-  - Jam Realtime: Berada di sisi **kiri** ticker bar, tepat di bawah kotak logo dengan lebar identik (192 px), latar belakang marun pekat (`#360505`), dan font tabular putih tebal beserta zona waktu siaran. Badge "BCCNEWS.ID" ditiadakan sehingga blok jam mengisi sisi kiri secara rapi dan selaras vertikal dengan kotak logo di atasnya.
-  - Running Text: Putih (`#FFFFFF`) dengan bullet pemisah oranye ("■") mengisi seluruh ruang di sebelah kanan jam.
-  - Teks Bawaan: Dilengkapi teks default `"INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS"` apabila rundown belum memiliki teks ticker khusus.
-- **Kontrol Master Independen di Produksi**:
-  - Sama seperti Liputan7, template BCC News memiliki 3 tombol master mandiri di panel kontrol siaran:
-    - **[1] LOGO**: Mengaktifkan / menonaktifkan kotak logo di Preview.
-    - **[2] LIVE**: Mengaktifkan / menonaktifkan badge LIVE di Preview.
-    - **[3] TICKER**: Mengaktifkan / menonaktifkan ticker bar di Preview.
-    - **[M] TERAPKAN MASTER**: Menerapkan konfigurasi master dari Preview ke ON AIR (Program).
+Based on BCC News broadcast visual references:
+- **Main Headline Bar (Headline Plate)**:
+  - Background: Deep Dark Maroon (`#6B0908` / `#4A0706`)
+  - Text Color: Crisp White (`#FFFFFF`), bold uppercase (Arial Narrow / Roboto Condensed / Arial)
+  - Height: 106 px (188 px in clean single-line mode)
+  - Height Transition: `transition: height 260ms cubic-bezier(.16,1,.3,1)` smooth expansion when detail toggles
+- **Subline / Soundbite / Detail Bar (Subline Plate)**:
+  - Background: Warm Cream / Peach Beige (`#F6D2A7`)
+  - Text Color: Dark Charcoal / Maroon (`#1A1A1A`), regular font weight
+  - SOT Divider: Deep maroon vertical bar (`#6B0908`) separating speaker name and role/title
+  - Height: 82 px
+- **Topic Tab / Kicker / Locator**:
+  - Background: Vivid Orange (`#FF6115`)
+  - Text Color: White (`#FFFFFF`), bold italic
+  - Shape: Chamfered angled polygon tab on the top-right
+  - Height: 52 px, aligned directly above the maroon headline plate
+- **Permanent Master Logo Box**:
+  - Position: Left-docked, flush with headline and subline plates
+  - Background: Warm Cream (`#F6D5A9`), matching logo background pixels seamlessly
+  - Dimensions: 192 × 188 px
+  - Official Logo: "BCC NEWS" (`/branding/bcc.png` / `/branding/bcc.webp`) in maroon (`#720F0A` – `#5B0400`)
+  - **Master Persistence**: Remains permanently mounted on screen; never unmounts or re-animates during headline entry (TAKE) or exit (CLEAR).
+- **LIVE Badge**:
+  - Position: Directly stacked atop the left logo box (`bottom: 100%`)
+  - Dimensions: 192 × 52 px (exact same height as the adjacent kicker tab)
+  - Background: Orange (`#FF6115`), bold white text "LIVE"
+  - **Persistence**: Stable companion to the logo box throughout on-air sequences.
+- **Ticker Bar (Bottom)**:
+  - Background: Dark Maroon (`#4A0706` / `#360505`)
+  - Height: 56 px
+  - Real-time Clock: Docked on the **left** of the ticker bar directly under the logo box (width 192 px), deep maroon background (`#360505`), tabular white typography, and broadcast timezone.
+  - Running Text: White (`#FFFFFF`) with orange bullet delimiters ("■") filling the space to the right of the clock.
+  - Default Content: Pre-populated with `"INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS"` when no custom text is provided.
+- **Independent Master Controls in Production**:
+  - Three dedicated master toggle buttons in Production:
+    - **[1] LOGO**: Toggles logo box in Preview.
+    - **[2] LIVE**: Toggles LIVE badge in Preview.
+    - **[3] TICKER**: Toggles ticker bar in Preview.
+    - **[M] APPLY MASTER**: Commits master staging configuration to Program.
 
 ---
 
-## 2. Animasi & Koreografi
+## 2. Animation & Choreography
 
 - **Master Layers (Logo, LIVE Badge, Ticker)**:
-  - Masuk saat master diaktifkan (`bcc-brand-in`, 420 ms).
-  - Tetap statis dan stabil selama pergantian materi headline ON AIR.
-  - Keluar hanya ketika layer master dimatikan atau saat operator menekan **ALL OUT (0)** / `CLEAR_ALL_ANIMATED`.
+  - Animate in when enabled (`bcc-brand-in`, 420 ms).
+  - Remain static and stable during on-air lower third transitions.
+  - Animate out only when master layers are disabled or when **ALL OUT (0)** / `CLEAR_ALL_ANIMATED` is pressed.
 - **Headline Entry (TAKE)**:
-  - Bar judul marun dan bar subline krem menyapu masuk secara horizontal dari kiri ke kanan (`bcc-panel-in`, 520 ms) seolah keluar dari balik kotak logo kiri.
-  - Tab kicker oranye menyapu masuk dari kiri (`bcc-panel-in`, 400 ms, delay 100 ms).
-  - Teks judul bergeser naik halus (`bcc-text-in`, 360 ms, delay 160 ms).
-  - Teks subline/narasumber bergeser naik halus (`bcc-text-in`, 340 ms, delay 240 ms).
-- **Update Live (UPDATE)**:
-  - Memperbarui teks secara instan tanpa mengulang animasi masuk panel.
+  - Maroon headline bar and cream subline bar slide horizontally from left to right (`bcc-panel-in`, 520 ms) revealing from behind the left logo box.
+  - Orange kicker tab sweeps in from the left (`bcc-panel-in`, 400 ms, 100 ms delay).
+  - Headline text slides up smoothly (`bcc-text-in`, 360 ms, 160 ms delay).
+  - Subline/speaker text slides up smoothly (`bcc-text-in`, 340 ms, 240 ms delay).
+- **Live Update (UPDATE)**:
+  - Updates text seamlessly without replaying panel entry animations.
 - **Headline Exit (CLEAR / OUT)**:
-  - Teks judul dan detail memudar (`bcc-text-out`, 160 ms).
-  - Bar judul marun dan subline krem menyapu keluar ke kiri (`bcc-panel-out`, 360 ms) secara serempak tanpa terputus di tengah jalan.
-  - Tab kicker oranye menyapu keluar ke kiri (`bcc-panel-out`, 280 ms).
-  - Logo dan LIVE badge tetap stabil di layarnya tanpa animasi buka-tutup.
-- **Detail Toggle Mandiri (Hotkey `D` / `SWITCH_DETAIL`)**:
-  - Saat detail dimatikan: Bar subline krem memainkan animasi geser keluar (`cg-detail-out` / `bcc-panel-out`, 220 ms) dan bar judul marun meluas dengan transisi tinggi halus dari 106 px ke 188 px.
-  - Saat detail dihidupkan: Bar judul mengecil ke 106 px dan bar subline krem menyapu masuk dengan `bcc-panel-in`.
+  - Text fades out (`bcc-text-out`, 160 ms).
+  - Maroon and cream bars sweep back out to the left (`bcc-panel-out`, 360 ms).
+  - Orange kicker tab sweeps out (`bcc-panel-out`, 280 ms).
+  - Logo and LIVE badge remain stable on screen.
+- **Detail Toggle (Hotkey `D` / `SWITCH_DETAIL`)**:
+  - Detail Off: Subline bar slides out (`cg-detail-out` / `bcc-panel-out`, 220 ms) and headline bar expands from 106 px to 188 px.
+  - Detail On: Headline bar contracts to 106 px and subline bar sweeps in.
 
 ---
 
-## 3. Cara Penggunaan & Akses
+## 3. Usage & Access
 
-1. **Pemilihan Template**:
-   - Di panel **Produksi**: Pada dropdown **Template siaran**, pilih **BCC News**, periksa tampilan di monitor Preview, lalu tekan **TERAPKAN MASTER (M)**.
-   - Di **Settings**: Pada menu **Pengaturan Default Siaran & Ticker**, pilih **BCC News** lalu klik **Simpan Default Master**.
-2. **Pratinjau Interaktif**:
-   - Buka URL `/templates/bcc` untuk mencoba variasi grafis BCC News (SOT, Headline, Highlight, Reporter, Breaking News) dan animasi IN/OUT secara interaktif.
-3. **Output Siaran**:
-   - URL `/output` otomatis merender grafis BCC News secara transparan murni (*alpha overlay*) siap dihubungkan ke switcher siaran (vMix, OBS Studio, Wirecast).
+1. **Template Selection**:
+   - In **Production**: Select **BCC News** in the broadcast template dropdown, inspect in Preview, then press **APPLY MASTER (M)**.
+   - In **Settings**: Select **BCC News** under master broadcast defaults and click **Save Master Defaults**.
+2. **Interactive Preview**:
+   - Navigate to `/templates/bcc` to test BCC News graphic variations (SOT, Headline, Highlight, Reporter, Breaking) and animations interactively.
+3. **Broadcast Output**:
+   - The `/output` URL renders clean alpha transparency output for direct integration into broadcast switchers (vMix, OBS Studio, Wirecast).

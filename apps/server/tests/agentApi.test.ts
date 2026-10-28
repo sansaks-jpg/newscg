@@ -85,6 +85,10 @@ describe("agent discovery and shared API contract", () => {
       expect(response.headers.get("content-type")).toContain("text/markdown");
       expect(await response.text()).toBe(await readFile(new URL(`../../../docs/${filename}`, import.meta.url), "utf8"));
     }
+    const agentsResponse = await fetch(`${baseUrl}${result.body.links.agentsGuide}`);
+    expect(agentsResponse.status).toBe(200);
+    expect(agentsResponse.headers.get("content-type")).toContain("text/markdown");
+    expect(await agentsResponse.text()).toBe(await readFile(new URL("../../../AGENTS.md", import.meta.url), "utf8"));
     expect(dbModule.getRundown(rundown.id)).toEqual(rundown);
     expect(liveModule.getLiveState()).toEqual(beforeState);
     expect(dbModule.getMasterOverlay()).toEqual(beforeMaster);
@@ -293,6 +297,38 @@ describe("rundown schedule and isolated ticker through real HTTP", () => {
       expect(dbModule.getMasterOverlay()).toEqual(beforeMaster);
       expect(dbModule.getGraphic(graphic.id)?.lastPushedFields).toBeNull();
     } finally { dbModule.db.exec("DROP TRIGGER reject_ticker_program"); }
+  });
+
+  it("supports global ticker for BCC News template without requiring rundown ownership", async () => {
+    const patchRes = await request("/api/live/master", "PATCH", {
+      broadcastTemplate: "bcc",
+      tickerText: "INFORMASI GLOBAL BCC NEWS • SIARAN LANGSUNG",
+      tickerSpeed: 95
+    });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body).toMatchObject({
+      broadcastTemplate: "bcc",
+      tickerText: "INFORMASI GLOBAL BCC NEWS • SIARAN LANGSUNG",
+      tickerSpeed: 95
+    });
+
+    const currentMaster = dbModule.getMasterOverlay();
+    expect(currentMaster.broadcastTemplate).toBe("bcc");
+    expect(currentMaster.tickerText).toBe("INFORMASI GLOBAL BCC NEWS • SIARAN LANGSUNG");
+    expect(currentMaster.tickerRundownId).toBeNull();
+
+    const { graphic } = await createMaterial();
+    await request("/api/live/take", "POST", { graphicId: graphic.id });
+    const afterTakeMaster = dbModule.getMasterOverlay();
+    expect(afterTakeMaster.broadcastTemplate).toBe("bcc");
+    expect(afterTakeMaster.tickerText).toBe("INFORMASI GLOBAL BCC NEWS • SIARAN LANGSUNG");
+
+    const updateRes = await request("/api/live/master", "PATCH", {
+      tickerText: "TEKS TICKER BCC TERBARU"
+    });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.tickerText).toBe("TEKS TICKER BCC TERBARU");
+    expect(dbModule.getMasterOverlay().tickerText).toBe("TEKS TICKER BCC TERBARU");
   });
 });
 

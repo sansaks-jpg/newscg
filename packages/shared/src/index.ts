@@ -689,17 +689,18 @@ export const masterOverlaySchema = z.object({
 });
 
 export const masterOverlayPatchSchema = masterOverlaySchema.omit({ tickerText: true, tickerSpeed: true, tickerRevision: true, tickerRundownId: true, tickerForDate: true }).partial().strict()
-
   .refine(data => Object.keys(data).length > 0, "Minimal satu field master yang dikenal harus diisi")
-
   .meta({ minProperties: 1 });
 
-
+export const bccMasterOverlayPatchSchema = masterOverlaySchema.omit({ tickerRundownId: true, tickerForDate: true }).partial().strict()
+  .refine(data => Object.keys(data).length > 0, "Minimal satu field master yang dikenal harus diisi")
+  .meta({ minProperties: 1 });
 
 export function masterControlPatch(master: MasterOverlayState) {
-
+  if (master.broadcastTemplate === "bcc") {
+    return bccMasterOverlayPatchSchema.parse(Object.fromEntries(Object.entries(master).filter(([key]) => key in bccMasterOverlayPatchSchema.shape)));
+  }
   return masterOverlayPatchSchema.parse(Object.fromEntries(Object.entries(master).filter(([key]) => key in masterOverlayPatchSchema.shape)));
-
 }
 
 
@@ -738,7 +739,8 @@ export function selectBroadcastTemplate(master: MasterOverlayState, broadcastTem
       logoText: (master.logoText === "CNN" || master.logoText === "NEWS" || !master.logoText) ? "BCC" : master.logoText,
       logoSub: (master.logoSub === "Indonesia" || master.logoSub === "BERITA" || !master.logoSub) ? "NEWS" : master.logoSub,
       showTicker: true,
-      tickerText: master.tickerText?.trim() ? master.tickerText : "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS"
+      tickerText: master.tickerText?.trim() ? master.tickerText : "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS",
+      tickerSpeed: master.tickerSpeed ?? 85
     } : {})
 
   };

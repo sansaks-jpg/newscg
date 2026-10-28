@@ -1,91 +1,61 @@
-# CG berita dan highlight
+# News CG Graphics and Highlights Guide
 
-Highlight tersedia di **Rundown & CG → Tambah/Edit Berita → + Highlight Berita**. Label HIGHLIGHT memakai tab topik di atas judul, sehingga judul mendapat ruang penuh tanpa panel label samping. Warna mengikuti master CNN atau studio. Satu cue menampilkan satu judul. Tambahkan beberapa cue sesuai urutan untuk ringkasan awal bulletin, pilih di Produksi, kemudian TAKE. Pergantian judul dikendalikan operator; tidak ada rotasi atau penayangan otomatis.
+Highlights are available in **Rundown & CG → Add/Edit Story → + News Highlight**. The HIGHLIGHT label appears in the topic tab above the headline, giving the headline full width without side label panels. Colors match the master CNN, BCC, or studio themes. One cue presents one headline. Add multiple cues in sequence for bulletin recaps, select in Production, and execute TAKE. Headline switching is strictly operator-controlled; there is no auto-rotation.
 
-Pada template **Liputan7**, tab topik memakai bahasa visual template sendiri: latar **burgundy**, teks **ivory**, garis aksen **sand** di sisi kiri, tinggi 32 px, menempel di **kiri atas** panel headline (x=384). Bila cue juga menampilkan lokasi, tab topik bertumpuk di atas tab lokasi. Topik biasa (bukan HIGHLIGHT) memakai gaya tab yang sama. Contoh interaktif tersedia di galeri `/templates/liputan7` (pilihan “Highlight (tab topik)”) dan `/templates/cnn` (pilihan “Highlight (tab topik)”), tanpa koneksi SSE atau perintah live.
+On the **Liputan7** template, the topic tab uses its distinct visual style: **burgundy** background, **ivory** text, **sand** accent border on the left, height 32 px, docked at the **top-left** of the headline plate (x=384). If the cue also shows a location, the topic tab stacks above the location tab. Interactive examples are available in `/templates/liputan7` and `/templates/cnn`.
 
-Di panel Produksi, saat Preview menampilkan cue **HIGHLIGHT**, panah **→ / ←** berpindah antar judul highlight pada berita tersebut; Spasi/Enter tetap menjalankan TAKE/UPDATE. Pada cue biasa, **→** menjalankan TAKE/UPDATE dan **←** menjadi OUT. Navigasi narasumber SOT memakai `PageUp`/`PageDown`.
+In the Production panel, when Preview displays a **HIGHLIGHT** cue, the **→ / ←** arrow keys cycle between highlight headlines in that story; Space/Enter triggers TAKE/UPDATE. On regular cues, **→** triggers TAKE/UPDATE and **←** triggers OUT. SOT soundbite navigation uses `PageUp`/`PageDown`.
 
-## Jenis grafis berita dan referensi CNN
+## Graphic Types & CNN References
 
-Riset diakses 10 Oktober 2026. Paket CNN berbeda menurut negara, program, dan periode. Uraian CNN 2023 di bawah merupakan referensi historis desain, bukan klaim bahwa seluruh siaran CNN hari ini memakai susunan yang identik. CNN Indonesia TV tidak berhasil diakses melalui alat riset pada sesi ini; kecocokan visual dengan siaran terbarunya belum diverifikasi.
+Based on standard news broadcast design patterns:
 
-Pada paket CNN Juni 2023, informasi dipisahkan menjadi headline, tab topik/program, logo, indikator LIVE, locator/waktu lokal, ticker/flipper, dan jam/informasi pasar. Penempatan dapat berubah saat banner muncul. Pengamatan tersebut menjadi acuan pembagian fungsi, bukan spesifikasi internal CNN. [NewscastStudio, paket CNN 1 Juni 2023](https://www.newscaststudio.com/2023/06/01/cnn-new-graphics-chryons-lower-thirds/).
-
-| Jenis CG | Fungsi editorial | Dukungan NewsCG |
+| CG Type | Editorial Function | NewsCG Support |
 |---|---|---|
-| Headline / story strap | Judul pokok berita di bawah gambar | `HEADLINE`, judul tunggal atau dengan detail |
-| Highlight / recap | Judul-judul pilihan saat awal/ringkasan bulletin | `HEADLINE` dengan `headlinePresentation: "bulletin"`, `kicker: "HIGHLIGHT"`; satu judul per cue |
-| Kicker / topic strap | Konteks topik di atas judul | `kicker` + `showKicker` |
-| Breaking / developing flag | Menandai urgensi/perkembangan berita | `BREAKING`; teks flag bisa diedit. Developing dapat memakai kicker HEADLINE |
-| Name strap / identifier | Nama presenter, reporter, atau tamu | `REPORTER`; nama + jabatan/akun |
-| SOT identifier | Identitas pembicara sambil mempertahankan judul berita | `SOT`; headline + nama + jabatan |
-| Locator | Tempat laporan atau gambar | `LOCATION` atau field lokasi pada cue |
-| Station bug / LIVE / clock | Identitas kanal dan status siaran | Master logo, LIVE, jam/zona waktu |
-| Ticker / crawl / flipper | Informasi tambahan bergantian/berjalan | Ticker per rundown dan jadwal tayang, diterapkan sebagai snapshot output; flipper belum tersedia |
-| Program / segment bug | Identitas acara atau segmen | `brandText` pada ticker; belum berupa layer program mandiri |
-| Source / courtesy / archive label | Menjelaskan asal/tanggal gambar | Belum ada layer khusus; jangan menyamarkan kredit sumber sebagai locator |
-| Full-screen / quote / factbox | Kutipan, fakta, kronologi, atau poin data | Belum ada template khusus; subline hanya untuk detail pendek |
-| OTS / shoulder graphic | Gambar topik di samping presenter | Belum tersedia |
-| Two-box / multi-box | Bingkai dua atau lebih sumber video | Belum tersedia; komposisi video ditangani switcher |
-| Map / chart / election results | Visualisasi data dan hasil pemilihan | Belum tersedia |
-| Tease / coming up / bumper | Pengantar segmen atau jeda | Cue headline pembuka bisa memberi teks teaser; bukan paket bumper/video |
+| Headline / story strap | Main story title below the image | `HEADLINE`, single or with detail subline |
+| Highlight / recap | Key selected headlines at bulletin opening/recap | `HEADLINE` with `headlinePresentation: "bulletin"`, `kicker: "HIGHLIGHT"`; one headline per cue |
+| Kicker / topic strap | Topic context above headline | `kicker` + `showKicker` |
+| Breaking / developing flag | Urgent or breaking news notification | `BREAKING`; flag text is editable. Developing can use HEADLINE kicker |
+| Name strap / identifier | Presenter, reporter, or guest identification | `REPORTER`; name + role/affiliation |
+| SOT identifier | Speaker identity while retaining story headline | `SOT`; headline + speaker name + role |
+| Locator | Geographic location of report or visual | `LOCATION` or location field on cues |
+| Station bug / LIVE / clock | Channel identity and broadcast status | Master logo, LIVE badge, clock/timezone |
+| Ticker / crawl | Rolling bottom text | Ticker per rundown schedule or global (BCC) |
 
-Baris yang belum tersedia merupakan peta kebutuhan produksi, bukan fitur yang telah dibuat. Istilah praktis name strap/SOT/recap di sini memetakan fungsi NewsCG, bukan daftar nama template resmi CNN.
+## Default News Anchor
 
-Untuk liputan khusus, pembuat paket CNN Election, BIGSTAR, mendokumentasikan lower thirds/locators, peta, struktur data, dan toolkit animasi. Ini membuktikan bahwa kebutuhan paket berita dapat meluas ke grafis data serta paket acara, di luar teks overlay harian. [BIGSTAR — CNN Election Package](https://bgstr.com/work/project/cnn-election-package/).
+The default news anchor name and title can be stored once in **Default Settings → News Anchor Defaults**.
+In Production, pressing **P** prepares this anchor in Preview; **Space/Enter** executes TAKE or UPDATE to Program. Pressing **P** again returns Preview to the story cue without modifying Program; **Esc/C** triggers OUT. Compatible with CNN, Studio themes, Liputan7, and BCC News. Default anchors do not clutter rundown cue lists. See [NEWS_ANCHOR_DEFAULT.md](NEWS_ANCHOR_DEFAULT.md).
 
-## News anchor default
+## Default Field Reporter
 
-Nama anchor dapat disimpan sekali di **Pengaturan Default → Default News Anchor**.
-Di Produksi, **P** menyiapkan nama/jabatan tersebut di Preview; **Spasi/Enter**
-TAKE atau UPDATE ke Program. **P** lagi kembali ke cue berita tanpa mengubah
-Program; **Esc/C** menjalankan OUT. Berlaku untuk CNN, seluruh warna Studio,
-Liputan7, dan BCC News. Anchor default tidak ditambahkan ke daftar CG setiap berita dan
-bisa dipakai tanpa rundown. Detail penggunaan ada di [NEWS_ANCHOR_DEFAULT.md](NEWS_ANCHOR_DEFAULT.md).
+The default field reporter is configured in **Default Settings → Field Reporter Defaults** (name, role default `Reporter Lapangan`, optional location).
+In Production, pressing **O** stages a `REPORTER` graphic in Preview; **Space/→** airs or updates it, **O** again reverts to the story cue, and **Esc/C/←** triggers OUT. This feature does not create rundown cues or alter master settings. See [REPORTER_LAPANGAN_DEFAULT.md](REPORTER_LAPANGAN_DEFAULT.md).
 
-## Reporter lapangan default
+## Highlights Fields and Operation
 
-Nama reporter lapangan disimpan di **Pengaturan Default → Default Reporter Lapangan**
-(nama, jabatan bawaan `Reporter Lapangan`, dan lokasi liputan opsional). Di
-Produksi, **O** menyiapkan CG `REPORTER` dari default tersebut di Preview;
-**Spasi/→** menayangkan atau memperbarui, **O** lagi kembali ke cue, dan
-**Esc/C/←** menjalankan OUT. Fitur ini tidak membuat cue rundown dan tidak
-mengubah master/ticker. Berbeda dari cue `REPORTER` yang tersimpan pada berita
-tertentu; saat Preview reporter lapangan aktif, edit cue dan toggle
-lokasi/topik/detail dinonaktifkan sampai kembali ke cue. Detail ada di
-[REPORTER_LAPANGAN_DEFAULT.md](REPORTER_LAPANGAN_DEFAULT.md).
+The underlying template remains `HEADLINE`, ensuring compatibility with existing rundowns and TAKE/UPDATE/CLEAR workflows:
 
-## Field dan cara mengoperasikan highlight
-
-Template tetap `HEADLINE`, sehingga rundown lama dan alur TAKE/UPDATE/CLEAR tetap kompatibel. Kontrak berada di `packages/shared/src/index.ts`:
-
-| Field | Nilai / batas |
+| Field | Value / Limit |
 |---|---|
-| `headline` | Wajib, 1–120 karakter |
-| `headlinePresentation` | `story` (bawaan untuk materi lama) atau `bulletin` |
-| `kicker` | Label tab topik, maksimal 60 karakter; preset `HIGHLIGHT` |
-| `showKicker` | Preset `"true"`; tombol T mengatur tampil/sembunyi topik sebelum TAKE/UPDATE |
-| `contentMode` | Gunakan `headline` untuk highlight |
-| `layoutStyle` | Preset `single`; `sub` jika memang memerlukan detail |
-| `showLocation`, `showDetail` | Preset `"false"`; nilai flag berupa string |
+| `headline` | Required, 1–120 characters |
+| `headlinePresentation` | `story` (default for legacy items) or `bulletin` |
+| `kicker` | Topic tab label, max 60 characters; preset `HIGHLIGHT` |
+| `showKicker` | Preset `"true"`; T button toggles topic visibility |
+| `contentMode` | Set to `headline` for highlights |
+| `layoutStyle` | Set to `single`; or `sub` if detail subline is needed |
+| `showLocation`, `showDetail` | Preset `"false"`; string boolean flags |
 
-Jenis Headline dapat dipilih di editor berita. Label disunting lewat Sub Topik/Kicker; label dan judul juga tersedia di Edit Cepat Produksi. Topik memakai AutoSquishText dan animasi topik yang sama: judul selesai masuk sebelum topik masuk; topik keluar sebelum panel judul. Master logo/ticker tetap mandiri. Output tetap `/output`, canvas transparan 1920 × 1080. Mengubah teks melalui UPDATE mempertahankan panel yang sama tanpa mengulang IN; CLEAR memainkan OUT dan mempertahankan master.
+## Editing via AI Agent
 
-Tab topik mengikuti template: paket CNN/Studio memakai strip gelap dengan teks terang; paket Liputan7 memakai tab burgundy–ivory bergaris sand di kiri atas panel (sejajar x=384). Pada Liputan7, tab topik selalu rata kiri dan tidak memakai panel samping. Panah kanan/kiri di Produksi berpindah judul highlight; Spasi/Enter menayangkan judul yang sedang di Preview.
-
-`headlineLabel` (1–24 karakter) hanya diterima untuk kompatibilitas preset samping lama. Pada cue `bulletin`, label lama dipindahkan ke `kicker` bila topik belum terisi; label contoh `HEADLINE` menjadi `HIGHLIGHT`. Editor dan PATCH menormalisasi ke field topik tanpa mengubah data secara in-place. Semua materi baru menggunakan `kicker`/`showKicker`.
-
-## Edit melalui agent
-
-Mulai `GET /api/agent`. `graphicPresets` menyediakan preset `headline-bulletin`; `links.cgGuide` menunjuk panduan ini dan OpenAPI mempublikasikan field/batasnya. Preset yang sama dipakai oleh pilihan **Highlight (tab topik)** di galeri `/templates/liputan7` dan `/templates/cnn`. Gabungkan preset dengan judul yang benar dari sumber:
+Start with `GET /api/agent`. `graphicPresets` provides `headline-bulletin`; `links.cgGuide` references this document. Combine the preset with verified headline text from the source:
 
 ```json
 {
   "templateType": "HEADLINE",
   "sortOrder": 0,
   "draftFields": {
-    "headline": "JUDUL BERITA DARI SUMBER",
+    "headline": "VERIFIED NEWS HEADLINE FROM SOURCE",
     "headlinePresentation": "bulletin",
     "kicker": "HIGHLIGHT",
     "contentMode": "headline",
@@ -97,17 +67,13 @@ Mulai `GET /api/agent`. `graphicPresets` menyediakan preset `headline-bulletin`;
 }
 ```
 
-Kirim ke `POST /api/items/{itemId}/graphics`, lalu `GET /api/graphics/{graphicId}`. Untuk menyunting:
+Post to `POST /api/items/{itemId}/graphics`, then verify with `GET /api/graphics/{graphicId}`. For editing:
 
 ```http
 PATCH /api/graphics/{graphicId}
 Content-Type: application/json
 
-{"draftFields":{"headline":"JUDUL REVISI DARI SUMBER","kicker":"HIGHLIGHT","showKicker":"true"}}
+{"draftFields":{"headline":"REVISED HEADLINE","kicker":"HIGHLIGHT","showKicker":"true"}}
 ```
 
-PATCH menggabungkan field sehingga field lain tetap tersimpan. Baca kembali CG, berita, dan rundown. Judul item berita dan teks headline merupakan dua field berbeda: jika user meminta keduanya berubah, lakukan juga `PATCH /api/items/{itemId}` dengan `title`.
-
-Untuk metadata edisi gunakan `PATCH /api/rundowns/{rundownId}`. Urutan berita memakai `POST /api/rundowns/{rundownId}/reorder` dengan seluruh `itemIds` tepat sekali. Untuk mengedit urutan cue, PATCH `sortOrder` masing-masing CG, lalu baca item kembali. PUT story mengganti seluruh daftar CG: sertakan ID dan seluruh cue yang masih dibutuhkan. Panduan lengkap: [AI_AGENT_API.md](AI_AGENT_API.md), [AI_RUNDOWN_GUIDE.md](AI_RUNDOWN_GUIDE.md).
-
-Edit materi tidak mengubah snapshot Program dan tidak mengirim event overlay. TAKE/UPDATE/CLEAR/master hanya dijalankan bila operator menginstruksikan live. Setelah UPDATE, readback `/api/live/state` dan event UPDATE membuktikan pemrosesan/sinkronisasi data; frame yang dirender serta hasil vMix/OBS tetap perlu pemeriksaan visual.
+Material edits never alter Program snapshots or dispatch overlay events without explicit live operator commands.

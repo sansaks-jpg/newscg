@@ -15,18 +15,24 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+const serverPort = process.env.PORT || process.env.VITE_BACKEND_PORT || "3002";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: "0.0.0.0",
     port: 5173,
+    allowedHosts: ["freemusic.duckdns.org", "insightradio.duckdns.org", "localhost", "127.0.0.1", ".duckdns.org"],
+    hmr: {
+      clientPort: 443
+    },
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        target: `http://127.0.0.1:${serverPort}`,
         changeOrigin: true
       },
       "/uploads": {
-        target: "http://localhost:3001",
+        target: `http://127.0.0.1:${serverPort}`,
         changeOrigin: true
       }
     }

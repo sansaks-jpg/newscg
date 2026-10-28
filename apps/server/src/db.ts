@@ -265,13 +265,23 @@ export const saveMasterAndClearOnAir = db.transaction((patch: Partial<MasterOver
 
 export function getMasterOverlay(): MasterOverlayState {
   const master = masterOverlaySchema.parse({ ...defaultMasterOverlayState, ...readValidatedSettingsFields("master_overlay", masterOverlaySchema.shape) });
+  if (master.broadcastTemplate === "bcc") {
+    return master;
+  }
   const tickerOwnerExists = master.tickerRundownId && db.prepare("SELECT 1 FROM rundowns WHERE id=?").get(master.tickerRundownId);
   return tickerOwnerExists ? master : { ...master, tickerText: "", tickerRundownId: null, tickerForDate: null };
 }
 
 export const saveMasterOverlay = db.transaction((patch: Partial<MasterOverlayState>): MasterOverlayState => {
-  const parsed = masterOverlaySchema.partial().parse(patch);
-  const updated = masterOverlaySchema.parse({ ...getMasterOverlay(), ...parsed });
+  const current = getMasterOverlay();
+  const textChanged = patch.tickerText !== undefined && patch.tickerText.trim() !== current.tickerText.trim();
+  const speedChanged = patch.tickerSpeed !== undefined && patch.tickerSpeed !== current.tickerSpeed;
+  const revision = patch.tickerRevision !== undefined
+    ? patch.tickerRevision
+    : ((textChanged || speedChanged) ? (current.tickerRevision ?? 0) + 1 : current.tickerRevision);
+  const patchWithRevision = { ...patch, ...(revision !== undefined ? { tickerRevision: revision } : {}) };
+  const parsed = masterOverlaySchema.partial().parse(patchWithRevision);
+  const updated = masterOverlaySchema.parse({ ...current, ...parsed });
   writeSettingsObject("master_overlay", parsed);
   return updated;
 });
@@ -292,6 +302,10 @@ export const saveProgramWithTicker = db.transaction((graphic: GraphicItem, field
   if (!item) throw new Error("Berita rundown tidak ditemukan");
   markGraphicPushed(graphic.id, fields);
   saveOnAir(graphic.id, "web-overlay", 1, fields, "confirmed");
+  const currentMaster = getMasterOverlay();
+  if (currentMaster.broadcastTemplate === "bcc") {
+    return currentMaster;
+  }
   return saveMasterOverlay(rundownTickerSnapshot(item.rundownId));
 });
 
