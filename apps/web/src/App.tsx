@@ -51,6 +51,14 @@ type View = "editor" | "rundown" | "settings";
 
 
 
+const defaultFallbackRundown: Rundown = {
+  id: "RD-DEFAULT",
+  programName: "NEWS LIVE",
+  title: "Siaran Langsung",
+  updatedAt: new Date().toISOString(),
+  items: []
+};
+
 const blankLive: LiveState = {
   connection: "STANDALONE",
   commandStatus: "idle",
@@ -115,7 +123,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const reloadSequence = useRef(0);
 
-  const active = rundowns.find((r) => r.id === activeId) || rundowns[0];
+  const active = rundowns.find((r) => r.id === activeId) || rundowns[0] || defaultFallbackRundown;
 
 
 
