@@ -41,6 +41,7 @@ import { BroadcastClock, BroadcastPreviewBox } from "./BroadcastGraphic";
 import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemplatePicker";
 import { Liputan7Settings } from "./Liputan7Settings";
 import { BroadcastTicker } from "./BroadcastTicker";
+import { initWebMcp } from "./webMcp";
 
 type View = "editor" | "rundown" | "settings";
 
@@ -115,6 +116,8 @@ export default function App() {
   const reloadSequence = useRef(0);
 
   const active = rundowns.find((r) => r.id === activeId) || rundowns[0];
+
+
 
   const reload = useCallback(async () => {
     const requestSequence = ++reloadSequence.current;
