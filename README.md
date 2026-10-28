@@ -25,9 +25,10 @@ Sistem ini beroperasi 100% berbasis web-native yang siap di-embed langsung ke be
   - Live Bug & Jam Digital otomatis berbasis zona waktu (WIB, WITA, WIT, CUSTOM).
   - Running Ticker / Crawl Berita di bagian bawah layar dengan pengaturan kecepatan (px/detik) dan label program otomatis pas huruf (*auto-fit*).
 - **Auto-Squish Typography**: Algoritma cerdas yang otomatis menyesuaikan rasio kompresi font (*horizontal squish*) agar teks panjang tidak pernah meluber melewati batas *Safe Area* siaran.
-- **Keyboard Shortcuts Cepat**: Dukungan penuh shortcut keyboard (`Space`/`Enter`/`→` untuk TAKE/UPDATE, `←` untuk OUT, saat HIGHLIGHT `→`/`←` berpindah judul, `P` news anchor, `O` reporter lapangan, `U` untuk Update, `Esc`/`C` untuk OUT, `0` untuk ALL OUT (animasi), `M` untuk Terapkan Master, dll.).
+- **Keyboard Shortcuts Cepat**: Dukungan penuh shortcut keyboard (`Space`/`Enter`/`→` untuk TAKE/UPDATE, `←` untuk OUT, saat HIGHLIGHT `→`/`←` berpindah judul, `P` news anchor, `O` reporter lapangan, `U` untuk Update, `Esc`/`C` untuk OUT, `0` untuk MASTER OUT / MASTER IN (toggle seluruh layer master), `1` logo, `2` live/jam, `3` ticker, `M` untuk Terapkan Master, tombol ALL OUT untuk blackout darurat, dll.).
 - **News Anchor & Reporter Lapangan Default**: Nama/jabatan anchor dan nama/jabatan/lokasi reporter lapangan disimpan di Pengaturan Default. `P` menyiapkan anchor, `O` menyiapkan reporter lapangan di Preview tanpa membuat cue rundown; Spasi/→ menayangkan. Data tersimpan di server dan tersedia lewat API.
 - **Impor & Ekspor Rundown**: Dukungan pencadangan dan pemindahan rundown siaran dalam format JSON.
+- **Dukungan WebMCP (Web Model Context Protocol)**: Protokol browser-native standar masa depan (`window.modelContext` / `navigator.modelContext`) yang memungkinkan asisten AI dalam browser (Gemini in Chrome, Chrome Built-in AI, Project Astra, dan agent extensions) untuk menginspeksi dan mengeksekusi 9 tool siaran secara terstruktur tanpa manipulasi DOM atau pixel.
 - **100% Offline & LAN-Ready**: Berjalan sepenuhnya di jaringan lokal tanpa ketergantungan koneksi internet publik.
 
 ---

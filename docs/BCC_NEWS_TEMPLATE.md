@@ -53,7 +53,7 @@ Based on BCC News broadcast visual references:
 - **Master Layers (Logo, LIVE Badge, Ticker)**:
   - Animate in when enabled (`bcc-brand-in`, 420 ms).
   - Remain static and stable during on-air lower third transitions.
-  - Animate out only when master layers are disabled or when **ALL OUT (0)** / `CLEAR_ALL_ANIMATED` is pressed.
+  - Animate out only when master layers are disabled, when Master Out (`0`) is toggled, or when **ALL OUT** (`CLEAR_ALL_ANIMATED`) is pressed.
 - **Headline Entry (TAKE)**:
   - Maroon headline bar and cream subline bar slide horizontally from left to right (`bcc-panel-in`, 520 ms) revealing from behind the left logo box.
   - Orange kicker tab sweeps in from the left (`bcc-panel-in`, 400 ms, 100 ms delay).

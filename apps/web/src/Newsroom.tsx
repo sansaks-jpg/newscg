@@ -1,16 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { EditableGraphic, GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
 import { getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, normalizeHeadlineTopicFields, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
   ArrowUp,
+  BookOpen,
+  Bot,
+  Check,
+  Copy,
   Download,
   Edit3,
+  FileSpreadsheet,
   MapPin,
   MonitorPlay,
   Plus,
   Search,
   SlidersHorizontal,
+  Sparkles,
+  Terminal,
   Trash2,
   Upload,
   UserRound,
@@ -49,6 +56,108 @@ type Props = {
   onPrepare?: () => void;
 };
 
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fallback
+    }
+  }
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return successful;
+  } catch {
+    return false;
+  }
+}
+
+function buildAiAgentPrompt(apiBaseUrl: string): string {
+  const cleanBase = (apiBaseUrl || "http://localhost:3001").replace(/\/+$/, "");
+  return `Kamu adalah Asisten Produser Siaran Berita & Operator CG untuk NewsCG.
+Tugas kamu adalah membaca berkas/naskah rundown siaran yang saya berikan (bisa berupa file Excel, PDF, naskah Word, foto/screenshot jadwal siaran fisik di studio, atau teks chat naskah berita), membedah struktur beritanya, lalu membuat paket rundown lengkap ke server NewsCG melalui REST API.
+
+--- PANDUAN KONEKSI & DOKUMENTASI API ---
+1. Base URL Server NewsCG: ${cleanBase}
+2. Kamu BISA dan HARUS menginspeksi dokumentasi API resmi NewsCG terlebih dahulu melalui terminal / HTTP (curl):
+   - GET ${cleanBase}/api/agent (Service Discovery & ringkasan operasi)
+   - GET ${cleanBase}/api/agent/guide.md (Panduan lengkap REST API)
+   - GET ${cleanBase}/api/agent/rundown-guide.md (Panduan konversi rundown file ke schema)
+   - GET ${cleanBase}/api/agent/cg-guide.md (Panduan jenis CG & varian visual)
+
+--- ATURAN STRUKTUR PAYLOAD (POST /api/rundowns) ---
+Kirimkan permintaan HTTP POST dengan header "Content-Type: application/json; charset=utf-8" berisi struktur JSON:
+{
+  "programName": "NAMA PROGRAM (mis. BCC NEWS UTAMA / SEPUTAR INDONESIA)",
+  "title": "EDISI SIARAN (mis. Edisi Siang - 29 Oktober 2026)",
+  "broadcastSchedule": {
+    "date": "YYYY-MM-DD",
+    "time": "HH:mm",
+    "timezone": "WIB" // atau "WITA" / "WIT"
+  },
+  "ticker": {
+    "text": "BERITA BERJALAN 1 • BERITA BERJALAN 2 • BERITA BERJALAN 3",
+    "forDate": "YYYY-MM-DD",
+    "speedMode": "auto",
+    "sources": []
+  },
+  "items": [
+    {
+      "slug": "HL-01",
+      "title": "Judul Berita 1",
+      "format": "PKG", // format: PKG / LIVE / VTR / RDR / SOT / TEL
+      "cgRequired": true,
+      "estimatedDurationSeconds": 120,
+      "sortOrder": 0,
+      "graphics": [
+        {
+          "templateType": "HEADLINE", // jenis: HEADLINE / SOT / REPORTER / BREAKING / LOCATION
+          "sortOrder": 0,
+          "draftFields": {
+            "headline": "JUDUL CG HURUF BESAR",
+            "subline": "Penjelasan ringkas / lead berita",
+            "kicker": "TOPIK / KICKER",
+            "showKicker": "true",
+            "location": "JAKARTA",
+            "showLocation": "true",
+            "showDetail": "true"
+          }
+        }
+      ]
+    }
+  ]
+}
+
+--- PANDUAN CG / LOWER THIRD YANG DIDUKUNG ---
+- HEADLINE: Berisi 'headline', 'subline', 'kicker' (topik tab), 'showKicker': "true", 'location', 'showLocation': "true". (Jika pembuka bulletin / highlight, gunakan kicker: "HIGHLIGHT" dan showKicker: "true").
+- SOT: Berisi 'headline' (topik kutipan), 'name' (nama narasumber), 'role' (jabatan/institusi), 'location', 'showLocation': "true".
+- REPORTER: Berisi 'name' (nama reporter), 'role' (default: "Reporter Lapangan"), 'location', 'showLocation': "true".
+- BREAKING: Berisi 'headline' berita darurat berurgensi tinggi.
+- LOCATION: Berisi 'location' penanda lokasi siaran pojok kiri atas.
+
+--- LANGKAH EKSEKUSI ---
+1. Eksekusi perintah curl untuk membuat rundown:
+   curl -X POST ${cleanBase}/api/rundowns \\
+     -H "Content-Type: application/json; charset=utf-8" \\
+     -d '<JSON_PAYLOAD>'
+2. Lakukan verifikasi readback:
+   curl ${cleanBase}/api/rundowns/<RUNDOWN_ID>
+3. Beritahu pengguna bahwa rundown telah berhasil dibuat beserta ID dan ringkasan daftar beritanya. Pengguna dapat langsung melihat, menyunting, mengubah urutan, atau menghapus materi secara bebas di dashboard web NewsCG.
+
+--- MATERI RUNDOWN DARI SAYA ---
+[LAMPIRKAN / TEMPELKAN BERKAS RUNDOWN (EXCEL/PDF/WORD/FOTO/TEKS) DI BAWAH INI]`;
+}
+
 // =====================================================================
 // PANEL PERSIAPAN (PREPARATION / RUNDOWN MANAGEMENT)
 // =====================================================================
@@ -64,6 +173,26 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
   const creatingRundown = useRef(false);
   const [search, setSearch] = useState("");
   const [renameTarget, setRenameTarget] = useState<Rundown | null>(null);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [copiedQuick, setCopiedQuick] = useState(false);
+
+  const copyAiPromptQuick = async () => {
+    const host =
+      typeof window !== "undefined" && window.location.port === "5173"
+        ? `${window.location.protocol}//${window.location.hostname}:3001`
+        : typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost:3001";
+    const prompt = buildAiAgentPrompt(host);
+    const ok = await copyTextToClipboard(prompt);
+    if (ok) {
+      setCopiedQuick(true);
+      toast("Prompt AI Agent berhasil disalin ke clipboard!");
+      setTimeout(() => setCopiedQuick(false), 2500);
+    } else {
+      toast("Gagal menyalin otomatis. Silakan buka panduan untuk salin manual.");
+    }
+  };
 
   async function move(item: RundownItem, offset: number) {
     if (!rundown || pending) return;
@@ -306,6 +435,16 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           )}
 
           <button
+            type="button"
+            className="btn-prep-ai"
+            onClick={() => setShowAiModal(true)}
+            title="Salin prompt & panduan untuk AI Agent membuat rundown dari Excel/PDF/Word/Foto"
+          >
+            <Sparkles size={13} />
+            <span>Salin Prompt AI</span>
+          </button>
+
+          <button
             className="btn-prep-primary"
             disabled={!rundown}
             onClick={(event) => { editingTrigger.current = event.currentTarget; setEditing("new"); }}
@@ -321,6 +460,31 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
         </div>
       </header>
       {rundown && <RundownBroadcastEditor key={rundown.id} rundown={rundown} reload={reload} toast={toast} />}
+
+      {/* Banner Panduan Cepat AI Agent */}
+      <div className="prep-ai-helper-banner">
+        <div className="ai-banner-content">
+          <div className="ai-banner-icon">
+            <Sparkles size={17} />
+          </div>
+          <div className="ai-banner-text">
+            <b>Bikin Rundown Otomatis via AI Agent (Excel, PDF, Word, Foto, Chat)</b>
+            <span>
+              Punya naskah rundown dalam format dokumen atau gambar? Salin instruksi prompt, berikan ke AI Agent (ChatGPT, Claude, Gemini, Antigravity, Cursor) beserta lampiran file. AI akan otomatis mem-posting seluruh berita & grafis ke NewsCG via API. Kamu tetap bisa mengedit semuanya langsung di web ini.
+            </span>
+          </div>
+        </div>
+        <div className="ai-banner-actions">
+          <button type="button" className="btn-ai-copy-quick" onClick={copyAiPromptQuick}>
+            {copiedQuick ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+            <span>{copiedQuick ? "Prompt Disalin!" : "Salin Prompt Cepat"}</span>
+          </button>
+          <button type="button" className="btn-ai-open-guide" onClick={() => setShowAiModal(true)}>
+            <BookOpen size={13} />
+            <span>Panduan Lengkap</span>
+          </button>
+        </div>
+      </div>
 
       {/* Metrics Summary Strip */}
       {rundown && (
@@ -463,13 +627,44 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             })}
 
             {!filteredItems.length && (
-              <div className="prep-table-empty">
-                <span>
-                  {search
-                    ? "Tidak ada berita yang cocok dengan pencarian"
-                    : "Rundown ini masih kosong. Klik 'Tambah Berita' untuk memulai."}
-                </span>
-              </div>
+              search ? (
+                <div className="prep-table-empty">
+                  <span>Tidak ada berita yang cocok dengan pencarian "{search}"</span>
+                </div>
+              ) : (
+                <div className="prep-table-empty-rich">
+                  <div className="empty-rich-icon">
+                    <FileSpreadsheet size={28} />
+                  </div>
+                  <h3>Rundown Ini Belum Memiliki Berita</h3>
+                  <p>
+                    Mulai siaran dengan menambah berita manual, atau gunakan <b>AI Agent</b> untuk
+                    mengonversi naskah rundown (Excel, PDF, Word, atau foto jadwal) secara instan ke server NewsCG via REST API.
+                    Semua data yang dibuat AI langsung dapat diedit di web ini.
+                  </p>
+                  <div className="empty-rich-actions">
+                    <button
+                      type="button"
+                      className="btn-prep-primary"
+                      onClick={(event) => {
+                        editingTrigger.current = event.currentTarget;
+                        setEditing("new");
+                      }}
+                    >
+                      <Plus size={14} />
+                      <span>Tambah Berita Manual</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-prep-ai"
+                      onClick={() => setShowAiModal(true)}
+                    >
+                      <Sparkles size={14} />
+                      <span>✨ Bikin via AI Agent (Salin Prompt)</span>
+                    </button>
+                  </div>
+                </div>
+              )
             )}
           </div>
         </div>
@@ -501,6 +696,14 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             closeEditor();
             toast("Berita dan seluruh materi CG berhasil disimpan");
           }}
+        />
+      )}
+
+      {/* Modal Panduan & Salin Prompt AI Agent */}
+      {showAiModal && (
+        <AiAgentRundownModal
+          onClose={() => setShowAiModal(false)}
+          toast={toast}
         />
       )}
     </section>
@@ -670,10 +873,26 @@ function StoryEditor({
   const submitInFlight = useRef(false);
   const savedStoryId = useRef(item?.id ?? null);
   const dialogRef = useRef<HTMLFormElement>(null);
+  const hasUnsavedEdits = () => {
+    if (title !== (item?.title || "")) return true;
+    if (slug !== (item?.slug || "")) return true;
+    if (format !== (item?.format || "PKG")) return true;
+    if (seconds !== (item?.estimatedDurationSeconds || 60)) return true;
+    if (cgRequired !== (item?.cgRequired ?? true)) return true;
+    return false;
+  };
+  const requestClose = () => {
+    if (hasUnsavedEdits()) {
+      if (!window.confirm("Ada perubahan materi yang belum disimpan. Tetap tutup editor?")) {
+        return;
+      }
+    }
+    onClose();
+  };
   const onDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.key === "Escape" && !saving) {
       event.stopPropagation();
-      onClose();
+      requestClose();
     }
     if (event.key !== "Tab") return;
     const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
@@ -904,7 +1123,7 @@ function StoryEditor({
             <small>EDITOR MATERI BERITA</small>
             <h2>{item ? "Edit Berita & Materi CG" : "Tambah Berita Baru"}</h2>
           </div>
-          <button type="button" className="btn-close-modal" disabled={saving} onClick={onClose}>
+          <button type="button" className="btn-close-modal" aria-label="Tutup editor materi" disabled={saving} onClick={requestClose}>
             <X size={15} />
           </button>
         </div>
@@ -1291,7 +1510,7 @@ function StoryEditor({
         <div className="modal-footer">
           <span className="modal-tip">Perubahan belum tersimpan sampai tombol Simpan ditekan.</span>
           <div className="footer-actions">
-            <button type="button" className="btn-modal-cancel" disabled={saving} onClick={onClose}>
+            <button type="button" className="btn-modal-cancel" disabled={saving} onClick={requestClose}>
               Batal
             </button>
             <button type="submit" className="btn-modal-save" disabled={saving}>
@@ -1300,6 +1519,169 @@ function StoryEditor({
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+// Modal Panduan & Salin Prompt untuk AI Agent (Excel / PDF / Word / Foto)
+function AiAgentRundownModal({
+  onClose,
+  toast
+}: {
+  onClose: () => void;
+  toast: (s: string) => void;
+}) {
+  const initialBase =
+    typeof window !== "undefined" && window.location.port === "5173"
+      ? `${window.location.protocol}//${window.location.hostname}:3001`
+      : typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3001";
+
+  const [baseUrl, setBaseUrl] = useState(initialBase);
+  const [copied, setCopied] = useState(false);
+
+  const promptText = useMemo(() => buildAiAgentPrompt(baseUrl), [baseUrl]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const handleCopy = async () => {
+    const ok = await copyTextToClipboard(promptText);
+    if (ok) {
+      setCopied(true);
+      toast("Prompt AI Agent berhasil disalin ke clipboard!");
+      setTimeout(() => setCopied(false), 2500);
+    } else {
+      toast("Gagal menyalin otomatis. Silakan salin teks di kotak secara manual.");
+    }
+  };
+
+  return (
+    <div className="nr-modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-box ai-agent-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-modal-heading"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="ai-modal-header">
+          <div className="ai-modal-title">
+            <span className="ai-modal-badge">
+              <Sparkles size={15} />
+            </span>
+            <div>
+              <h2 id="ai-modal-heading">Panduan & Prompt AI Agent</h2>
+              <small>Otomasi Rundown dari Excel, PDF, Word, Foto & Teks</small>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-close-modal"
+            onClick={onClose}
+            aria-label="Tutup panduan AI"
+          >
+            <X size={17} />
+          </button>
+        </div>
+
+        <div className="ai-modal-body">
+          {/* Step Guidance */}
+          <div className="ai-steps-container">
+            <div className="ai-steps-title">
+              <BookOpen size={13} className="text-purple-400" />
+              <span>CARA MENGGUNAKAN (5 LANGKAH MUDAH):</span>
+            </div>
+            <div className="ai-steps-grid">
+              <div className="ai-step-card">
+                <span className="step-num">1</span>
+                <b>Salin Prompt</b>
+                <p>Klik tombol <b>"Salin Prompt untuk AI"</b> di bawah.</p>
+              </div>
+              <div className="ai-step-card">
+                <span className="step-num">2</span>
+                <b>Buka AI Chat</b>
+                <p>Buka ChatGPT, Claude, Gemini, Antigravity, Cursor, dsb.</p>
+              </div>
+              <div className="ai-step-card">
+                <span className="step-num">3</span>
+                <b>Lampirkan File</b>
+                <p>Paste prompt & lampirkan berkas rundown (Excel, PDF, Word, atau foto).</p>
+              </div>
+              <div className="ai-step-card">
+                <span className="step-num">4</span>
+                <b>AI Eksekusi API</b>
+                <p>AI membedah rundown & mengeksekusi <code>POST /api/rundowns</code> via curl.</p>
+              </div>
+              <div className="ai-step-card">
+                <span className="step-num">5</span>
+                <b>Bebas Edit di Web</b>
+                <p>Data otomatis muncul di dashboard! Kamu bebas mengedit teks kapan saja.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Reassurance Note */}
+          <div className="ai-edit-note">
+            <Check size={18} className="text-emerald-400 shrink-0" />
+            <div>
+              <strong>Semua Hasil AI Dapat Diedit Sepenuhnya di Web:</strong> Setelah AI mem-posting rundown, kamu dapat langsung mengubah judul, mengedit teks lower third, menambah narasumber, atau mengatur urutan berita secara visual di halaman ini tanpa batasan.
+            </div>
+          </div>
+
+          {/* Server URL Config Bar */}
+          <div className="ai-server-config">
+            <label htmlFor="ai-server-base-url">
+              <Terminal size={14} className="text-sky-400" />
+              <span>URL Server NewsCG:</span>
+            </label>
+            <input
+              id="ai-server-base-url"
+              type="text"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://localhost:3001"
+              title="URL Server NewsCG yang dapat diakses oleh AI agent"
+            />
+          </div>
+
+          {/* Prompt Preview & Copy Button */}
+          <div className="ai-prompt-container">
+            <div className="ai-prompt-header">
+              <span>
+                <Bot size={13} className="text-pink-400" />
+                <span>PROMPT SIAP SALIN UNTUK AI AGENT:</span>
+              </span>
+              <button type="button" className="btn-ai-copy-main" onClick={handleCopy}>
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+                <span>{copied ? "Prompt Disalin!" : "Salin Prompt untuk AI"}</span>
+              </button>
+            </div>
+            <div className="ai-prompt-box">
+              <pre>{promptText}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div className="ai-modal-footer">
+          <span>Format didukung: Excel (.xlsx, .csv), Dokumen PDF, Word (.docx), Foto Naskah, atau Teks Chat</span>
+          <div className="ai-modal-footer-actions">
+            <button type="button" className="btn-modal-cancel" onClick={onClose}>
+              Tutup
+            </button>
+            <button type="button" className="btn-ai-copy-main" onClick={handleCopy}>
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              <span>{copied ? "Prompt Disalin!" : "Salin Prompt AI"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

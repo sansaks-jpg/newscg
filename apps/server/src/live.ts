@@ -66,7 +66,7 @@ export function addOverlaySubscriber(
   };
 }
 
-export function broadcastOverlayEvent(event: OverlayEvent) {
+function broadcastOverlayEvent(event: OverlayEvent) {
   currentRevision++;
   const eventWithRevision: OverlayEvent = { ...event, revision: currentRevision };
   for (const sub of subscribers.values()) {
@@ -78,7 +78,7 @@ export function broadcastOverlayEvent(event: OverlayEvent) {
   }
 }
 
-export function getOutputClientsCount(): number {
+function getOutputClientsCount(): number {
   let count = 0;
   for (const sub of subscribers.values()) {
     if (sub.role === "output") count++;

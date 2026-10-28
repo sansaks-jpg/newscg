@@ -1397,7 +1397,7 @@ export function SimpleProductionEditor({
         </div>
         <div className="all-output-actions" aria-label="Kontrol seluruh output">
           <span>Seluruh layer</span>
-          <button type="button" disabled={busy} onClick={() => executeClearAll(false)}>ALL OUT · Animasi <kbd>0</kbd></button>
+          <button type="button" disabled={busy} onClick={() => executeClearAll(false)}>ALL OUT · Animasi</button>
           <button type="button" className="emergency-clear" disabled={busy} onClick={() => executeClearAll(true)}><Trash2 size={14} /> CLEAR ALL · Darurat</button>
         </div>
 
@@ -1435,7 +1435,7 @@ export function SimpleProductionEditor({
 
           <div className="mini-editor-grid">
             <div className="mini-input-group span-2">
-              <label>
+              <label htmlFor="quick-edit-headline">
                 {selectedCue?.templateType === "SOT"
                   ? "Nama Narasumber"
                   : selectedCue?.templateType === "REPORTER"
@@ -1445,6 +1445,7 @@ export function SimpleProductionEditor({
                   : "Headline Utama"}
               </label>
               <input
+                id="quick-edit-headline"
                 type="text"
                 autoFocus
                 placeholder={
@@ -1468,8 +1469,9 @@ export function SimpleProductionEditor({
             </div>
 
             <div className="mini-input-group">
-              <label>Lokasi Siaran · L</label>
+              <label htmlFor="quick-edit-location">Lokasi Siaran · L</label>
               <input
+                id="quick-edit-location"
                 type="text"
                 placeholder={selectedCue ? "Contoh: Jakarta Pusat" : "-"}
                 maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE", "location")}
@@ -1480,8 +1482,9 @@ export function SimpleProductionEditor({
             </div>
 
             <div className="mini-input-group">
-              <label>Topik / Kicker (Atas)</label>
+              <label htmlFor="quick-edit-kicker">Topik / Kicker (Atas)</label>
               <input
+                id="quick-edit-kicker"
                 type="text"
                 placeholder={selectedCue ? "Contoh: BREAKING NEWS" : "-"}
                 maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE", "kicker")}
@@ -1492,7 +1495,7 @@ export function SimpleProductionEditor({
             </div>
 
             <div className="mini-input-group span-2">
-              <label>
+              <label htmlFor="quick-edit-subline">
                 {selectedCue?.templateType === "SOT"
                   ? "Jabatan / Institusi Narasumber"
                   : selectedCue?.templateType === "REPORTER"
@@ -1500,6 +1503,7 @@ export function SimpleProductionEditor({
                   : "Detail / Subline Keterangan"}
               </label>
               <input
+                id="quick-edit-subline"
                 type="text"
                 placeholder={
                   selectedCue?.templateType === "SOT"

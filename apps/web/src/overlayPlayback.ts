@@ -104,14 +104,16 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
             commit({ graphic: null, fields: null, exiting: false });
           }, getGraphicRetainMs(state.master));
           break;
-        default: {
+        case "CLEAR_ALL_IMMEDIATE":
+        case "CLEAR_ALL_ANIMATED":
+        case "CLEAR_ALL": {
           cancel();
           const finish = () => {
             timer = undefined;
             commit({ graphic: null, fields: null, exiting: false, exitAll: false, blackout: true,
               master: { ...state.master, showLogo: false, showTicker: false, showLiveBadge: false, showProgramLogo: false, showWeather: false } });
           };
-          if (event.type === "CLEAR_ALL_ANIMATED" || (event.type === "CLEAR_ALL" && event.immediate === false)) {
+          if (event.type === "CLEAR_ALL_ANIMATED" || (event.type === "CLEAR_ALL" && (event as any).immediate === false)) {
             commit({ exiting: true, exitAll: true, synced: false });
             timer = setTimeout(() => {
               commit({ graphic: null, fields: null, exiting: false,
@@ -133,7 +135,11 @@ export function createOverlayPlayback(publish: (state: OverlayPlaybackState) => 
               }, broadcastMotion.tickerOutMs + 20);
             }, state.graphic ? getGraphicRetainMs(state.master) : 0);
           } else finish();
+          break;
         }
+        default:
+          console.warn("Event overlay tidak dikenal diabaikan:", event);
+          break;
       }
     }
   };

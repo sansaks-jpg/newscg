@@ -11,7 +11,7 @@ import { BccGraphic } from "./BccGraphic";
 const motionStyle = Object.fromEntries(Object.entries(broadcastMotion).map(([name, milliseconds]) =>
   [`--cg-${name}`, `${milliseconds}ms`])) as CSSProperties;
 
-export type GhostFields = BroadcastGhostFields;
+type GhostFields = BroadcastGhostFields;
 
 export function BroadcastGraphic(props: BroadcastGraphicProps) {
   if (props.master?.broadcastTemplate === "liputan7") return <Liputan7Graphic {...props} />;

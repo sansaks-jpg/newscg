@@ -15,7 +15,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-const serverPort = process.env.PORT || process.env.VITE_BACKEND_PORT || "3002";
+const serverPort = process.env.PORT || process.env.VITE_BACKEND_PORT || "3001";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -23,9 +23,9 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     allowedHosts: ["freemusic.duckdns.org", "insightradio.duckdns.org", "localhost", "127.0.0.1", ".duckdns.org"],
-    hmr: {
-      clientPort: 443
-    },
+    hmr: process.env.VITE_HMR_CLIENT_PORT
+      ? { clientPort: Number(process.env.VITE_HMR_CLIENT_PORT) }
+      : undefined,
     proxy: {
       "/api": {
         target: `http://127.0.0.1:${serverPort}`,

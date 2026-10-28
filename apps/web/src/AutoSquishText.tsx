@@ -17,7 +17,7 @@ export function AutoSquishText({ text, className, minScale = 0.72, fillHeight, m
       span.style.fontSize = "inherit";
       const width = container.clientWidth;
       const natural = span.scrollWidth;
-      const floor = Math.max(0.72, Math.min(1, minScale));
+      const floor = Math.max(0.1, Math.min(1, minScale));
       if (natural > width / floor) {
         const baseSize = parseFloat(getComputedStyle(container).fontSize);
         span.style.fontSize = `${baseSize * width / (natural * floor)}px`;

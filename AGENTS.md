@@ -75,10 +75,11 @@ The overlay output (`/output`) connects to the backend via Server-Sent Events at
 1. **`SYNC`**: Sent when an overlay client connects or reconnects. Dispatches current live state, active graphic, field snapshots, and master state.
 2. **`TAKE`**: Instructs the overlay to render a new graphic with its entrance animation.
 3. **`UPDATE`**: Seamlessly updates text/data on the currently active on-air graphic without re-triggering entrance animations.
-4. **`CLEAR`**: Plays an exit transition animation for the lower third graphic while keeping the master overlay (logo/clock/ticker) active.
-5. **`MASTER_UPDATE`**: Updates logo, live badge, ticker, or timezone configurations without affecting lower thirds.
-6. **`CLEAR_ALL_IMMEDIATE`**: Instantly wipes all elements off-screen (emergency total blackout).
-7. **`CLEAR_ALL_ANIMATED`**: Clears all screen elements with smooth exit animations.
+4. **`SWITCH_DETAIL`**: Smoothly toggles detail/subline expansion or contraction on the active on-air graphic.
+5. **`CLEAR`**: Plays an exit transition animation for the lower third graphic while keeping the master overlay (logo/clock/ticker) active.
+6. **`MASTER_UPDATE`**: Updates logo, live badge, ticker, or timezone configurations without affecting lower thirds.
+7. **`CLEAR_ALL_IMMEDIATE`**: Instantly wipes all elements off-screen (emergency total blackout).
+8. **`CLEAR_ALL_ANIMATED`**: Clears all screen elements with smooth exit animations.
 
 ---
 
@@ -116,8 +117,8 @@ npm run build
 
 - Standard canvas resolution: `1920 x 1080` (Full HD).
 - Canvas background must remain completely transparent (`background: transparent`).
-- All lower third elements must stay within broadcast **Title Safe Area** boundaries (EBU R95 / SMPTE standards).
-- Dynamic headline and name text must utilize the `AutoSquishText` component to prevent text overflow when character counts are high.
+- All lower third elements are positioned for broadcast safe display (templates anchor to `bottom: 30px` - `40px` with left margin for branding bugs). While outer bounding boxes align to modern 16:9 broadcast graphics positioning, dynamic headline, subline, and speaker text must utilize the `AutoSquishText` component to prevent text overflow when character counts are high.
+- `AutoSquishText` supports variable compression clamping down to `minScale: 0.1` (or specified prop value) via horizontal CSS scaling (`transform: scaleX(s)`) to maintain layout stability without clipping.
 
 ---
 
@@ -129,7 +130,24 @@ npm run build
 - For direct HTTP interactions, begin at `GET /api/agent` and consult [docs/AI_AGENT_API.md](docs/AI_AGENT_API.md). Use published schemas and read back results after every mutation.
 - Graphic types and opening headlines are documented in [docs/CG_GUIDE.md](docs/CG_GUIDE.md) and available at `GET /api/agent/cg-guide.md`. The `headline-bulletin` preset is listed in discovery `graphicPresets`; it uses the `HEADLINE` template. Edit headlines via PATCH graphic, edition metadata via PATCH rundown, and story titles via PATCH item. Keep these three entities separate, read back each, and never apply to Program without live instructions.
 - The HIGHLIGHT label uses the topic tab above the headline via `kicker` and `showKicker`, along with the T toggle. Do not reintroduce side panels. `headlineLabel` is deprecated and kept only for backward compatibility; new materials must use topic fields. On Liputan7, the topic tab uses template visuals (burgundy–ivory with sand line, left-aligned above panel). Interactive HIGHLIGHT examples are available in `/templates/liputan7` and `/templates/cnn`.
-- Operator shortcuts: in Production, `→`/`←` trigger TAKE/UPDATE and OUT on regular cues; when Preview displays a HIGHLIGHT cue, `→`/`←` navigate between highlight headlines (without triggering live commands). Space/Enter always execute TAKE/UPDATE, `Esc`/`C` execute OUT, and `PageUp`/`PageDown` select SOT soundbites. All controls use the unified live command queue and Idempotency-Key.
+- Operator shortcuts: in Production:
+  - `Space` / `Enter`: execute primary live action (`TAKE` or `UPDATE`).
+  - `→` / `←`: trigger TAKE/UPDATE and OUT on regular cues; when Preview displays a HIGHLIGHT cue, `→`/`←` navigate between highlight headlines (without triggering live commands).
+  - `Esc` / `C`: execute `CLEAR` (OUT) for the active lower-third graphic.
+  - `U`: execute live in-place `UPDATE`.
+  - `P`: stage default News Anchor in Preview.
+  - `O`: stage default Field Reporter in Preview.
+  - `H`: stage Headline preset.
+  - `K`: stage SOT preset; `PageUp` / `PageDown`: select previous / next SOT soundbites.
+  - `L`: toggle Location bug in draft/preview.
+  - `T`: toggle Topic/kicker tab in draft/preview.
+  - `D`: toggle Detail / subline bar in draft/preview.
+  - `M`: commit staged Master overlay changes to Program.
+  - `1`: toggle Master Logo layer (or Program Logo on Liputan7).
+  - `2`: toggle Master Live badge / Jam.
+  - `3`: toggle Master Ticker (BCC / Liputan7).
+  - `0`: toggle **Master Out / Master In** (mutes or restores all active master layers on Program).
+  - Note: Blackout `ALL OUT` (animasi/seketika) is triggered via explicit UI button or live API command (`POST /api/live/clear-all`), distinct from key `0` which controls master layers.
 - Field reporter defaults are stored in `reporter_defaults` settings (`name`, default `role: "Reporter Lapangan"`, `location`) and triggered via hotkey `O` in Production. `O` only stages Preview; TAKE/UPDATE requires explicit live commands. The `GET/PATCH /api/settings/reporter-defaults` and `POST /api/live/reporter` endpoints follow shared schemas, queues, and idempotency keys. Do not create rundown cues just because the operator uses `O`; see [docs/REPORTER_LAPANGAN_DEFAULT.md](docs/REPORTER_LAPANGAN_DEFAULT.md).
 - When receiving a rundown in PDF, Excel/XLSX/CSV, documents, images, chat, or other formats, agents must inquire whether the user would like a news ticker created, unless the user gave explicit instructions. Clear sections of the rundown may be imported while awaiting a reply.
 - Ticker on **CNN** and **Liputan7** templates is **per-rundown** material, tied to the rundown's identity and broadcast schedule; ticker news does not need to duplicate rundown stories. Do not reuse tickers from other rundowns or fill the master ticker instead of per-rundown storage. Meanwhile, on the **BCC News** template, the ticker is **GLOBAL** on the master overlay (`tickerText` & `tickerSpeed`), applying to all broadcasts without being bound to a rundown.
@@ -231,3 +249,23 @@ curl -X POST https://freemusic.duckdns.org/api/rundowns \
      -d '\''{"broadcastTemplate": "bcc", "tickerText": "BREAKING NEWS BCC • LIVE BROADCAST FROM MAIN STUDIO", "tickerSpeed": 85}'\''
    ```
    This ticker text activates immediately on the BCC broadcast overlay without modifying active on-air lower thirds.
+
+---
+
+## 9. WebMCP (Web Model Context Protocol) In-Browser Agent Protocol
+
+In addition to backend REST endpoints and SSE streams, NewsCG provides native **WebMCP** integration in the operator frontend (`apps/web/src/webMcp.ts`), mounted into the React lifecycle via `App.tsx`.
+
+- **Standard Alignment**: Implements the emerging W3C / Chrome Web Model Context Protocol (`document.modelContext` / `navigator.modelContext`) and registers an accessible polyfill provider at `window.modelContext`.
+- **Readiness Announcement**: Dispatches a `webmcp:ready` custom event on `window` upon mounting.
+- **Available Tools**:
+  1. `take_graphic`: Air standby graphic to Program ON AIR (`POST /api/live/take`).
+  2. `update_live_graphic`: Update on-air text seamlessly without restarting entrance animation (`PATCH /api/graphics/{id}` + `POST /api/live/update`).
+  3. `clear_graphic`: Exit lower-third graphic from broadcast with smooth animation (`POST /api/live/clear`).
+  4. `clear_all_blackout`: Emergency full screen wipe / blackout (`POST /api/live/clear-all`).
+  5. `update_master_overlay`: Update master branding, logo, clock, ticker, and broadcast template.
+  6. `take_news_anchor`: Air default news anchor lower-third (`POST /api/live/news-anchor`).
+  7. `take_field_reporter`: Air default field reporter lower-third (`POST /api/live/reporter`).
+  8. `create_rundown`: Create a complete news rundown with stories and CG cues (`POST /api/rundowns`).
+  9. `get_broadcast_status`: Read live on-air state, master overlay, and rundown summaries.
+

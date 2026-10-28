@@ -224,7 +224,7 @@ function writeSettingsObject(key: string, patch: Record<string, unknown>) {
   }
   db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify({ ...stored, ...patch }));
 }
-export function getSettingsInternal() {
+function getSettingsInternal() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'outputMode'").get() as { value: string } | undefined;
   if (!row) return { ...defaultAppSettings };
   try {

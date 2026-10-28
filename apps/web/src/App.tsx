@@ -117,7 +117,12 @@ export default function App() {
 
   const active = rundowns.find((r) => r.id === activeId) || rundowns[0];
 
-
+  const masterRef = useRef(master);
+  masterRef.current = master;
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const rundownsRef = useRef(rundowns);
+  rundownsRef.current = rundowns;
 
   const reload = useCallback(async () => {
     const requestSequence = ++reloadSequence.current;
@@ -178,6 +183,20 @@ export default function App() {
       throw e;
     }
   }
+
+  const updateMasterCallback = useCallback(async (patch: Partial<MasterOverlayState>) => {
+    return updateMaster(patch);
+  }, [master.broadcastTemplate]);
+
+  useEffect(() => {
+    initWebMcp({
+      getMaster: () => masterRef.current,
+      getLiveState: () => liveRef.current,
+      getRundowns: () => rundownsRef.current,
+      onUpdateMaster: updateMasterCallback,
+      onReload: reload
+    });
+  }, [updateMasterCallback, reload]);
 
   async function copyOutputUrl() {
     const url = `${window.location.origin}/output`;

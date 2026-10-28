@@ -55,19 +55,19 @@ app.get("/api/weather", async (req, res) => {
 });
 app.get("/api/agent/openapi.json", (_req, res) => res.json(agentOpenApi));
 app.get("/api/agent/guide.md", (_req, res) => {
-  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/AI_AGENT_API.md", import.meta.url)));
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/AI_AGENT_API.md", import.meta.url)), { dotfiles: "allow" });
 });
 app.get("/api/agent/rundown-guide.md", (_req, res) => {
-  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/AI_RUNDOWN_GUIDE.md", import.meta.url)));
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/AI_RUNDOWN_GUIDE.md", import.meta.url)), { dotfiles: "allow" });
 });
 app.get("/api/agent/cg-guide.md", (_req, res) => {
-  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/CG_GUIDE.md", import.meta.url)));
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../docs/CG_GUIDE.md", import.meta.url)), { dotfiles: "allow" });
 });
 app.get("/api/agent/AGENTS.md", (_req, res) => {
-  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../AGENTS.md", import.meta.url)));
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../AGENTS.md", import.meta.url)), { dotfiles: "allow" });
 });
 const sendAgentsMd = (_req: any, res: any) => {
-  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../AGENTS.md", import.meta.url)));
+  res.type("text/markdown; charset=utf-8").sendFile(fileURLToPath(new URL("../../../AGENTS.md", import.meta.url)), { dotfiles: "allow" });
 };
 app.get('/api/agent/agents.md', sendAgentsMd);
 app.get('/api/AGENTS.md', sendAgentsMd);
@@ -293,7 +293,7 @@ app.get("/api/actions",(req,res)=>{
   return res.json(getActions(parsed.data));
 });
 app.use("/api", (_req, res) => res.status(404).json({ error: "Endpoint API tidak ditemukan" }));
-const webDist=fileURLToPath(new URL("../../web/dist",import.meta.url)); if(existsSync(webDist)){app.use(express.static(webDist));app.get("/{*path}",(_req,res)=>res.sendFile(resolve(webDist,"index.html")));}
+const webDist=fileURLToPath(new URL("../../web/dist",import.meta.url)); if(existsSync(webDist)){app.use(express.static(webDist));app.get("/{*path}",(_req,res)=>res.sendFile(resolve(webDist,"index.html"), { dotfiles: "allow" }));}
 app.use((err:any,req:any,res:any,next:any)=>{
   if (res.headersSent) return next(err);
   if (err?.code === "IDEMPOTENCY_KEY_CONFLICT" && err?.status === 409) return res.status(409).json({error:err.message});

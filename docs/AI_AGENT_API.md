@@ -30,7 +30,7 @@ Invoke-RestMethod "$newsCgApiBase$($newsCgDiscovery.links.openapi)"
 Invoke-RestMethod "$newsCgApiBase$($newsCgDiscovery.links.guide)"
 ```
 
-Discovery links are relative to the same server. `#/components/schemas/...` references in templates should be read from the OpenAPI document. If an agent runtime supports OpenAPI imports, use the specification URL; if it only supports raw HTTP tools, select operations from the catalog and send standard HTTP requests. There are no MCP endpoints in this version.
+Discovery links are relative to the same server. `#/components/schemas/...` references in templates should be read from the OpenAPI document. If an agent runtime supports OpenAPI imports, use the specification URL; if it only supports raw HTTP tools, select operations from the catalog and send standard HTTP requests. For server-to-server AI agents, standard REST endpoints and SSE streams are used. For in-browser AI agents, NewsCG provides native **WebMCP** support (`window.modelContext` / `navigator.modelContext`, see Section 8).
 
 ## 2. Request and Readback Conventions
 
@@ -127,3 +127,20 @@ Successful DELETE returns HTTP 204 No Content without a JSON body.
 ## 7. Instructions for Downstream AI Agents
 
 > Connect to the NewsCG base URL provided by the operator. Read GET /api/agent, OpenAPI, and Markdown guides first. Choose operations matching user instructions, read fresh data, apply minimal required changes, and perform readbacks. Preserve source facts and ordering. When receiving a rundown in any format, ask whether a ticker is needed unless already decided. If requested, research news on D-2/D-1 based on the broadcast schedule and cite sources. For CNN/Liputan7 templates, tickers are stored per rundown with auto speed mode; for BCC News, tickers run globally on master. Apply live operations only when explicitly instructed by the user. Use role=monitor for SSE connections and unique Idempotency-Key headers for live commands.
+
+## 8. WebMCP Protocol for In-Browser AI Agents
+
+For browser-embedded AI agents (such as Gemini in Chrome, Chrome Built-in AI, Project Astra, or browser extension agents), NewsCG provides **WebMCP** (Web Model Context Protocol) support directly inside the web client (`apps/web/src/webMcp.ts`):
+
+- **API Access**: Access tools via `window.modelContext.executeTool(name, params)` or native `navigator.modelContext` / `document.modelContext`.
+- **Event Hook**: Listens for window event `webmcp:ready` to discover registered tools.
+- **Available WebMCP Tools**:
+  - `take_graphic`: Takes standby or specified graphic on-air with entrance animation.
+  - `update_live_graphic`: Updates active on-air text without re-triggering entrance animation.
+  - `clear_graphic`: Triggers exit animation for on-air lower third.
+  - `clear_all_blackout`: Emergency full screen wipe (blackout).
+  - `update_master_overlay`: Updates master overlay (logo, live badge, ticker, template).
+  - `take_news_anchor`: Takes default news anchor graphic on-air.
+  - `take_field_reporter`: Takes default field reporter graphic on-air.
+  - `create_rundown`: Creates a complete news rundown with stories and graphics.
+  - `get_broadcast_status`: Queries live on-air status, master state, and rundowns summary.
