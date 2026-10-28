@@ -28,6 +28,7 @@ import { broadcastTemplates, emptyRundownTicker, getBroadcastColorTheme, getGrap
 import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemplatePicker";
 import { Liputan7Settings } from "./Liputan7Settings";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
+import { BorderBeam, PulsingLed, ShimmerButton } from "./MagicUi";
 import "./simple-production.css";
 
 type Props = {
@@ -1056,7 +1057,7 @@ export function SimpleProductionEditor({
         <header className="production-header-bar">
           <div className="header-status-group">
             <div className={`status-pill ${live.onAirGraphicId ? "is-live" : "is-standby"}`}>
-              <span className={`dot-led ${live.onAirGraphicId ? "red pulse" : "green"}`} />
+              <PulsingLed color={live.onAirGraphicId ? "#ef4444" : "#10b981"} active={Boolean(live.onAirGraphicId)} />
               <b>{live.onAirGraphicId ? "LOWER THIRD: AKTIF" : "LOWER THIRD: KOSONG"}</b>
             </div>
 
@@ -1235,20 +1236,17 @@ export function SimpleProductionEditor({
               </label>
               <button type="button" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER · M</button>
               <button type="button" disabled={busy || !stagedMaster.showTicker} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
-              <small>TERAPKAN MASTER menerapkan ticker global BCC. Ticker segera mereset guliran dan langsung menampilkan teks baru.</small>
             </>
           ) : (
             <>
               <label>Ticker rundown · {rundown?.title || "Belum dipilih"}
                 <textarea rows={3} value={rundown?.ticker?.text ?? ""} readOnly />
               </label>
-              <small>{rundown?.broadcastSchedule ? `Tayang ${rundown.broadcastSchedule.date} ${rundown.broadcastSchedule.time} ${rundown.broadcastSchedule.timezone}` : "Jadwal belum diisi"} · Edit jadwal dan materi ticker di Rundown & CG.</small>
               <label>Kecepatan
                 <input readOnly value={`${rundownTickerSpeed} px/detik · ${rundown?.ticker?.speedMode === "manual" ? "Manual" : "Otomatis seimbang"}`} />
               </label>
               <button type="button" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER · M</button>
               <button type="button" disabled={busy || !stagedMaster.showTicker || !rundown} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
-              <small>TERAPKAN MASTER memakai ticker rundown yang dipilih. Ticker segera menerapkannya dan mereset guliran. Memilih atau menyunting rundown tidak mengubah Program.</small>
             </>
           )}
         </details>
@@ -1273,30 +1271,21 @@ export function SimpleProductionEditor({
                 : { ...stagedMaster, tickerText: rundown?.ticker?.text ?? "", tickerSpeed: rundownTickerSpeed, tickerRundownId: rundown?.id ?? null }}
               emptyText="LAYAR BERSIH — TEKAN ↑ / ↓ UNTUK MEMILIH BERITA"
             />
+            {previewCue && <BorderBeam colorFrom="#38bdf8" colorTo="#818cf8" duration={6} size={90} theme="cyan" />}
           </div>
 
           {/* 2. MONITOR KECIL: LIVE PROGRAM · NEWS CG */}
           <aside className="live-mini-panel" aria-label="Monitor status output NewsCG">
             <div className="live-mini-header">
               <div className="live-mini-badge">
-                <span className={`dot-led ${live.onAirGraphicId ? "red pulse" : "green"}`} />
+                <PulsingLed color={live.onAirGraphicId ? "#ef4444" : "#10b981"} active={Boolean(live.onAirGraphicId)} />
                 <span>PROGRAM · NEWS CG</span>
               </div>
-              {live.onAirGraphicId && (
-                <button
-                  type="button"
-                  className="live-mini-clear-btn"
-                  onClick={executeClear}
-                  title="OUT lower third; master tetap tampil (Esc / C)"
-                >
-                  <X size={11} />
-                  <span>OUT</span>
-                </button>
-              )}
             </div>
 
             <div className={`live-mini-screen-wrapper ${live.onAirGraphicId ? "is-on-air" : ""}`}>
               <ProgramMonitor />
+              {live.onAirGraphicId && <BorderBeam colorFrom="#ef4444" colorTo="#f43f5e" duration={4} size={110} theme="ruby" />}
             </div>
 
             <div className="live-mini-footer">
@@ -1304,25 +1293,31 @@ export function SimpleProductionEditor({
                 {onAirTitle || (hasVisibleMasterLayers(master) ? "MASTER AKTIF" : "OUTPUT KOSONG")}
               </span>
               <span className={`live-mini-status ${live.onAirGraphicId ? "" : "off"}`}>
-                STATUS APLIKASI
+                {live.onAirGraphicId ? "ON AIR" : "STANDBY"}
               </span>
             </div>
           </aside>
         </div>
 
         <div className="primary-actions-deck" aria-label="Perintah siaran">
-          <button type="button" className={`action-btn ${canUpdate ? "btn-update" : "btn-take"}`} disabled={busy || !previewCue} onClick={executePrimary}>
+          <ShimmerButton
+            type="button"
+            variant={canUpdate ? "update" : "take"}
+            className="action-btn"
+            disabled={busy || !previewCue}
+            onClick={executePrimary}
+          >
             <span className="btn-inner">{canUpdate ? <RefreshCw size={16} /> : <Play size={16} />}<span className="btn-title">{canUpdate ? "UPDATE" : "TAKE"}</span></span><kbd>SPACE / ENTER</kbd>
-          </button>
-          <button type="button" className="action-btn btn-clear" disabled={busy || !live.onAirGraphicId} onClick={executeClear}>
+          </ShimmerButton>
+          <button type="button" className={`action-btn btn-clear ${live.onAirGraphicId ? "armed" : ""}`} disabled={busy || !live.onAirGraphicId} onClick={executeClear}>
             <span className="btn-inner"><X size={16} /><span className="btn-title">OUT</span></span><kbd>ESC / C</kbd>
           </button>
         </div>
         <div className="live-change-summary" role="status">
-          {busy ? "Memproses…" : reporterPreview ? `Reporter Lapangan: ${reporterPreview.draftFields.name}. Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"}; O untuk kembali ke cue.` : anchorPreview ? `News Anchor: ${anchorPreview.draftFields.name}. Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"}; P untuk kembali ke cue.` : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item ini memerlukan CG, tetapi belum punya cue. Tambahkan di Rundown & CG." : "Item ini tanpa CG lower third. Pilih item lain untuk menyiapkan cue.") : "Pilih cue dari rundown atau tekan P/O untuk default."}
-          {isMasterChanged && " Perubahan master belum diterapkan (M)."}
-          {isSelectedOnAir && <small>{pendingChanges.length ? `Belum diterapkan: ${pendingChanges.join(", ")}.` : "Isi Preview sama dengan snapshot Program."}</small>}
-          <small>{live.overlayClientsCount} klien output terhubung · Program ini adalah monitor internal NewsCG, bukan pembacaan switcher.</small>
+          <span>{busy ? "Memproses…" : reporterPreview ? `Reporter Lapangan: ${reporterPreview.draftFields.name} · Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"} (O: kembali)` : anchorPreview ? `News Anchor: ${anchorPreview.draftFields.name} · Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"} (P: kembali)` : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue siap di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item memerlukan CG tetapi belum ada cue." : "Item tanpa lower third.") : "Pilih cue atau tekan P/O untuk default."}</span>
+          {isMasterChanged && <span className="summary-alert">Perubahan master belum diterapkan (M).</span>}
+          {isSelectedOnAir && pendingChanges.length > 0 && <span className="summary-pending">Belum diterapkan: {pendingChanges.join(", ")}.</span>}
+          <span className="summary-client-pill">{live.overlayClientsCount} output terhubung</span>
         </div>
 
         {/* Quick Actions (H, K, L, T, D) - Menyiapkan cue Preview sebelum TAKE / UPDATE */}
@@ -1396,9 +1391,9 @@ export function SimpleProductionEditor({
           </div>
         </div>
         <div className="all-output-actions" aria-label="Kontrol seluruh output">
-          <span>Seluruh layer</span>
-          <button type="button" disabled={busy} onClick={() => executeClearAll(false)}>ALL OUT · Animasi</button>
-          <button type="button" className="emergency-clear" disabled={busy} onClick={() => executeClearAll(true)}><Trash2 size={14} /> CLEAR ALL · Darurat</button>
+          <span className="all-out-label">Seluruh layer:</span>
+          <button type="button" className="btn-all-out" disabled={busy} onClick={() => executeClearAll(false)}>ALL OUT (Animasi)</button>
+          <button type="button" className="emergency-clear" disabled={busy} onClick={() => executeClearAll(true)}><Trash2 size={13} /> BLACKOUT (Seketika)</button>
         </div>
 
 

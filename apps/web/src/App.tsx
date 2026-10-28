@@ -42,6 +42,7 @@ import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemp
 import { Liputan7Settings } from "./Liputan7Settings";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { initWebMcp } from "./webMcp";
+import { PulsingLed } from "./MagicUi";
 
 type View = "editor" | "rundown" | "settings";
 
@@ -258,7 +259,7 @@ export default function App() {
             >
               <Icon size={14} />
               <span>{label}</span>
-              {id === "editor" && live.onAirGraphicId ? <span className="tab-pulse-dot" /> : null}
+              {id === "editor" && live.onAirGraphicId ? <PulsingLed color="#ef4444" active={true} /> : null}
             </button>
           ))}
         </nav>
@@ -283,7 +284,10 @@ export default function App() {
             </button>
           </div>
           <span className={`status-chip ${status.kind}`}>
-            <Signal size={12} />
+            <PulsingLed
+              color={status.kind === "live" ? "#ef4444" : status.kind === "ready" ? "#10b981" : "#f59e0b"}
+              active={status.kind === "live"}
+            />
             {status.label}
           </span>
           <span className="clock-compact">

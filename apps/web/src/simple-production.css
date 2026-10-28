@@ -681,7 +681,7 @@
 /* Primary Broadcast Actions Deck */
 .primary-actions-deck {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 10px;
   width: 100%;
   max-width: 1140px;

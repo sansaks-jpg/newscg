@@ -1,0 +1,363 @@
+/* ==========================================================================
+   MAGIC UI DESIGN SYSTEM FOR NEWSCG
+   Components inspired by magicui.design (Shimmer Button, Border Beam, Glass)
+   ========================================================================== */
+
+/* 1. Shimmer Button */
+@keyframes magic-shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+  }
+}
+
+@keyframes magic-spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+  }
+  15%, 35% {
+    transform: translateZ(0) rotate(90deg);
+  }
+  65%, 85% {
+    transform: translateZ(0) rotate(270deg);
+  }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+  }
+}
+
+.magic-shimmer-btn {
+  --shimmer-color: #ffffff;
+  --radius: 6px;
+  --speed: 3s;
+  --cut: 1px;
+  --bg: #111726;
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 14px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+}
+
+.magic-shimmer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.magic-shimmer-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.magic-shimmer-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.magic-shimmer-btn .shimmer-spark-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  pointer-events: none;
+}
+
+.magic-shimmer-btn .shimmer-spark {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  aspect-ratio: 1;
+  animation: magic-shimmer-slide var(--speed) ease-in-out infinite alternate;
+}
+
+.magic-shimmer-btn .shimmer-spark-rotator {
+  position: absolute;
+  inset: -100%;
+  width: auto;
+  transform: rotate(0);
+  animation: magic-spin-around calc(var(--speed) * 2) infinite linear;
+  background: conic-gradient(from 225deg, transparent 0, var(--shimmer-color) 90deg, transparent 90deg);
+}
+
+.magic-shimmer-btn .shimmer-backdrop {
+  position: absolute;
+  inset: var(--cut);
+  z-index: -1;
+  background: var(--bg);
+  border-radius: calc(var(--radius) - var(--cut));
+}
+
+.magic-shimmer-btn.variant-primary {
+  --bg: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  --shimmer-color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+.magic-shimmer-btn.variant-take {
+  --bg: linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #ef4444 100%);
+  --shimmer-color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 18px rgba(220, 38, 38, 0.35);
+}
+
+.magic-shimmer-btn.variant-update {
+  --bg: linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%);
+  --shimmer-color: #a7f3d0;
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 18px rgba(5, 150, 105, 0.35);
+}
+
+.magic-shimmer-btn.variant-ai {
+  --bg: linear-gradient(135deg, #581c87 0%, #7e22ce 50%, #a21caf 100%);
+  --shimmer-color: #f0abfc;
+  border-color: rgba(192, 132, 252, 0.5);
+  box-shadow: 0 4px 18px rgba(126, 34, 206, 0.35);
+}
+
+/* 2. Border Beam (Animated Light Beam Tracing Card Perimeter) */
+@keyframes border-beam-anim {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+.border-beam-container {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid transparent;
+  border-radius: inherit;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: destination-out;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.border-beam-spark {
+  position: absolute;
+  aspect-ratio: 1;
+  inset: 0;
+  margin: auto;
+  width: 90px;
+  background: linear-gradient(to left, var(--beam-from, #ef4444), var(--beam-to, #f97316), transparent);
+  offset-path: rect(0 auto auto 0 round 6px);
+  animation: border-beam-anim var(--beam-duration, 5s) linear infinite;
+  filter: drop-shadow(0 0 8px var(--beam-from, #ef4444));
+}
+
+.border-beam-spark.beam-ruby {
+  --beam-from: #ef4444;
+  --beam-to: #f43f5e;
+}
+
+.border-beam-spark.beam-cyan {
+  --beam-from: #38bdf8;
+  --beam-to: #818cf8;
+}
+
+/* 3. Magic Pulsing LED Indicator */
+.magic-pulse-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 8px;
+}
+
+.magic-pulse-indicator .ping-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: var(--pulse-color, #ef4444);
+  opacity: 0.75;
+  animation: magic-ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.magic-pulse-indicator .solid-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--pulse-color, #ef4444);
+  box-shadow: 0 0 8px var(--pulse-color, #ef4444);
+}
+
+@keyframes magic-ping {
+  75%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* 4. Magic UI Bento Card */
+.magic-card {
+  background: rgba(13, 18, 28, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.magic-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* 5. Production Action Buttons & Enhancements */
+.magic-shimmer-btn.action-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 62px;
+  padding: 10px 14px;
+  border-radius: 6px;
+}
+
+.magic-shimmer-btn.action-btn > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.action-btn.btn-clear {
+  position: relative;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.action-btn.btn-clear:hover:not(:disabled) {
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.action-btn.btn-clear.armed {
+  border-color: #f87171;
+  color: #fecaca;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+}
+
+.action-btn.btn-clear.armed:hover:not(:disabled) {
+  background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%);
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+}
+
+/* 6. Streamlined Output & Summary Bars */
+.all-output-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.all-output-actions .all-out-label {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.all-output-actions .btn-all-out {
+  padding: 6px 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.all-output-actions .btn-all-out:hover:not(:disabled) {
+  background: #334155;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.all-output-actions .emergency-clear {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(69, 10, 10, 0.7);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.all-output-actions .emergency-clear:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+.live-change-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(13, 18, 28, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.live-change-summary .summary-client-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.live-change-summary .summary-alert {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.live-change-summary .summary-pending {
+  color: #fbbf24;
+}
+

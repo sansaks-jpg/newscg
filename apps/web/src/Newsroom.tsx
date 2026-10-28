@@ -27,6 +27,7 @@ import { api, mutate } from "./api";
 import { BroadcastTemplateInfo } from "./VisualTemplatePicker";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { RundownBroadcastEditor } from "./RundownBroadcastEditor";
+import { ShimmerButton } from "./MagicUi";
 
 const duration = (seconds: number) =>
   `${seconds < 0 ? "+" : ""}${Math.floor(Math.abs(seconds) / 60)
@@ -317,7 +318,6 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
       {/* Top Header & Rundown Selector */}
       <header className="prep-header-bar">
         <div className="prep-brand-info">
-          <div className="prep-tag">01 / PRA PRODUKSI</div>
           <div className="prep-title-group">
             <h1>{rundown?.programName || "Manajemen Rundown"}</h1>
             <span className="prep-edition-badge">{rundown?.title || "Edisi Siaran"}</span>
@@ -335,22 +335,6 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
         </div>
 
         <div className="prep-actions-group">
-          <select
-            className="prep-select-rundown"
-            aria-label="Pilih Rundown"
-            value={rundown?.id || ""}
-            onChange={(e) => {
-              onRundown(e.target.value);
-              setEditing(null);
-            }}
-          >
-            {rundowns.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.programName} · {r.title}
-              </option>
-            ))}
-          </select>
-
           <button
             className="btn-prep-secondary"
             disabled={pending}
@@ -434,57 +418,26 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
             </button>
           )}
 
-          <button
-            type="button"
-            className="btn-prep-ai"
+          <ShimmerButton
+            variant="ai"
             onClick={() => setShowAiModal(true)}
             title="Salin prompt & panduan untuk AI Agent membuat rundown dari Excel/PDF/Word/Foto"
           >
             <Sparkles size={13} />
-            <span>Salin Prompt AI</span>
-          </button>
+            <span>Prompt AI Agent</span>
+          </ShimmerButton>
 
-          <button
-            className="btn-prep-primary"
+          <ShimmerButton
+            variant="primary"
             disabled={!rundown}
             onClick={(event) => { editingTrigger.current = event.currentTarget; setEditing("new"); }}
           >
             <Plus size={14} />
             <span>Tambah Berita</span>
-          </button>
-
-          <button className="btn-prep-settings" onClick={onSetup} title="Pengaturan Ticker & Logo">
-            <SlidersHorizontal size={13} />
-            <span>Pengaturan</span>
-          </button>
+          </ShimmerButton>
         </div>
       </header>
       {rundown && <RundownBroadcastEditor key={rundown.id} rundown={rundown} reload={reload} toast={toast} />}
-
-      {/* Banner Panduan Cepat AI Agent */}
-      <div className="prep-ai-helper-banner">
-        <div className="ai-banner-content">
-          <div className="ai-banner-icon">
-            <Sparkles size={17} />
-          </div>
-          <div className="ai-banner-text">
-            <b>Bikin Rundown Otomatis via AI Agent (Excel, PDF, Word, Foto, Chat)</b>
-            <span>
-              Punya naskah rundown dalam format dokumen atau gambar? Salin instruksi prompt, berikan ke AI Agent (ChatGPT, Claude, Gemini, Antigravity, Cursor) beserta lampiran file. AI akan otomatis mem-posting seluruh berita & grafis ke NewsCG via API. Kamu tetap bisa mengedit semuanya langsung di web ini.
-            </span>
-          </div>
-        </div>
-        <div className="ai-banner-actions">
-          <button type="button" className="btn-ai-copy-quick" onClick={copyAiPromptQuick}>
-            {copiedQuick ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-            <span>{copiedQuick ? "Prompt Disalin!" : "Salin Prompt Cepat"}</span>
-          </button>
-          <button type="button" className="btn-ai-open-guide" onClick={() => setShowAiModal(true)}>
-            <BookOpen size={13} />
-            <span>Panduan Lengkap</span>
-          </button>
-        </div>
-      </div>
 
       {/* Metrics Summary Strip */}
       {rundown && (
@@ -1461,10 +1414,7 @@ function StoryEditor({
               <div className="preview-header-left">
                 <span className="dot-led green pulse" />
                 <div>
-                    <h3 className="section-title">PRATINJAU CG</h3>
-                  <span className="preview-subtitle">
-                    Perubahan form terlihat di sini sebelum disimpan; output siaran tidak berubah.
-                  </span>
+                  <h3 className="section-title">PRATINJAU CG</h3>
                 </div>
               </div>
 
@@ -1499,17 +1449,13 @@ function StoryEditor({
                 emptyText="Ketik headline pada form di atas untuk melihat visual siaran..."
               />
             </div>
-            <div className="story-preview-caption">
-              <span>Simpan materi CG, lalu gunakan TAKE di Kontrol Siaran untuk menayangkan.</span>
-            </div>
           </div>
         </div>
 
         {error && <div className="modal-error-banner">{error}</div>}
 
         <div className="modal-footer">
-          <span className="modal-tip">Perubahan belum tersimpan sampai tombol Simpan ditekan.</span>
-          <div className="footer-actions">
+          <div className="footer-actions ml-auto">
             <button type="button" className="btn-modal-cancel" disabled={saving} onClick={requestClose}>
               Batal
             </button>
@@ -1577,8 +1523,8 @@ function AiAgentRundownModal({
               <Sparkles size={15} />
             </span>
             <div>
-              <h2 id="ai-modal-heading">Panduan & Prompt AI Agent</h2>
-              <small>Otomasi Rundown dari Excel, PDF, Word, Foto & Teks</small>
+              <h2 id="ai-modal-heading">Prompt AI Agent</h2>
+              <small>Buat Rundown dari Excel, PDF, Word, atau Foto</small>
             </div>
           </div>
           <button
@@ -1592,49 +1538,6 @@ function AiAgentRundownModal({
         </div>
 
         <div className="ai-modal-body">
-          {/* Step Guidance */}
-          <div className="ai-steps-container">
-            <div className="ai-steps-title">
-              <BookOpen size={13} className="text-purple-400" />
-              <span>CARA MENGGUNAKAN (5 LANGKAH MUDAH):</span>
-            </div>
-            <div className="ai-steps-grid">
-              <div className="ai-step-card">
-                <span className="step-num">1</span>
-                <b>Salin Prompt</b>
-                <p>Klik tombol <b>"Salin Prompt untuk AI"</b> di bawah.</p>
-              </div>
-              <div className="ai-step-card">
-                <span className="step-num">2</span>
-                <b>Buka AI Chat</b>
-                <p>Buka ChatGPT, Claude, Gemini, Antigravity, Cursor, dsb.</p>
-              </div>
-              <div className="ai-step-card">
-                <span className="step-num">3</span>
-                <b>Lampirkan File</b>
-                <p>Paste prompt & lampirkan berkas rundown (Excel, PDF, Word, atau foto).</p>
-              </div>
-              <div className="ai-step-card">
-                <span className="step-num">4</span>
-                <b>AI Eksekusi API</b>
-                <p>AI membedah rundown & mengeksekusi <code>POST /api/rundowns</code> via curl.</p>
-              </div>
-              <div className="ai-step-card">
-                <span className="step-num">5</span>
-                <b>Bebas Edit di Web</b>
-                <p>Data otomatis muncul di dashboard! Kamu bebas mengedit teks kapan saja.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Reassurance Note */}
-          <div className="ai-edit-note">
-            <Check size={18} className="text-emerald-400 shrink-0" />
-            <div>
-              <strong>Semua Hasil AI Dapat Diedit Sepenuhnya di Web:</strong> Setelah AI mem-posting rundown, kamu dapat langsung mengubah judul, mengedit teks lower third, menambah narasumber, atau mengatur urutan berita secara visual di halaman ini tanpa batasan.
-            </div>
-          </div>
-
           {/* Server URL Config Bar */}
           <div className="ai-server-config">
             <label htmlFor="ai-server-base-url">
@@ -1656,12 +1559,12 @@ function AiAgentRundownModal({
             <div className="ai-prompt-header">
               <span>
                 <Bot size={13} className="text-pink-400" />
-                <span>PROMPT SIAP SALIN UNTUK AI AGENT:</span>
+                <span>Salin & lampirkan berkas rundown ke AI:</span>
               </span>
-              <button type="button" className="btn-ai-copy-main" onClick={handleCopy}>
+              <ShimmerButton variant="ai" onClick={handleCopy}>
                 {copied ? <Check size={13} /> : <Copy size={13} />}
                 <span>{copied ? "Prompt Disalin!" : "Salin Prompt untuk AI"}</span>
-              </button>
+              </ShimmerButton>
             </div>
             <div className="ai-prompt-box">
               <pre>{promptText}</pre>
@@ -1670,14 +1573,12 @@ function AiAgentRundownModal({
         </div>
 
         <div className="ai-modal-footer">
-          <span>Format didukung: Excel (.xlsx, .csv), Dokumen PDF, Word (.docx), Foto Naskah, atau Teks Chat</span>
+          <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
+            <Check size={14} /> Seluruh hasil AI otomatis tampil dan dapat diedit di web
+          </span>
           <div className="ai-modal-footer-actions">
             <button type="button" className="btn-modal-cancel" onClick={onClose}>
               Tutup
-            </button>
-            <button type="button" className="btn-ai-copy-main" onClick={handleCopy}>
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copied ? "Prompt Disalin!" : "Salin Prompt AI"}</span>
             </button>
           </div>
         </div>
