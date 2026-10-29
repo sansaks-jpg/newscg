@@ -23,7 +23,7 @@ export function useWeatherForecast(enabled: boolean, locations: WeatherLocation[
       if (disposed) return;
       const forecasts = settled.flatMap(item => item.status === "fulfilled" ? [item.value] : []);
       const error = settled.flatMap(item => item.status === "rejected" ? [item.reason instanceof Error ? item.reason.message : "Cuaca gagal dimuat"] : []).join("; ");
-      if (error) console.error("Cuaca otomatis:", error);
+      if (error) console.warn("Cuaca otomatis (BMKG):", error);
       setResult({ key: locationKey, forecasts, error });
       const expiresIn = forecasts.length ? Math.min(...forecasts.map(forecast => Date.parse(forecast.expiresAt) - Date.now())) : liputan7Motion.weatherRefreshMs;
       timer = setTimeout(refresh, error ? 60000 : Math.max(1000, Math.min(liputan7Motion.weatherRefreshMs, expiresIn)));

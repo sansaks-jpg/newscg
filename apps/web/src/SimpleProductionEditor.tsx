@@ -605,55 +605,51 @@ export function SimpleProductionEditor({
   // Aksi Master 1: Toggle Logo di Preview (Safety: Tekan M untuk kirim ke ON AIR)
   const toggleMasterLogo = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    setStagedMaster((prev) => {
-      const nextVal = !prev.showLogo;
-      toast(
-        nextVal
-          ? "Preview: Logo AKTIF (Tekan M untuk terapkan master)"
-          : "Preview: Logo NONAKTIF (Tekan M untuk terapkan master)"
-      );
-      return { ...prev, showLogo: nextVal };
-    });
-  }, [toast]);
+    const nextVal = !stagedMaster.showLogo;
+    setStagedMaster((prev) => ({ ...prev, showLogo: nextVal }));
+    toast(
+      nextVal
+        ? "Preview: Logo AKTIF (Tekan M untuk terapkan master)"
+        : "Preview: Logo NONAKTIF (Tekan M untuk terapkan master)"
+    );
+  }, [stagedMaster.showLogo, toast]);
 
   const toggleMasterProgram = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    setStagedMaster(previous => ({ ...previous, showProgramLogo: !previous.showProgramLogo }));
-    toast("Preview: Logo Program diubah (Tekan M untuk terapkan master)");
-  }, [toast]);
+    const nextVal = !stagedMaster.showProgramLogo;
+    setStagedMaster(previous => ({ ...previous, showProgramLogo: nextVal }));
+    toast(nextVal ? "Preview: Logo Program AKTIF (Tekan M untuk terapkan master)" : "Preview: Logo Program NONAKTIF (Tekan M untuk terapkan master)");
+  }, [stagedMaster.showProgramLogo, toast]);
 
   const toggleMasterTicker = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    setStagedMaster(previous => ({ ...previous, showTicker: !previous.showTicker }));
-    toast("Preview: Ticker diubah (Tekan M untuk terapkan master)");
-  }, [toast]);
+    const nextVal = !stagedMaster.showTicker;
+    setStagedMaster(previous => ({ ...previous, showTicker: nextVal }));
+    toast(nextVal ? "Preview: Ticker AKTIF (Tekan M untuk terapkan master)" : "Preview: Ticker NONAKTIF (Tekan M untuk terapkan master)");
+  }, [stagedMaster.showTicker, toast]);
 
   const toggleMasterLive = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    setStagedMaster(previous => {
-      const nextVal = !previous.showLiveBadge;
-      toast(nextVal ? "Preview: LIVE AKTIF (Tekan M untuk terapkan master)" : "Preview: LIVE NONAKTIF (Tekan M untuk terapkan master)");
-      return { ...previous, showLiveBadge: nextVal };
-    });
-  }, [toast]);
+    const nextVal = !stagedMaster.showLiveBadge;
+    setStagedMaster(previous => ({ ...previous, showLiveBadge: nextVal }));
+    toast(nextVal ? "Preview: LIVE AKTIF (Tekan M untuk terapkan master)" : "Preview: LIVE NONAKTIF (Tekan M untuk terapkan master)");
+  }, [stagedMaster.showLiveBadge, toast]);
 
   // Aksi Master 2: Toggle Ticker + Live di Preview (Safety: Tekan M untuk kirim ke ON AIR)
   const toggleMasterTickerLive = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    setStagedMaster((prev) => {
-      const bothActive = prev.showTicker && prev.showLiveBadge;
-      toast(
-        !bothActive
-          ? "Preview: Ticker+Live AKTIF (Tekan M untuk terapkan master)"
-          : "Preview: Ticker+Live NONAKTIF (Tekan M untuk terapkan master)"
-      );
-      return {
-        ...prev,
-        showTicker: !bothActive,
-        showLiveBadge: !bothActive
-      };
-    });
-  }, [toast]);
+    const bothActive = stagedMaster.showTicker && stagedMaster.showLiveBadge;
+    setStagedMaster((prev) => ({
+      ...prev,
+      showTicker: !bothActive,
+      showLiveBadge: !bothActive
+    }));
+    toast(
+      !bothActive
+        ? "Preview: Ticker+Live AKTIF (Tekan M untuk terapkan master)"
+        : "Preview: Ticker+Live NONAKTIF (Tekan M untuk terapkan master)"
+    );
+  }, [stagedMaster.showTicker, stagedMaster.showLiveBadge, toast]);
 
   // Aksi Quick Action Headline (H) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
   const actionNewsAnchor = useCallback(async () => {

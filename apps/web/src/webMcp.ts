@@ -44,14 +44,32 @@ export function isWebMcpNativeSupported(): boolean {
   return false;
 }
 
-export function initWebMcp(options: {
+export interface WebMcpOptions {
   getMaster: () => MasterOverlayState;
   getLiveState: () => LiveState;
   getRundowns: () => Rundown[];
   onUpdateMaster: (patch: Partial<MasterOverlayState>) => Promise<void>;
   onReload: () => Promise<void>;
-}) {
-  const registeredTools: Map<string, WebMcpTool> = new Map();
+}
+
+let activeOptions: WebMcpOptions | null = null;
+let isInitialized = false;
+const registeredTools: Map<string, WebMcpTool> = new Map();
+
+function getOptions(): WebMcpOptions {
+  if (!activeOptions) {
+    throw new Error("[WebMCP] WebMcpOptions belum diinisialisasi.");
+  }
+  return activeOptions;
+}
+
+export function initWebMcp(options: WebMcpOptions): WebMcpContext {
+  activeOptions = options;
+
+  if (isInitialized && typeof window !== "undefined" && window.modelContext) {
+    return window.modelContext;
+  }
+  isInitialized = true;
 
   const tools: WebMcpTool[] = [
     {
@@ -70,7 +88,7 @@ export function initWebMcp(options: {
         const body: Record<string, unknown> = {};
         if (args?.graphicId) body.graphicId = args.graphicId;
         const res = await mutate("/api/live/take", "POST", body);
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "Grafis berhasil ditayangkan ke Program ON AIR", result: res };
       }
     },
@@ -87,7 +105,7 @@ export function initWebMcp(options: {
         }
       },
       execute: async (args: Record<string, string>) => {
-        const live = options.getLiveState();
+        const live = getOptions().getLiveState();
         if (!live.onAirGraphicId) {
           throw new Error("Tidak ada grafis yang sedang tayang ON AIR untuk di-update.");
         }
@@ -99,7 +117,7 @@ export function initWebMcp(options: {
 
         await mutate(`/api/graphics/${live.onAirGraphicId}`, "PATCH", { draftFields });
         const res = await mutate("/api/live/update", "POST", { graphicId: live.onAirGraphicId });
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "Grafis ON AIR berhasil diperbarui tanpa animasi ulang", result: res };
       }
     },
@@ -112,7 +130,7 @@ export function initWebMcp(options: {
       },
       execute: async () => {
         const res = await mutate("/api/live/clear", "POST", {});
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "Lower third berhasil di-OUT", result: res };
       }
     },
@@ -127,7 +145,7 @@ export function initWebMcp(options: {
       },
       execute: async (args: { immediate?: boolean }) => {
         const res = await mutate("/api/live/clear-all", "POST", { immediate: args?.immediate !== false });
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "Layar berhasil dibersihkan (Blackout)", result: res };
       }
     },
@@ -150,9 +168,9 @@ export function initWebMcp(options: {
         }
       },
       execute: async (patch: Partial<MasterOverlayState>) => {
-        await options.onUpdateMaster(patch);
-        await options.onReload();
-        return { status: "success", message: "Master overlay berhasil diperbarui", master: options.getMaster() };
+        await getOptions().onUpdateMaster(patch);
+        await getOptions().onReload();
+        return { status: "success", message: "Master overlay berhasil diperbarui", master: getOptions().getMaster() };
       }
     },
     {
@@ -171,7 +189,7 @@ export function initWebMcp(options: {
           payload.defaults = { name: args.name, role: args.role || "News Anchor" };
         }
         const res = await mutate("/api/live/news-anchor", "POST", payload);
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "News Anchor berhasil ditayangkan ke Program", result: res };
       }
     },
@@ -196,7 +214,7 @@ export function initWebMcp(options: {
           };
         }
         const res = await mutate("/api/live/reporter", "POST", payload);
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "Reporter Lapangan berhasil ditayangkan ke Program", result: res };
       }
     },
@@ -238,7 +256,7 @@ export function initWebMcp(options: {
           items: args.items || []
         };
         const res = await mutate("/api/rundowns", "POST", payload);
-        await options.onReload();
+        await getOptions().onReload();
         return { status: "success", message: "Rundown berhasil dibuat", rundown: res };
       }
     },
@@ -251,10 +269,10 @@ export function initWebMcp(options: {
       },
       execute: async () => {
         return {
-          liveState: options.getLiveState(),
-          masterOverlay: options.getMaster(),
-          rundownCount: options.getRundowns().length,
-          rundownsSummary: options.getRundowns().map((r) => ({
+          liveState: getOptions().getLiveState(),
+          masterOverlay: getOptions().getMaster(),
+          rundownCount: getOptions().getRundowns().length,
+          rundownsSummary: getOptions().getRundowns().map((r) => ({
             id: r.id,
             programName: r.programName,
             title: r.title,
@@ -274,14 +292,29 @@ export function initWebMcp(options: {
     (typeof navigator !== "undefined" && navigator.modelContext);
 
   if (nativeApi && typeof nativeApi.registerTool === "function") {
+    let registeredCount = 0;
     tools.forEach((t) => {
       try {
-        nativeApi.registerTool(t);
-      } catch (err) {
+        const res = nativeApi.registerTool(t);
+        if (res && typeof (res as Promise<unknown>).catch === "function") {
+          (res as Promise<unknown>).catch((err: unknown) => {
+            const message = String((err as any)?.message || err);
+            if ((err as any)?.name === "InvalidStateError" || message.includes("Duplicate") || message.includes("duplicate")) {
+              return;
+            }
+            console.warn(`[WebMCP] Native tool registration rejected for ${t.name}:`, err);
+          });
+        }
+        registeredCount++;
+      } catch (err: unknown) {
+        const message = String((err as any)?.message || err);
+        if ((err as any)?.name === "InvalidStateError" || message.includes("Duplicate") || message.includes("duplicate")) {
+          return;
+        }
         console.warn(`[WebMCP] Native tool registration skipped for ${t.name}:`, err);
       }
     });
-    console.info(`[WebMCP] Registered ${tools.length} native browser tools via document/navigator.modelContext`);
+    console.info(`[WebMCP] Registered ${registeredCount} native browser tools via document/navigator.modelContext`);
   }
 
   // 2. Global modelContext provider (Inspector & Agent Extensions Polyfill)
