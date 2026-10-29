@@ -471,4 +471,87 @@ describe("template-specific quick editing", () => {
     }));
     expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("MASTER IN"));
   });
+
+  it("swaps Master (hanya headline) and Preview (headline + lokasi + detail) back and forth like vMix", async () => {
+    live = {
+      ...live,
+      onAirGraphicId: "A1",
+      onAirSnapshot: {
+        headline: "ORIGINAL A1",
+        location: "JAKARTA",
+        subline: "DETAIL",
+        showLocation: "false",
+        showDetail: "false",
+        showKicker: "false"
+      }
+    };
+    await mount();
+
+    await click(action("L"));
+    await click(action("D"));
+    expect(action("L").classList.contains("active")).toBe(true);
+    expect(action("D").classList.contains("active")).toBe(true);
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    });
+
+    expect(liveRequests().map(([url]) => url)).toEqual(["/api/live/update"]);
+    const liveBody = JSON.parse(liveRequests()[0]![1]!.body as string);
+    expect(liveBody.fields).toMatchObject({
+      showLocation: "true",
+      showDetail: "true"
+    });
+
+    expect(action("L").classList.contains("active")).toBe(false);
+    expect(action("D").classList.contains("active")).toBe(false);
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("vMix flip-flop"));
+
+    live = {
+      ...live,
+      onAirGraphicId: "A1",
+      onAirSnapshot: {
+        headline: "ORIGINAL A1",
+        location: "JAKARTA",
+        subline: "DETAIL",
+        showLocation: "true",
+        showDetail: "true",
+        showKicker: "false"
+      }
+    };
+    await mount();
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    });
+    expect(liveRequests().map(([url]) => url)).toEqual(["/api/live/update", "/api/live/update"]);
+    const secondLiveBody = JSON.parse(liveRequests()[1]![1]!.body as string);
+    expect(secondLiveBody.fields).toMatchObject({
+      showLocation: "false",
+      showDetail: "false"
+    });
+
+    expect(action("L").classList.contains("active")).toBe(true);
+    expect(action("D").classList.contains("active")).toBe(true);
+  });
+
+  it("swaps different cues between Program and Preview on TAKE like vMix", async () => {
+    live = {
+      ...live,
+      onAirGraphicId: "A1",
+      onAirSnapshot: { headline: "ORIGINAL A1", showLocation: "false", showDetail: "false" }
+    };
+    await mount();
+
+    await selectStory(1);
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL B1");
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    });
+    expect(liveRequests().map(([url]) => url)).toEqual(["/api/live/take"]);
+    expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toMatchObject({ graphicId: "B1" });
+
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL A1");
+  });
 });

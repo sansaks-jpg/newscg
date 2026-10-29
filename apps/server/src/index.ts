@@ -216,7 +216,7 @@ app.post("/api/live/prepare", (req, res, next) => {
 app.post("/api/live/take", asyncRoute(async (req:any, res:any) => {
   const parsed = liveTakeInputSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Data TAKE tidak valid", details: parsed.error.issues });
-  return res.json(await take(parsed.data.graphicId, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID(), { presentation: parsed.data.presentation }));
+  return res.json(await take(parsed.data.graphicId, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID(), { presentation: parsed.data.presentation, fields: parsed.data.fields }));
 }));
 app.post("/api/live/news-anchor", asyncRoute(async (req: express.Request, res: express.Response) => {
   const parsed = liveNewsAnchorInputSchema.safeParse(req.body);
@@ -236,7 +236,7 @@ app.post("/api/live/variant", asyncRoute(async (req:any, res:any) => {
 app.post("/api/live/update", asyncRoute(async (req:any, res:any) => {
   const parsed = liveUpdateInputSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Data UPDATE tidak valid", details: parsed.error.issues });
-  return res.json(await updateLive(parsed.data.graphicId, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID(), { syncComposition: parsed.data.syncComposition }));
+  return res.json(await updateLive(parsed.data.graphicId, res.locals.idempotencyKey || parsed.data.idempotencyKey || randomUUID(), { syncComposition: parsed.data.syncComposition, fields: parsed.data.fields }));
 }));
 app.post("/api/live/clear", asyncRoute(async (req:any, res:any) => {
   const parsed = liveClearInputSchema.safeParse(req.body ?? {});

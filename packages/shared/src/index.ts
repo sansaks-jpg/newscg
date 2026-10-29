@@ -1549,13 +1549,13 @@ export const livePrepareInputSchema = z.object({ graphicId: apiIdSchema });
 
 export const liveTakeInputSchema = livePrepareInputSchema.extend({
 
-  ...idempotencyBodyShape, presentation: z.literal("clean").optional()
+  ...idempotencyBodyShape, presentation: z.literal("clean").optional(), fields: z.record(z.string(), z.string()).optional()
 
 });
 
 export const liveUpdateInputSchema = livePrepareInputSchema.extend({
 
-  ...idempotencyBodyShape, syncComposition: z.boolean().optional()
+  ...idempotencyBodyShape, syncComposition: z.boolean().optional(), fields: z.record(z.string(), z.string()).optional()
 
 });
 

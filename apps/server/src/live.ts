@@ -136,8 +136,8 @@ export function prepare(graphicId: string) {
   return publicState();
 }
 
-export function take(graphicId: string, idempotencyKey: string, options?: { presentation?: "clean" }) {
-  return enqueue(idempotencyKey, `TAKE:${JSON.stringify([graphicId, options?.presentation ?? null])}`, async () => {
+export function take(graphicId: string, idempotencyKey: string, options?: { presentation?: "clean"; fields?: Record<string, string> }) {
+  return enqueue(idempotencyKey, `TAKE:${JSON.stringify([graphicId, options?.presentation ?? null, options?.fields ?? null])}`, async () => {
     const requestId = randomUUID();
     const graphic = getGraphic(graphicId);
     live = { ...live, commandStatus: "pending", error: null, lastActionAt: new Date().toISOString() };
@@ -151,11 +151,12 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
         previousGraphic.itemId === graphic.itemId &&
         ["HEADLINE", "SOT"].includes(previousGraphic.templateType) &&
         ["HEADLINE", "SOT"].includes(graphic.templateType));
-      const normalized = normalizeHeadlineTopicFields(graphic.templateType, graphic.draftFields);
+      const sourceFields = options?.fields || graphic.draftFields;
+      const normalized = normalizeHeadlineTopicFields(graphic.templateType, sourceFields);
       const effectiveFields: Record<string, string> = options?.presentation === "clean"
         ? { ...normalized, showLocation: "false", showKicker: "false", layoutStyle: "single" }
         : { ...normalized };
-      if (switchDetail && previous?.snapshot) {
+      if (switchDetail && previous?.snapshot && !options?.fields) {
         const snapshot = effectiveOnAirFields(previousGraphic, previous.snapshot as Record<string, string>) || {};
         effectiveFields.location = snapshot.location || effectiveFields.location || "";
         effectiveFields.showLocation = snapshot.showLocation ?? (snapshot.location?.trim() ? "true" : "false");
@@ -254,9 +255,9 @@ export function takeFieldReporter(input: LiveReporterInput, idempotencyKey: stri
 export function updateLive(
   graphicId: string,
   idempotencyKey: string,
-  options?: { syncComposition?: boolean }
+  options?: { syncComposition?: boolean; fields?: Record<string, string> }
 ) {
-  return enqueue(idempotencyKey, `UPDATE:${JSON.stringify([graphicId, options?.syncComposition ?? false])}`, async () => {
+  return enqueue(idempotencyKey, `UPDATE:${JSON.stringify([graphicId, options?.syncComposition ?? false, options?.fields ?? null])}`, async () => {
     const requestId = randomUUID();
 
     try {
@@ -274,14 +275,14 @@ export function updateLive(
 
       const existingSnapshot = effectiveOnAirFields(previousGraphic, current.snapshot as Record<string, string>) || {};
       const effectiveFields: Record<string, string> = {
-        ...normalizeHeadlineTopicFields(graphic.templateType, graphic.draftFields)
+        ...normalizeHeadlineTopicFields(graphic.templateType, options?.fields || graphic.draftFields)
       };
-      if (!options?.syncComposition) {
+      if (!options?.syncComposition && !options?.fields) {
         if (existingSnapshot.showLocation !== undefined) effectiveFields.showLocation = existingSnapshot.showLocation;
         if (existingSnapshot.showKicker !== undefined) effectiveFields.showKicker = existingSnapshot.showKicker;
         if (existingSnapshot.layoutStyle !== undefined) effectiveFields.layoutStyle = existingSnapshot.layoutStyle;
       }
-      if (switchDetail) {
+      if (switchDetail && !options?.fields) {
         effectiveFields.location = existingSnapshot.location || effectiveFields.location || "";
         effectiveFields.showLocation = existingSnapshot.showLocation ?? (existingSnapshot.location?.trim() ? "true" : "false");
       }

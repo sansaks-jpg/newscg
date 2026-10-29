@@ -20,7 +20,7 @@ import {
   X
 } from "lucide-react";
 import { api, mutate } from "./api";
-import { createNewsAnchorGraphic, newsAnchorDefaultsSchema } from "@newscg/shared";
+import { createNewsAnchorGraphic, newsAnchorDefaultsSchema, newsAnchorGraphicId } from "@newscg/shared";
 import { createFieldReporterGraphic, fieldReporterGraphicId, reporterDefaultsSchema, type ReporterDefaults } from "@newscg/shared";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
@@ -497,6 +497,10 @@ export function SimpleProductionEditor({
     if ((action === "take" && onAirGraphicId === previewCue.id) || (action === "update" && !canUpdate)) return;
     commandLock.current = true;
     setBusy(true);
+
+    const previousOnAirId = live.onAirGraphicId;
+    const previousOnAirSnapshot = live.onAirSnapshot ? { ...live.onAirSnapshot } : null;
+
     try {
       if (reporterPreview) {
         await sendLiveCommand("/api/live/reporter", { action,
@@ -505,30 +509,178 @@ export function SimpleProductionEditor({
             role: reporterPreview.draftFields.role,
             location: reporterPreview.draftFields.location
           } });
+        if (previousOnAirId && previousOnAirId !== fieldReporterGraphicId) {
+          if (previousOnAirId === newsAnchorGraphicId) {
+            const defaults = newsAnchorDefaultsSchema.safeParse(previousOnAirSnapshot);
+            setReporterPreview(null);
+            setAnchorPreview(defaults.success && defaults.data.name ? createNewsAnchorGraphic(defaults.data) : createNewsAnchorGraphic({ name: previousOnAirSnapshot?.name || "News Anchor", role: previousOnAirSnapshot?.role || "News Anchor" }));
+          } else {
+            const prevStory = items.find((item) => item.graphics.some((g) => g.id === previousOnAirId));
+            const prevCue = prevStory?.graphics.find((g) => g.id === previousOnAirId);
+            if (prevStory && prevCue) {
+              selectCue(prevStory.id, prevCue.id);
+              if (previousOnAirSnapshot) {
+                const swappedComp: PreviewComposition = {
+                  showLocation: previousOnAirSnapshot.showLocation === "true",
+                  showKicker: previousOnAirSnapshot.showKicker === "true",
+                  showDetail: previousOnAirSnapshot.showDetail === "true"
+                };
+                restoreCompositionRef.current = swappedComp;
+                setComposition(swappedComp);
+              }
+            }
+          }
+        }
         void reload().catch(() => {});
-        toast(action === "take" ? "Reporter lapangan ditayangkan" : "Reporter lapangan diperbarui");
+        toast(action === "take" ? "Reporter lapangan ditayangkan (vMix flip-flop)" : "Reporter lapangan diperbarui");
         return;
       }
       if (anchorPreview) {
         await sendLiveCommand("/api/live/news-anchor", { action,
           defaults: { name: anchorPreview.draftFields.name, role: anchorPreview.draftFields.role } });
+        if (previousOnAirId && previousOnAirId !== newsAnchorGraphicId) {
+          if (previousOnAirId === fieldReporterGraphicId) {
+            const defaults = reporterDefaultsSchema.safeParse(previousOnAirSnapshot);
+            setAnchorPreview(null);
+            setReporterPreview(defaults.success && defaults.data.name ? createFieldReporterGraphic(defaults.data) : createFieldReporterGraphic({ name: previousOnAirSnapshot?.name || "Reporter", role: previousOnAirSnapshot?.role || "Reporter Lapangan", location: previousOnAirSnapshot?.location || "" }));
+          } else {
+            const prevStory = items.find((item) => item.graphics.some((g) => g.id === previousOnAirId));
+            const prevCue = prevStory?.graphics.find((g) => g.id === previousOnAirId);
+            if (prevStory && prevCue) {
+              selectCue(prevStory.id, prevCue.id);
+              if (previousOnAirSnapshot) {
+                const swappedComp: PreviewComposition = {
+                  showLocation: previousOnAirSnapshot.showLocation === "true",
+                  showKicker: previousOnAirSnapshot.showKicker === "true",
+                  showDetail: previousOnAirSnapshot.showDetail === "true"
+                };
+                restoreCompositionRef.current = swappedComp;
+                setComposition(swappedComp);
+              }
+            }
+          }
+        }
         void reload().catch(() => {});
-        toast(action === "take" ? "News anchor ditayangkan" : "News anchor diperbarui");
+        toast(action === "take" ? "News anchor ditayangkan (vMix flip-flop)" : "News anchor diperbarui");
         return;
       }
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
-      if (!await flushSaveDraft(miniDraft, composition)) return;
-      await sendLiveCommand(`/api/live/${action}`, { graphicId: previewCue.id, syncComposition: true });
+
+      const fieldsToSend: Record<string, string> = {
+        ...(previewCue.draftFields || {}),
+        location: miniDraft.location.trim(),
+        kicker: miniDraft.kicker.trim(),
+        subline: miniDraft.subline.trim(),
+        showLocation: composition.showLocation ? "true" : "false",
+        showKicker: composition.showKicker ? "true" : "false",
+        showDetail: composition.showDetail ? "true" : "false",
+        layoutStyle: composition.showDetail ? "sub" : "single"
+      };
+      if (previewCue.templateType === "REPORTER" || previewCue.templateType === "SOT") {
+        fieldsToSend.name = miniDraft.headline.trim();
+        fieldsToSend.role = miniDraft.subline.trim();
+      } else if (previewCue.templateType === "LOCATION") {
+        fieldsToSend.location = miniDraft.headline.trim() || miniDraft.location.trim();
+      } else {
+        fieldsToSend.headline = miniDraft.headline.trim();
+      }
+
+      if (!await flushSaveDraft(miniDraft, composition, previewCue)) return;
+      await sendLiveCommand('/api/live/' + action, {
+        graphicId: previewCue.id,
+        syncComposition: true,
+        fields: fieldsToSend
+      });
+
+      // vMix Flip-Flop: jika sebelumnya ada materi tayang di Program, tukar ke Preview
+      if (previousOnAirId && previousOnAirSnapshot) {
+        if (previousOnAirId === newsAnchorGraphicId) {
+          const defaults = newsAnchorDefaultsSchema.safeParse(previousOnAirSnapshot);
+          const anchorGraphic = defaults.success && defaults.data.name
+            ? createNewsAnchorGraphic(defaults.data)
+            : createNewsAnchorGraphic({ name: previousOnAirSnapshot.name || "News Anchor", role: previousOnAirSnapshot.role || "News Anchor" });
+          setReporterPreview(null);
+          setAnchorPreview(anchorGraphic);
+        } else if (previousOnAirId === fieldReporterGraphicId) {
+          const defaults = reporterDefaultsSchema.safeParse(previousOnAirSnapshot);
+          const reporterGraphic = defaults.success && defaults.data.name
+            ? createFieldReporterGraphic(defaults.data)
+            : createFieldReporterGraphic({
+                name: previousOnAirSnapshot.name || "Reporter",
+                role: previousOnAirSnapshot.role || "Reporter Lapangan",
+                location: previousOnAirSnapshot.location || ""
+              });
+          setAnchorPreview(null);
+          setReporterPreview(reporterGraphic);
+        } else if (previousOnAirId === previewCue.id) {
+          // Kasus cue yang sama: Komposisi tampilan (Lokasi, Topik, Detail) ditukar dengan Master (vMix flip-flop)
+          const swappedComp: PreviewComposition = {
+            showLocation: previousOnAirSnapshot.showLocation === "true",
+            showKicker: previousOnAirSnapshot.showKicker === "true",
+            showDetail: previousOnAirSnapshot.showDetail === "true"
+          };
+          restoreCompositionRef.current = swappedComp;
+          setComposition(swappedComp);
+          void flushSaveDraft(miniDraft, swappedComp, previewCue);
+        } else {
+          // Kasus cue berbeda di rundown
+          const prevStory = items.find((item) => item.graphics.some((g) => g.id === previousOnAirId));
+          const prevCue = prevStory?.graphics.find((g) => g.id === previousOnAirId);
+          if (prevStory && prevCue) {
+            selectCue(prevStory.id, prevCue.id);
+            const swappedComp: PreviewComposition = {
+              showLocation: previousOnAirSnapshot.showLocation === "true",
+              showKicker: previousOnAirSnapshot.showKicker === "true",
+              showDetail: previousOnAirSnapshot.showDetail === "true"
+            };
+            const swappedDraft: MiniDraft = {
+              headline: (prevCue.templateType === "REPORTER" || prevCue.templateType === "SOT")
+                ? (previousOnAirSnapshot.name || previousOnAirSnapshot.headline || "")
+                : (previousOnAirSnapshot.headline || previousOnAirSnapshot.name || ""),
+              location: previousOnAirSnapshot.location || "",
+              kicker: previousOnAirSnapshot.kicker || "",
+              subline: (prevCue.templateType === "REPORTER" || prevCue.templateType === "SOT")
+                ? (previousOnAirSnapshot.role || previousOnAirSnapshot.subline || "")
+                : (previousOnAirSnapshot.subline || previousOnAirSnapshot.role || "")
+            };
+            restoreCompositionRef.current = swappedComp;
+            setComposition(swappedComp);
+            setMiniDraft(swappedDraft);
+            void flushSaveDraft(swappedDraft, swappedComp, prevCue);
+          }
+        }
+      }
+
       void reload().catch(() => {});
-      toast(action === "take" ? "TAKE diterima server NewsCG" : "UPDATE diterima server NewsCG");
+      toast(
+        previousOnAirId
+          ? (action === "take" ? "TAKE" : "UPDATE") + " terkonfirmasi — Program & Preview ditukar (vMix flip-flop)"
+          : (action === "take" ? "TAKE" : "UPDATE") + " diterima server NewsCG"
+      );
     } catch (error: any) {
       toast(error.message || "Perintah grafis gagal");
     } finally {
       commandLock.current = false;
       setBusy(false);
     }
-  }, [previewCue, anchorPreview, onAirGraphicId, canUpdate, flushSaveDraft, miniDraft, composition, sendLiveCommand, reload, toast]);
+  }, [
+    previewCue,
+    anchorPreview,
+    reporterPreview,
+    onAirGraphicId,
+    canUpdate,
+    flushSaveDraft,
+    miniDraft,
+    composition,
+    sendLiveCommand,
+    reload,
+    toast,
+    live.onAirGraphicId,
+    live.onAirSnapshot,
+    items,
+    selectCue
+  ]);
   const executeUpdate = useCallback(() => executeGraphic("update"), [executeGraphic]);
   const executePrimary = useCallback(() => executeGraphic(primaryGraphicAction(canUpdate)), [executeGraphic, canUpdate]);
 
