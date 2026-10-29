@@ -1,3 +1,6 @@
+import dns from "node:dns";
+try { dns.setDefaultResultOrder("ipv4first"); } catch {}
+
 import "dotenv/config";
 import express from "express";
 import { actionLogLimitSchema, bccMasterOverlayPatchSchema, broadcastLogoMimeTypeSchema, broadcastLogoUploadSpec, liveStageInputSchema, storySaveInputSchema, masterOverlayPatchSchema, livePrepareInputSchema, liveTakeInputSchema, liveUpdateInputSchema, liveVariantInputSchema, liveClearInputSchema, liveClearAllInputSchema, rundownReorderInputSchema, rundownImportInputSchema } from "@newscg/shared";
@@ -17,12 +20,14 @@ import { agentApiDiscovery, agentOpenApi } from "./agentApi.js";
 import { liveTickerInputSchema, rundownBroadcastSchema } from "@newscg/shared";
 import { applyRundownTicker } from "./live.js";
 import { weatherLocationSchema } from "@newscg/shared";
-import { getWeatherForecast } from "./weather.js";
+import { getWeatherForecast, syncAllWeather } from "./weather.js";
 import { liveNewsAnchorInputSchema, liveReporterInputSchema, newsAnchorDefaultsPatchSchema, reporterDefaultsPatchSchema } from "@newscg/shared";
 import { getNewsAnchorDefaults, getReporterDefaults, saveNewsAnchorDefaults, saveReporterDefaults } from "./db.js";
 import { takeFieldReporter, takeNewsAnchor } from "./live.js";
 
 seedIfEmpty();
+void syncAllWeather().catch(() => {});
+setInterval(() => void syncAllWeather().catch(() => {}), 15 * 60 * 1000);
 const app=express(); const port=Number(process.env.PORT||3001);
 const serverDir = dirname(fileURLToPath(import.meta.url));
 const uploadsDir = resolve(serverDir, process.env.UPLOADS_PATH || "../data/uploads");
@@ -49,9 +54,9 @@ app.use(express.json({limit:"2mb"}));
 app.get("/api/agent", (_req, res) => res.json(agentApiDiscovery));
 app.get("/api/weather", async (req, res) => {
   const parsed = weatherLocationSchema.shape.adm4.safeParse(req.query.adm4);
-  if (!parsed.success) return res.status(400).json({ error: "Pilih kode wilayah cuaca BMKG yang valid, misalnya 31.71.03.1001." });
+  if (!parsed.success) return res.status(400).json({ error: "Pilih kode wilayah cuaca yang valid, misalnya 31.71.03.1001." });
   try { return res.json(await getWeatherForecast(parsed.data)); }
-  catch (error) { return res.status(503).json({ error: error instanceof Error ? error.message : "Prakiraan BMKG belum tersedia" }); }
+  catch (error) { return res.status(503).json({ error: error instanceof Error ? error.message : "Prakiraan cuaca belum tersedia" }); }
 });
 app.get("/api/agent/openapi.json", (_req, res) => res.json(agentOpenApi));
 app.get("/api/agent/guide.md", (_req, res) => {

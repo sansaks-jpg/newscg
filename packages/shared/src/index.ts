@@ -104,7 +104,7 @@ export const weatherForecastSchema = z.object({
 
   validAt: z.iso.datetime(), expiresAt: z.iso.datetime(), forecastDate: z.iso.date(),
 
-  fetchedAt: z.iso.datetime(), source: z.literal("BMKG"), sourceUrl: z.url(), isDaytime: z.boolean().optional().default(true)
+  fetchedAt: z.iso.datetime(), source: z.string().optional().default("Open-Meteo"), sourceUrl: z.url(), isDaytime: z.boolean().optional().default(true)
 
 });
 
@@ -117,6 +117,68 @@ export const weatherIconAssets: Record<WeatherCondition, string> = {
   sunny: "clear-day", "partly-cloudy": "partly-cloudy-day", cloudy: "overcast", rain: "rain", storm: "thunderstorms-rain", fog: "fog"
 
 };
+
+export const WMO_WEATHER_MAP: Record<number, { condition: WeatherCondition; label: string }> = {
+  0: { condition: "sunny", label: "Cerah" },
+  1: { condition: "sunny", label: "Cerah Berawan" },
+  2: { condition: "partly-cloudy", label: "Sebagian Berawan" },
+  3: { condition: "cloudy", label: "Berawan" },
+  45: { condition: "fog", label: "Berkabut" },
+  48: { condition: "fog", label: "Kabut Tebal" },
+  51: { condition: "rain", label: "Gerimis Ringan" },
+  53: { condition: "rain", label: "Gerimis Sedang" },
+  55: { condition: "rain", label: "Gerimis Lebat" },
+  56: { condition: "rain", label: "Gerimis Dingin" },
+  57: { condition: "rain", label: "Gerimis Dingin Lebat" },
+  61: { condition: "rain", label: "Hujan Ringan" },
+  63: { condition: "rain", label: "Hujan Sedang" },
+  65: { condition: "rain", label: "Hujan Lebat" },
+  66: { condition: "rain", label: "Hujan Es Ringan" },
+  67: { condition: "rain", label: "Hujan Es Lebat" },
+  71: { condition: "cloudy", label: "Salju Ringan" },
+  73: { condition: "cloudy", label: "Salju Sedang" },
+  75: { condition: "cloudy", label: "Salju Lebat" },
+  77: { condition: "cloudy", label: "Butir Salju" },
+  80: { condition: "rain", label: "Hujan Lokal Ringan" },
+  81: { condition: "rain", label: "Hujan Lokal Sedang" },
+  82: { condition: "rain", label: "Hujan Lokal Lebat" },
+  85: { condition: "cloudy", label: "Hujan Salju Ringan" },
+  86: { condition: "cloudy", label: "Hujan Salju Lebat" },
+  95: { condition: "storm", label: "Hujan Petir" },
+  96: { condition: "storm", label: "Hujan Badai Petir Ringan" },
+  99: { condition: "storm", label: "Hujan Badai Petir Lebat" }
+};
+
+export function mapWmoCode(code: number): { condition: WeatherCondition; label: string } {
+  return WMO_WEATHER_MAP[code] ?? { condition: "cloudy", label: "Berawan" };
+}
+
+export const defaultWeatherCoordinates: Record<string, { lat: number; lon: number; city: string; village: string; timezone: string }> = {
+  "31.71.03.1001": { lat: -6.2088, lon: 106.8456, city: "Jakarta", village: "Kemayoran", timezone: "Asia/Jakarta" },
+  "32.73.01.1001": { lat: -6.9175, lon: 107.6191, city: "Bandung", village: "Sukarasa", timezone: "Asia/Jakarta" },
+  "35.78.01.1001": { lat: -7.2575, lon: 112.7521, city: "Surabaya", village: "Karang Pilang", timezone: "Asia/Jakarta" },
+  "12.71.01.1001": { lat: 3.5952, lon: 98.6722, city: "Medan", village: "Pasar Baru", timezone: "Asia/Jakarta" },
+  "33.74.01.1001": { lat: -6.9932, lon: 110.4203, city: "Semarang", village: "Miroto", timezone: "Asia/Jakarta" },
+  "51.71.01.1001": { lat: -8.6705, lon: 115.2126, city: "Denpasar", village: "Serangan", timezone: "Asia/Makassar" },
+  "73.71.01.1001": { lat: -5.1477, lon: 119.4327, city: "Makassar", village: "Bontorannu", timezone: "Asia/Makassar" }
+};
+
+export const openMeteoResponseSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+  timezone: z.string().optional().default("Asia/Jakarta"),
+  current: z.object({
+    time: z.string(),
+    temperature_2m: z.number(),
+    weather_code: z.number(),
+    is_day: z.number().optional().default(1)
+  }),
+  daily: z.object({
+    time: z.array(z.string()).min(1),
+    temperature_2m_max: z.array(z.number()).min(1),
+    temperature_2m_min: z.array(z.number()).min(1)
+  })
+});
 
 // Only the fields consumed from the external service; all runtime validation lives here.
 

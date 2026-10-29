@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, NewsAnchorDefaults, ReporterDefaults, Rundown, RundownItem } from "@newscg/shared";
+import type { AppSettings, GraphicItem, HeadlineDefaults, MasterOverlayState, NewsAnchorDefaults, ReporterDefaults, Rundown, RundownItem, WeatherForecast } from "@newscg/shared";
 import { defaultNewsAnchorDefaults, defaultReporterDefaults, newsAnchorDefaultsPatchSchema, newsAnchorDefaultsSchema, reporterDefaultsPatchSchema, reporterDefaultsSchema } from "@newscg/shared";
 import { appSettingsSchema, defaultAppSettings, defaultHeadlineDefaults, defaultMasterOverlayState, emptyRundownTicker, rundownBroadcastSchema, rundownTickerSchema, getRundownTickerSpeed, headlineDefaultsPatchSchema, headlineDefaultsSchema, masterOverlaySchema, normalizeHeadlineTopicFields, settingsPatchSchema } from "@newscg/shared";
 import type { ZodType } from "zod";
@@ -344,4 +344,23 @@ export function seedIfEmpty() {
   if ((db.prepare("SELECT COUNT(*) count FROM rundowns").get() as any).count) return;
   const rd = createRundown({ id: "NEWS-001", programName: "NEWS LIVE", title: "Rundown Siaran", items: [] });
   logAction("SYSTEM", "confirmed", `Rundown baru ${rd.id} dibuat (bersih)`);
+}
+
+export function saveCachedWeather(adm4: string, forecast: WeatherForecast): void {
+  try {
+    db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(`weather_cache_${adm4}`, JSON.stringify(forecast));
+  } catch (err) {
+    console.warn("Gagal menyimpan cache cuaca ke SQLite:", err);
+  }
+}
+
+export function getCachedWeather(adm4: string): WeatherForecast | null {
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(`weather_cache_${adm4}`) as { value: string } | undefined;
+    if (!row) return null;
+    return JSON.parse(row.value) as WeatherForecast;
+  } catch {
+    return null;
+  }
 }

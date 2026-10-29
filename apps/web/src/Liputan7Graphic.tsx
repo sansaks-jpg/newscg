@@ -47,7 +47,7 @@ export function Liputan7Graphic({ type, fields, master = defaultMasterOverlaySta
   const weatherEnabled = Boolean(hasActiveCg && programEnabled && master.showWeather && forecasts.length);
   const weather = useLiputan7WeatherCycle(weatherEnabled, forecasts.map(forecast => forecast.adm4).join(","), forecasts.length);
   const forecast = forecasts[weather.index % Math.max(1, forecasts.length)];
-  const weatherVisible = weather.phase !== "logo" && weather.phase !== "closing" && weatherEnabled && forecast && Date.parse(forecast.expiresAt) > Date.now();
+  const weatherVisible = weather.phase !== "logo" && weather.phase !== "closing" && weatherEnabled && Boolean(forecast);
   const weatherLayer = useLayerPresence(Boolean(weatherVisible), liputan7Motion.weatherMorphMs + 20);
   const label = locations.find(location => location.adm4 === forecast?.adm4)?.label || forecast?.village || "";
   const [lastWeather, setLastWeather] = useState<WeatherDisplay | null>(null);
@@ -76,7 +76,7 @@ export function Liputan7Graphic({ type, fields, master = defaultMasterOverlaySta
     </div> : ghostPreview && ghostFields?.location && <div className="l7-location l7-ghost"><AutoSquishText text={ghostFields.location} minScale={1} /></div>}
     {programLayer.present && <div className={`l7-program ${master.programLogoImage ? "l7-custom-program" : ""} ${programLayer.exiting ? "l7-layer-out" : "l7-layer-in"} ${weatherVisible ? "l7-weather-active" : ""}`}>
       <div className="l7-program-face"><div className="l7-program-wordmark"><img src={master.programLogoImage || "/branding/liputan7.svg"} alt="Liputan7" /></div></div>
-      {weatherLayer.present && displayedWeather && <div data-weather-source="BMKG" className={`l7-weather ${weatherLayer.exiting ? "l7-weather-out" : ""}`}>
+      {weatherLayer.present && displayedWeather && <div data-weather-source={displayedWeather.forecast.source || "Open-Meteo"} className={`l7-weather ${weatherLayer.exiting ? "l7-weather-out" : ""}`}>
         <div key={`${weather.cycle}-${displayedWeather.forecast.adm4}`} className={`l7-weather-row l7-city-${weather.motion} l7-city-${weather.phase}`}><div className="l7-weather-place"><AutoSquishText className="l7-weather-city" text={displayedWeather.label} minScale={1} /></div><WeatherSymbol condition={displayedWeather.forecast.condition} isDaytime={displayedWeather.forecast.isDaytime} />
           <span className="l7-weather-temperature">{displayedWeather.forecast.minimum}–{displayedWeather.forecast.maximum}°C</span></div>
       </div>}

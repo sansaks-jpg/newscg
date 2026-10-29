@@ -15,15 +15,15 @@ export function useWeatherForecast(enabled: boolean, locations: WeatherLocation[
       const settled = await Promise.allSettled(locationKey.split(",").filter(Boolean).map(async adm4 => {
         const response = await fetch(`/api/weather?adm4=${encodeURIComponent(adm4)}`, { signal: abort.signal });
         const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Prakiraan BMKG belum tersedia");
+        if (!response.ok) throw new Error(body.error || "Prakiraan cuaca belum tersedia");
         const forecast = weatherForecastSchema.parse(body);
-        if (forecast.adm4 !== adm4 || Date.parse(forecast.expiresAt) <= Date.now()) throw new Error("Prakiraan BMKG sudah kedaluwarsa atau wilayah tidak cocok");
+        if (forecast.adm4 !== adm4) throw new Error("Wilayah tidak cocok");
         return forecast;
       }));
       if (disposed) return;
       const forecasts = settled.flatMap(item => item.status === "fulfilled" ? [item.value] : []);
       const error = settled.flatMap(item => item.status === "rejected" ? [item.reason instanceof Error ? item.reason.message : "Cuaca gagal dimuat"] : []).join("; ");
-      if (error) console.warn("Cuaca otomatis (BMKG):", error);
+      if (error) console.warn("Cuaca otomatis (Open-Meteo):", error);
       setResult({ key: locationKey, forecasts, error });
       const expiresIn = forecasts.length ? Math.min(...forecasts.map(forecast => Date.parse(forecast.expiresAt) - Date.now())) : liputan7Motion.weatherRefreshMs;
       timer = setTimeout(refresh, error ? 60000 : Math.max(1000, Math.min(liputan7Motion.weatherRefreshMs, expiresIn)));

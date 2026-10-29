@@ -17,7 +17,7 @@ import {
 
 // A single catalog supplies both discovery metadata and OpenAPI operations.
 export const agentApiOperations: readonly AgentApiOperation[] = [
-  { method: "GET", path: "/api/weather", operationId: "getWeather", summary: "Automated BMKG forecast for a specific adm4 region code", effect: "read", responseSchema: "WeatherForecast" },
+  { method: "GET", path: "/api/weather", operationId: "getWeather", summary: "Automated Open-Meteo forecast for a specific location", effect: "read", responseSchema: "WeatherForecast" },
   { method: "GET", path: "/api/agent", operationId: "discoverAgentApi", summary: "Discover agent API and documentation", effect: "read", responseSchema: "AgentDiscovery" },
   { method: "GET", path: "/api/agent/openapi.json", operationId: "getOpenApi", summary: "Read OpenAPI specification", effect: "read", responseSchema: "OpenApiDocument" },
   { method: "GET", path: "/api/agent/AGENTS.md", operationId: "getAgentsMd", summary: "Main AGENTS.md guidelines for AI agents", effect: "read", responseContentType: "text/markdown" },
@@ -215,7 +215,7 @@ export const agentApiDiscovery = {
     description: "One headline per cue with HIGHLIGHT in the topic tab above the headline (kicker). Arrange multiple cues via sortOrder; advancement is operator-controlled. In Liputan7, the topic tab uses template visuals (burgundy–ivory, sand line) on the top-left of the panel; right/left arrows in Production switch highlight headlines during HIGHLIGHT preview, whereas on regular cues right arrow triggers TAKE/UPDATE and left arrow triggers OUT." }],
   colorThemes: broadcastColorThemeIds.map(id => ({ id, label: broadcastColorThemes[id].label })),
   broadcastTemplates: broadcastTemplateIds.map(id => ({ id, ...broadcastTemplates[id] })),
-  weather: { source: "BMKG", path: "/api/weather?adm4={kode_wilayah}", documentation: "https://data.bmkg.go.id/prakiraan-cuaca/", automaticallyAppliesToProgram: false },
+  weather: { source: "Open-Meteo", path: "/api/weather?adm4={kode_wilayah}", documentation: "https://open-meteo.com/", automaticallyAppliesToProgram: false },
   logo: { ...broadcastLogoUploadSpec, mimeTypes: broadcastLogoMimeTypes, recommendedFormat: "Transparent PNG", uploadPath: "/api/uploads/logo", appliesToLiveAutomatically: false },
   operations: agentApiOperations
 };
