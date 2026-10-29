@@ -325,6 +325,18 @@ export function SimpleProductionEditor({
         patchFields.kicker = draftToSave.kicker.trim();
       }
 
+      const sourceCue = rundown?.items.flatMap((item) => item.graphics).find((g) => g.id === targetCue.id);
+      const serverFields = sourceCue?.draftFields || {};
+      const isIdenticalToServer = Object.keys(patchFields).every((k) => patchFields[k] === (serverFields[k] ?? "")) &&
+        Object.keys(serverFields).every((k) => (serverFields[k] ?? "") === (patchFields[k] ?? ""));
+      const isPendingOrFailed = Boolean(pendingSaveRef.current) ||
+        (saveSeqByCueRef.current[targetCue.id] || 0) > (completedSaveByCueRef.current[targetCue.id] || 0);
+
+      if (isIdenticalToServer && !isPendingOrFailed) {
+        if (currentCueIdRef.current === targetCue.id) setSaveStatus("saved");
+        return Promise.resolve(true);
+      }
+
       cacheCueFields(targetCue.id, patchFields);
       const task = saveQueueRef.current.then(async () => {
         try {
@@ -336,11 +348,9 @@ export function SimpleProductionEditor({
             cacheCueFields(targetCue.id, updated.draftFields || patchFields);
             if (currentCueIdRef.current === targetCue.id) setSaveStatus("saved");
           }
-          try {
-            await reload();
-          } catch (error) {
+          void reload().catch((error) => {
             toast(`Perubahan tersimpan, tetapi rundown belum diperbarui: ${(error as Error).message}`);
-          }
+          });
           return true;
         } catch (err: any) {
           completedSaveByCueRef.current = { ...completedSaveByCueRef.current, [targetCue.id]: currentSeq };
@@ -495,14 +505,14 @@ export function SimpleProductionEditor({
             role: reporterPreview.draftFields.role,
             location: reporterPreview.draftFields.location
           } });
-        await reload();
+        void reload().catch(() => {});
         toast(action === "take" ? "Reporter lapangan ditayangkan" : "Reporter lapangan diperbarui");
         return;
       }
       if (anchorPreview) {
         await sendLiveCommand("/api/live/news-anchor", { action,
           defaults: { name: anchorPreview.draftFields.name, role: anchorPreview.draftFields.role } });
-        await reload();
+        void reload().catch(() => {});
         toast(action === "take" ? "News anchor ditayangkan" : "News anchor diperbarui");
         return;
       }
@@ -510,7 +520,7 @@ export function SimpleProductionEditor({
       debounceTimerRef.current = null;
       if (!await flushSaveDraft(miniDraft, composition)) return;
       await sendLiveCommand(`/api/live/${action}`, { graphicId: previewCue.id, syncComposition: true });
-      await reload();
+      void reload().catch(() => {});
       toast(action === "take" ? "TAKE diterima server NewsCG" : "UPDATE diterima server NewsCG");
     } catch (error: any) {
       toast(error.message || "Perintah grafis gagal");
@@ -536,7 +546,7 @@ export function SimpleProductionEditor({
         }
         await onUpdateMaster(patch);
         if (!urgent) isUserStagingMasterRef.current = false;
-        await reload();
+        void reload().catch(() => {});
         toast(urgent ? "Ticker global BCC diterapkan segera" : "Master BCC diterapkan");
       } else {
         const masterPatch = urgent ? null : masterControlPatch(stagedMaster);
@@ -546,7 +556,7 @@ export function SimpleProductionEditor({
         }
         if (masterPatch) await onUpdateMaster(masterPatch);
         if (!urgent) isUserStagingMasterRef.current = false;
-        await reload();
+        void reload().catch(() => {});
         toast(urgent ? "Ticker diterapkan segera" : "Master diterapkan; isi ticker baru masuk pada batas segmen");
       }
     } catch (error: any) {
@@ -564,7 +574,7 @@ export function SimpleProductionEditor({
     setBusy(true);
     try {
       await sendLiveCommand("/api/live/clear");
-      await reload();
+      void reload().catch(() => {});
       toast("OUT — Lower third keluar; cue tetap siap di Preview");
     } catch (error: any) {
       toast(error.message || "OUT gagal");
@@ -582,7 +592,7 @@ export function SimpleProductionEditor({
       await sendLiveCommand("/api/live/clear-all", { immediate });
       isUserStagingMasterRef.current = false;
       setStagedMaster((previous) => ({ ...previous, showLogo: false, showTicker: false, showLiveBadge: false, showProgramLogo: false, showWeather: false }));
-      await reload();
+      void reload().catch(() => {});
       toast(immediate ? "CLEAR ALL — Seluruh layer dihapus segera" : "ALL OUT — Seluruh layer keluar beranimasi");
     } catch (error: any) {
       toast(error.message || "Perintah seluruh layer gagal");

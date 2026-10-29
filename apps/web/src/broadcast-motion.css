@@ -1,3 +1,14 @@
+/* Hardware acceleration promotion for zero-jank broadcast motion */
+[data-broadcast-motion] .cg-main-box,
+[data-broadcast-motion] .cg-copy-motion,
+[data-broadcast-motion] .cg-kicker-tab,
+[data-broadcast-motion] .cg-location-tag,
+[data-broadcast-motion] .cg-ticker-bar {
+  will-change: clip-path, transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 /* Motion on the output canvas is part of the broadcast picture. Each OUT uses
    the exact endpoints of its matching IN in reverse order. Keep transforms on
    wrappers so AutoSquishText can continue measuring and fitting its own text. */

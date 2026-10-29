@@ -1,5 +1,15 @@
 import { useLayoutEffect, useRef, type CSSProperties } from "react";
 
+let sharedContext: CanvasRenderingContext2D | null = null;
+function getSharedCanvasContext(): CanvasRenderingContext2D | null {
+  if (typeof document === "undefined") return null;
+  if (!sharedContext) {
+    const canvas = document.createElement("canvas");
+    sharedContext = canvas.getContext("2d", { willReadFrequently: false });
+  }
+  return sharedContext;
+}
+
 export function AutoSquishText({ text, className, minScale = 0.72, fillHeight, maxVerticalScale = 1, style }: {
   text: string; className?: string; minScale?: number; fillHeight?: number;
   maxVerticalScale?: number; style?: CSSProperties;
@@ -19,28 +29,28 @@ export function AutoSquishText({ text, className, minScale = 0.72, fillHeight, m
       const natural = span.scrollWidth;
       const floor = Math.max(0.1, Math.min(1, minScale));
       if (natural > width / floor) {
-        const baseSize = parseFloat(getComputedStyle(container).fontSize);
+        const baseSize = parseFloat(getComputedStyle(container).fontSize) || 16;
         span.style.fontSize = `${baseSize * width / (natural * floor)}px`;
       }
       if (floor === 1) {
-        // Fixed letter spacing survives a font-size change. Re-measure it instead
+        // Fixed letter spacing survives a font-size change. Re-measure it once instead
         // of correcting the remaining overflow by distorting the glyphs.
-        for (let attempt = 0; attempt < 3 && span.scrollWidth > width; attempt++) {
-          const fontSize = parseFloat(getComputedStyle(span).fontSize);
-          span.style.fontSize = `${Math.max(.1, fontSize * width / span.scrollWidth - .1)}px`;
+        if (span.scrollWidth > width) {
+          const fontSize = parseFloat(getComputedStyle(span).fontSize) || 16;
+          span.style.fontSize = `${Math.max(0.1, fontSize * width / span.scrollWidth - 0.2)}px`;
         }
         return;
       }
-      for (let attempt = 0; attempt < 3 && span.scrollWidth * floor > width; attempt++) {
-        const fontSize = parseFloat(getComputedStyle(span).fontSize);
-        span.style.fontSize = `${Math.max(.1, fontSize * width / (span.scrollWidth * floor) - .1)}px`;
+      if (span.scrollWidth * floor > width) {
+        const fontSize = parseFloat(getComputedStyle(span).fontSize) || 16;
+        span.style.fontSize = `${Math.max(0.1, fontSize * width / (span.scrollWidth * floor) - 0.2)}px`;
       }
       const scaleX = Math.min(1, width / Math.max(1, span.scrollWidth));
       let scaleY = 1;
       let offsetY = 0;
       if (fillHeight && container.clientHeight) {
         const css = getComputedStyle(span);
-        const context = document.createElement("canvas").getContext("2d");
+        const context = getSharedCanvasContext();
         if (context) {
           context.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`;
           const ink = context.measureText(text);
@@ -59,8 +69,10 @@ export function AutoSquishText({ text, className, minScale = 0.72, fillHeight, m
       span.style.transform = `translateY(${offsetY}px) scale(${scaleX}, ${scaleY})`;
     };
     adjust();
-    document.fonts.ready.then(adjust).catch(error => console.error("Font grafis gagal dimuat:", error));
-    const observer = new ResizeObserver(adjust);
+    document.fonts.ready.then(() => { if (!disposed) adjust(); }).catch(() => {});
+    const observer = new ResizeObserver(() => {
+      if (!disposed) adjust();
+    });
     if (containerRef.current) observer.observe(containerRef.current);
     return () => { disposed = true; observer.disconnect(); };
   }, [text, minScale, fillHeight, maxVerticalScale, className]);
@@ -68,7 +80,7 @@ export function AutoSquishText({ text, className, minScale = 0.72, fillHeight, m
     <div ref={containerRef} className={className} style={{ width: "100%", minWidth: 0,
       overflow: "hidden", whiteSpace: "nowrap", display: "flex", alignItems: "center", ...style }}>
       <span ref={textRef} style={{ display: "inline-block", flexShrink: 0,
-        whiteSpace: "nowrap", transformOrigin: "left center" }}>{text}</span>
+        whiteSpace: "nowrap", transformOrigin: "left center", willChange: "transform" }}>{text}</span>
     </div>
   );
 }

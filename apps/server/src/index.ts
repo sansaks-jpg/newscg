@@ -270,17 +270,28 @@ app.get("/api/live/stream", (req, res) => {
     return res.status(400).json({error:"Parameter role harus monitor atau output."});
   }
   const role = req.query.role === "monitor" ? "monitor" : "output";
+  req.socket?.setNoDelay(true);
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive"
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no"
   });
+  if (typeof (res as any).flushHeaders === "function") {
+    (res as any).flushHeaders();
+  }
   res.write(": connected\n\n");
   const unsubscribe = addOverlaySubscriber(event => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
+    if (typeof (res as any).flush === "function") {
+      (res as any).flush();
+    }
   }, role);
   const keepAlive = setInterval(() => {
     res.write(": ping\n\n");
+    if (typeof (res as any).flush === "function") {
+      (res as any).flush();
+    }
   }, 15000);
   req.on("close", () => {
     clearInterval(keepAlive);

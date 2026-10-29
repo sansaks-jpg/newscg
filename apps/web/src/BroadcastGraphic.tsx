@@ -383,7 +383,7 @@ export function BroadcastPreviewBox({
       if (w > 0 && h > 0) {
         // Strict proportional 16:9 fitting inside viewport (matching 1920x1080 canvas)
         const s = Math.min(w / 1920, h / 1080);
-        setScale(s);
+        setScale((prev) => (Math.abs(prev - s) > 0.001 ? s : prev));
       }
     };
 
@@ -395,7 +395,7 @@ export function BroadcastPreviewBox({
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [visible]);
+  }, []);
 
   const hasGraphic = Boolean(graphic && fields);
   const showMaster = hasVisibleMasterLayers(master);
