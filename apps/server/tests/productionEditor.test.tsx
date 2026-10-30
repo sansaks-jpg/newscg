@@ -472,7 +472,7 @@ describe("template-specific quick editing", () => {
     expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("MASTER IN"));
   });
 
-  it("swaps Master (hanya headline) and Preview (headline + lokasi + detail) back and forth like vMix", async () => {
+  it("retains Preview composition (headline + lokasi + detail) after UPDATE instead of flip-flopping", async () => {
     live = {
       ...live,
       onAirGraphicId: "A1",
@@ -503,39 +503,13 @@ describe("template-specific quick editing", () => {
       showDetail: "true"
     });
 
-    expect(action("L").classList.contains("active")).toBe(false);
-    expect(action("D").classList.contains("active")).toBe(false);
-    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("vMix flip-flop"));
-
-    live = {
-      ...live,
-      onAirGraphicId: "A1",
-      onAirSnapshot: {
-        headline: "ORIGINAL A1",
-        location: "JAKARTA",
-        subline: "DETAIL",
-        showLocation: "true",
-        showDetail: "true",
-        showKicker: "false"
-      }
-    };
-    await mount();
-
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-    });
-    expect(liveRequests().map(([url]) => url)).toEqual(["/api/live/update", "/api/live/update"]);
-    const secondLiveBody = JSON.parse(liveRequests()[1]![1]!.body as string);
-    expect(secondLiveBody.fields).toMatchObject({
-      showLocation: "false",
-      showDetail: "false"
-    });
-
+    // Without flip-flop, Preview keeps the operator's active composition
     expect(action("L").classList.contains("active")).toBe(true);
     expect(action("D").classList.contains("active")).toBe(true);
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("UPDATE diterima server NewsCG"));
   });
 
-  it("swaps different cues between Program and Preview on TAKE like vMix", async () => {
+  it("retains staged cue in Preview on TAKE instead of swapping like vMix", async () => {
     live = {
       ...live,
       onAirGraphicId: "A1",
@@ -552,6 +526,8 @@ describe("template-specific quick editing", () => {
     expect(liveRequests().map(([url]) => url)).toEqual(["/api/live/take"]);
     expect(JSON.parse(liveRequests()[0]![1]!.body as string)).toMatchObject({ graphicId: "B1" });
 
-    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL A1");
+    // Without flip-flop, Preview retains the selected cue B1 instead of swapping back to A1
+    expect(host.querySelector(".preview-screen-wrapper")?.textContent).toContain("ORIGINAL B1");
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("TAKE diterima server NewsCG"));
   });
 });
