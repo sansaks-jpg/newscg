@@ -2,4 +2,5 @@ import { StrictMode } from "react"; import { createRoot } from "react-dom/client
 import "./broadcast-palettes.css";
 import "./broadcast-liputan7.css";
 import "./broadcast-bcc.css";
+import "./ui-redesign.css";
 createRoot(document.getElementById("root")!).render(<StrictMode><App/></StrictMode>);

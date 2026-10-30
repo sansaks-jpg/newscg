@@ -43,15 +43,22 @@ async function mount(nextRundown = rundown, nextLive = live) {
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 const click = (element: HTMLElement) => act(async () => { element.click(); });
 const buttons = () => Array.from(host.querySelectorAll<HTMLButtonElement>("button"));
-const action = (key: string) => buttons().find((button) => button.querySelector(".qa-kbd")?.textContent === key)!;
-const input = (index = 0) => host.querySelectorAll<HTMLInputElement>(".mini-editor-grid input")[index]!;
+const toggleLabels: Record<string, string> = { L: "Lokasi", T: "Topik", D: "Detail" };
+const action = (key: string) => toggleLabels[key]
+  ? host.querySelector<HTMLButtonElement>(`button[aria-label="${toggleLabels[key]}"]`)!
+  : buttons().find((button) => button.querySelector(".ui-kbd")?.textContent === key)!;
+// Inline edit form field order: headline, location, kicker, subline (same indexes as the former drawer).
+const inputIds = ["#quick-edit-headline", "#quick-edit-location", "#quick-edit-kicker", "#quick-edit-subline"];
+const input = (index = 0) => host.querySelector<HTMLInputElement>(inputIds[index]!)!;
 const selectStory = (index: number) => click(host.querySelectorAll<HTMLButtonElement>(".story-select-button")[index]!);
 const selectCue = (id: string) => click(Array.from(host.querySelectorAll<HTMLButtonElement>(".cue-pill")).find((button) => {
     const story = button.closest(".sidebar-story-card");
-    const storyId = story?.querySelector(".story-number")?.textContent === "#2" ? "B" : "A";
+    const storyId = story?.querySelector(".story-number")?.textContent === "2" ? "B" : "A";
     return `${storyId}${button.textContent?.includes("#2") ? "2" : "1"}` === id;
   })!);
-const openEditor = () => click(host.querySelector<HTMLButtonElement>('button[title="Edit teks cue terpilih tanpa meninggalkan kontrol siaran"]')!);
+// The text form is always visible inline now, so there is nothing to open or close.
+const openEditor = async () => {};
+const closeEditor = async () => {};
 const change = (element: HTMLInputElement, value: string) => act(async () => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(element, value);
   element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -167,7 +174,7 @@ describe("production draft persistence", () => {
   it("ignores P while typing, held, modified, or when hotkeys are disabled", async () => {
     await mount(); await openEditor();
     await act(async () => { input().dispatchEvent(new KeyboardEvent("keydown", { key: "p", bubbles: true })); });
-    await click(host.querySelector<HTMLButtonElement>(".quick-edit-close")!);
+    await closeEditor();
     for (const options of [{ repeat: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }])
       await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "p", bubbles: true, ...options })); });
     await click(buttons().find(button => button.textContent?.includes("HOTKEYS: ON"))!);
@@ -243,7 +250,7 @@ describe("production draft persistence", () => {
     expect(host.querySelector(".save-indicator")?.textContent).toContain("Tersimpan");
     await selectStory(1); await selectStory(0);
     expect(input().value).toBe("SAVED HEADLINE");
-    await click(host.querySelector<HTMLButtonElement>(".quick-edit-close")!);
+    await closeEditor();
     await click(host.querySelector<HTMLButtonElement>(".primary-actions-deck button")!);
     expect(stored.get("A1")?.draftFields.headline).toBe("SAVED HEADLINE");
     expect(liveRequests().map(([path]) => path)).toEqual(["/api/live/take"]);
@@ -347,7 +354,7 @@ describe("production draft persistence", () => {
     expect(toast).toHaveBeenCalledWith("Penyimpanan gagal");
     expect(host.querySelector(".save-indicator")?.textContent).toContain("Gagal menyimpan");
     await selectStory(1); await selectStory(0); expect(input().value).toBe("UNSAVED RETRY");
-    await click(host.querySelector<HTMLButtonElement>(".quick-edit-close")!);
+    await closeEditor();
     await click(host.querySelector<HTMLButtonElement>(".primary-actions-deck button")!);
     expect(stored.get("A1")?.draftFields.headline).toBe("UNSAVED RETRY");
   });

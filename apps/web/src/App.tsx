@@ -6,12 +6,7 @@ import {
   FileJson,
   Globe,
   Image as ImageIcon,
-  LayoutList,
-
-  PencilLine,
   Save,
-  Settings,
-  Signal,
   SlidersHorizontal,
   Trash2,
   Upload,
@@ -42,15 +37,8 @@ import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemp
 import { Liputan7Settings } from "./Liputan7Settings";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { initWebMcp } from "./webMcp";
-import { PulsingLed } from "./MagicUi";
 
 type View = "editor" | "rundown" | "settings";
-
-
-
-
-
-
 
 const defaultFallbackRundown: Rundown = {
   id: "RD-DEFAULT",
@@ -118,11 +106,26 @@ export default function App() {
   const [master, setMaster] = useState<MasterOverlayState>(defaultMasterOverlayState);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [shortcutsEnabled, setShortcutsEnabled] = useState(true);
   const liveReadSequence = useRef(0);
   const masterWriteSequence = useRef(0);
 
   const [toast, setToast] = useState("");
   const reloadSequence = useRef(0);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 2800);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const toastKind = /gagal|tidak valid|terputus|melebihi|error|belum tersedia/i.test(toast)
+    ? "error"
+    : /belum|tunggu|tidak dapat/i.test(toast)
+    ? "warn"
+    : /berhasil|tersimpan|diterapkan|disalin/i.test(toast)
+    ? "success"
+    : "info";
 
   const active = rundowns.find((r) => r.id === activeId) || rundowns[0] || defaultFallbackRundown;
 
@@ -141,14 +144,12 @@ export default function App() {
       api<Rundown[]>("/api/rundowns"),
       api<AppSettings>("/api/settings"),
       api<LiveState>("/api/live/state"),
-
       api<MasterOverlayState>("/api/live/master")
     ]);
     if (requestSequence !== reloadSequence.current) return;
     setRundowns(r);
     setSettings(s);
     if (liveSequence === liveReadSequence.current) setLive(l);
-
     if (m && masterSequence === masterWriteSequence.current) setMaster(m);
     setActiveId((id) => r.some((item) => item.id === id) ? id : r[0]?.id || "");
   }, []);
@@ -175,6 +176,25 @@ export default function App() {
     );
     return () => clearInterval(id);
   }, [reload]);
+
+  // F1, F2, F3 global tab navigation shortcuts
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!shortcutsEnabled || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === "F1") {
+        event.preventDefault();
+        setView("editor");
+      } else if (event.key === "F2") {
+        event.preventDefault();
+        setView("rundown");
+      } else if (event.key === "F3") {
+        event.preventDefault();
+        setView("settings");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [shortcutsEnabled]);
 
   async function updateMaster(patch: Partial<MasterOverlayState>) {
     try {
@@ -224,18 +244,30 @@ export default function App() {
       ? { label: `${live.overlayClientsCount} KLIEN OUTPUT`, kind: "ok" }
       : { label: "0 KLIEN OUTPUT", kind: "mock" };
 
+  const activeLayerParts: string[] = [];
+  if (live.onAirGraphicId) activeLayerParts.push("Lower Third");
+  if (master.showLogo || master.showProgramLogo) activeLayerParts.push("Logo");
+  if (master.showTicker) activeLayerParts.push("Ticker");
+  const onAirBannerText = live.onAirGraphicId || activeLayerParts.length > 0
+    ? `${live.onAirGraphicId ? "ON AIR" : "MASTER"} · ${activeLayerParts.join(" · ") || "Standby"}`
+    : "STANDBY · Output Bersih";
+
+  const templateBadgeLabel =
+    master.broadcastTemplate === "liputan7"
+      ? "Liputan7 · HOC TV"
+      : master.broadcastTemplate === "bcc"
+      ? "BCC News"
+      : "CNN / Studio";
+
   return (
-    <div className="app-shell-zero-scroll">
-      <header className="unified-topbar">
+    <div className="app-shell-zero-scroll rt">
+      <header className="unified-topbar hd">
         <div className="topbar-left">
-          <button className="brand-compact" onClick={() => setView("editor")}>
-            <span className="brand-mark">N</span>
-            <span className="brand-text">
-              <b>NewsCG</b>
-              <small>LIVE</small>
-            </span>
+          <button type="button" className="brand-compact lg" onClick={() => setView("editor")}>
+            <span className="brand-mark mk" />
+            <span>NewsCG</span>
           </button>
-          <div className="topbar-program-badge">
+          <div className="topbar-program-badge sr-only-text">
             <small>PROGRAM:</small>
             <select
               aria-label="Pilih Rundown Program"
@@ -252,29 +284,81 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="topbar-nav-tabs">
+        <nav className="topbar-nav-tabs tabs" aria-label="Navigasi utama">
           {(
             [
-              ["editor", PencilLine, "Kontrol Siaran"],
-              ["rundown", LayoutList, "Rundown & CG"],
-              ["settings", Settings, "Pengaturan Default"]
+              ["editor", "Kontrol", "F1", "Kontrol Siaran"],
+              ["rundown", "Rundown", "F2", "Rundown & CG"],
+              ["settings", "Settings", "F3", "Pengaturan Default"]
             ] as const
-          ).map(([id, Icon, label]) => (
+          ).map(([id, shortLabel, hotkey, accessibleLabel]) => (
             <button
               key={id}
-              className={`topbar-tab-btn ${view === id ? "active" : ""}`}
+              type="button"
+              data-label={shortLabel}
+              data-key={hotkey}
+              className={`topbar-tab-btn tab ${view === id ? "active on" : ""}`}
               onClick={() => setView(id)}
             >
-              <Icon size={14} />
-              <span>{label}</span>
-              {id === "editor" && live.onAirGraphicId ? <PulsingLed color="#ef4444" active={true} /> : null}
+              <span className="sr-only-text">{accessibleLabel}</span>
             </button>
           ))}
         </nav>
 
-        <div className="topbar-right">
-          <div className="output-url-box">
+        <div className="topbar-right hr">
+          <button
+            type="button"
+            className={`oa ${live.onAirGraphicId ? "" : "standby"}`}
+            onClick={() => setView("editor")}
+            title="Status layer yang sedang tayang di Program"
+          >
+            <i className="dt" style={{ background: live.onAirGraphicId ? "#fff" : "#3DD68C" }} />
+            <span>{onAirBannerText}</span>
+          </button>
+
+          <button
+            type="button"
+            className="pill"
+            onClick={() => setShowSetupModal(true)}
+            title="Klik untuk membuka Pengaturan Cepat Template & Identitas"
+          >
+            {templateBadgeLabel}
+          </button>
+
+          <button
+            type="button"
+            className="pill"
+            onClick={() => setShortcutsEnabled((prev) => !prev)}
+            title="Aktif/nonaktifkan Hotkeys Keyboard"
+          >
+            <i className="dt" style={{ background: shortcutsEnabled ? "#3DD68C" : "#6B7686" }} />
+            <span>Hotkeys {shortcutsEnabled ? "ON" : "OFF"}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pill status-chip ${status.kind}`}
+            onClick={copyOutputUrl}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              window.open("/output", "_blank");
+            }}
+            title="Klik untuk menyalin URL /output · Klik kanan untuk membuka /output di tab baru"
+          >
+            <i
+              className="dt"
+              style={{
+                background:
+                  status.kind === "bad" ? "#FF6369" : live.overlayClientsCount > 0 ? "#3DD68C" : "#6B7686"
+              }}
+            />
+            <span aria-hidden="true">{live.overlayClientsCount} output</span>
+            <span className="sr-only-text">{status.label}</span>
+          </button>
+
+          <div className="output-url-box sr-only-text">
             <button
+              type="button"
               className="copy-url-btn"
               onClick={copyOutputUrl}
               title="Salin URL output untuk vMix/OBS Web Browser"
@@ -284,6 +368,7 @@ export default function App() {
               <Copy size={11} />
             </button>
             <button
+              type="button"
               className="open-url-btn"
               onClick={() => window.open("/output", "_blank")}
               title="Buka layar overlay di tab baru"
@@ -291,23 +376,10 @@ export default function App() {
               <ExternalLink size={12} />
             </button>
           </div>
-          <span className={`status-chip ${status.kind}`}>
-            <PulsingLed
-              color={status.kind === "live" ? "#ef4444" : status.kind === "ready" ? "#10b981" : "#f59e0b"}
-              active={status.kind === "live"}
-            />
-            {status.label}
-          </span>
-          <span className="clock-compact">
+
+          <span className="m clk clock-compact">
             <Clock timezone={master.timezone} customLabel={master.customTimezoneLabel} />
           </span>
-          <button
-            className="setup-modal-icon-btn"
-            onClick={() => setShowSetupModal(true)}
-            title="Pengaturan Siaran, Identitas & Logo"
-          >
-            <SlidersHorizontal size={13} />
-          </button>
         </div>
       </header>
 
@@ -315,14 +387,16 @@ export default function App() {
         {view === "editor" && (
           <SimpleProductionEditor
             rundown={active}
-
-
+            rundowns={rundowns}
+            onSelectRundown={setActiveId}
+            onOpenRundownTab={() => setView("rundown")}
             reload={reload}
             toast={setToast}
             master={master}
             live={live}
             onUpdateMaster={updateMaster}
-
+            shortcutsEnabled={shortcutsEnabled}
+            onToggleShortcuts={() => setShortcutsEnabled((prev) => !prev)}
           />
         )}
         {view === "rundown" && (
@@ -335,6 +409,7 @@ export default function App() {
             master={master}
             live={live}
             onSetup={() => setShowSetupModal(true)}
+            onSendToPreview={() => setView("editor")}
           />
         )}
         {view === "settings" && settings && (
@@ -343,9 +418,10 @@ export default function App() {
             master={master}
             live={live}
             onUpdateMaster={updateMaster}
-
             onSaved={reload}
             toast={setToast}
+            shortcutsEnabled={shortcutsEnabled}
+            onToggleShortcuts={() => setShortcutsEnabled((prev) => !prev)}
           />
         )}
       </main>
@@ -359,10 +435,11 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="toast" role="status">
-          <span>{toast}</span>
-          <button onClick={() => setToast("")}>
-            <X size={16} />
+        <div className={`toast toast-${toastKind}`} role="status">
+          <i className="toast-dot" aria-hidden="true" />
+          <span className="toast-text">{toast}</span>
+          <button type="button" className="toast-close" onClick={() => setToast("")} aria-label="Tutup notifikasi">
+            <X size={14} />
           </button>
         </div>
       )}
@@ -385,7 +462,7 @@ function Clock({ timezone = "WIB", customLabel }: { timezone?: TimezoneMode; cus
 
   return (
     <>
-      {targetTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+      {targetTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/\./g, ":")}
       <small> {label}</small>
     </>
   );
@@ -415,7 +492,7 @@ function BroadcastSetupModal({
     if (event.key === "Escape" && !saving) { event.stopPropagation(); onClose(); }
     if (event.key !== "Tab") return;
     const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+      "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])"
     ) || []).filter((element) => element.getClientRects().length > 0);
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -476,12 +553,6 @@ function BroadcastSetupModal({
       .finally(() => {
         setSaving(false);
       });
-    return;
-
-
-
-
-
   };
 
   return (
@@ -513,16 +584,16 @@ function BroadcastSetupModal({
 
         {activeTab === "broadcast" && (
           <div className="modal-tab-content">
-            <BroadcastTemplatePicker value={draft.broadcastTemplate} disabled={saving} onChange={value => setDraft(current => selectBroadcastTemplate(current, value))} />
+            <BroadcastTemplatePicker value={draft.broadcastTemplate} disabled={saving} onChange={(value) => setDraft((current) => selectBroadcastTemplate(current, value))} />
             <Liputan7Settings master={draft} disabled={saving} onChange={setDraft} onBusyChange={setSaving} />
             <div className="setup-field-group">
               <label>
                 <span className="master-label">Nama Berita di Ticker (Badge Merah — Fit Huruf)</span>
                 <input
                   className="master-input full"
-                   value={draft.brandText || ""}
+                  value={draft.brandText || ""}
                   placeholder="CNNINDONESIA.COM"
-                   onChange={(e) => patchDraft({ brandText: e.target.value })}
+                  onChange={(e) => patchDraft({ brandText: e.target.value })}
                 />
                 <small className="field-hint">Warna merah pada layar siaran otomatis fit membungkus teks tanpa space kosong.</small>
               </label>
@@ -532,21 +603,21 @@ function BroadcastSetupModal({
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <select
                     className="master-select full"
-                     value={draft.timezone}
-                     onChange={(e) => patchDraft({ timezone: e.target.value as TimezoneMode })}
+                    value={draft.timezone}
+                    onChange={(e) => patchDraft({ timezone: e.target.value as TimezoneMode })}
                   >
                     <option value="WIB">WIB — Waktu Indonesia Barat (UTC+7)</option>
                     <option value="WITA">WITA — Waktu Indonesia Tengah (UTC+8)</option>
                     <option value="WIT">WIT — Waktu Indonesia Timur (UTC+9)</option>
                     <option value="CUSTOM">Custom Label Zona Waktu</option>
                   </select>
-                   {draft.timezone === "CUSTOM" && (
+                  {draft.timezone === "CUSTOM" && (
                     <input
                       className="master-input"
                       style={{ width: 90 }}
                       placeholder="Label"
-                       value={draft.customTimezoneLabel || ""}
-                       onChange={(e) => patchDraft({ customTimezoneLabel: e.target.value })}
+                      value={draft.customTimezoneLabel || ""}
+                      onChange={(e) => patchDraft({ customTimezoneLabel: e.target.value })}
                     />
                   )}
                 </div>
@@ -582,10 +653,9 @@ function BroadcastSetupModal({
                 <p className="field-hint">Materi ticker mengikuti rundown dan jadwal tayang. Sunting di Rundown &amp; CG.</p>
               )}
 
-              {/* Pratinjau Interaktif Ticker */}
               <div style={{ marginTop: 14 }}>
                 <span className="master-label" style={{ display: "block", marginBottom: 6, color: "#38bdf8" }}>
-                   PRATINJAU TICKER (BADGE FIT & ANIMASI):
+                  PRATINJAU TICKER (BADGE FIT & ANIMASI):
                 </span>
                 <div
                   className="cg-ticker-bar cnn-template"
@@ -600,11 +670,11 @@ function BroadcastSetupModal({
                   }}
                 >
                   <div className="cg-ticker-badge" style={{ height: "100%", fontSize: 18 }}>
-                     <span>{draft.brandText || "CNNINDONESIA.COM"}</span>
+                    <span>{draft.brandText || "CNNINDONESIA.COM"}</span>
                   </div>
-                   <BroadcastTicker text={draft.tickerText?.trim() || (draft.broadcastTemplate === "bcc" ? "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS" : "")} speed={draft.tickerSpeed} revision={draft.tickerRevision} fps={30} />
+                  <BroadcastTicker text={draft.tickerText?.trim() || (draft.broadcastTemplate === "bcc" ? "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS" : "")} speed={draft.tickerSpeed} revision={draft.tickerRevision} fps={30} />
                   <div className="cg-ticker-clock" style={{ height: "100%", fontSize: 20 }}>
-                     <BroadcastClock timezone={draft.timezone} customLabel={draft.customTimezoneLabel} />
+                    <BroadcastClock timezone={draft.timezone} customLabel={draft.customTimezoneLabel} />
                   </div>
                 </div>
               </div>
@@ -616,30 +686,30 @@ function BroadcastSetupModal({
           <div className="modal-tab-content">
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
               <button
-                 className={`toggle-btn ${draft.logoType === "text" ? "active" : ""}`}
+                className={`toggle-btn ${draft.logoType === "text" ? "active" : ""}`}
                 style={{ flex: 1, justifyContent: "center", padding: "8px 12px" }}
-                 onClick={() => patchDraft({ logoType: "text" })}
+                onClick={() => patchDraft({ logoType: "text" })}
               >
                 Teks Bawaan (CNN Indonesia)
               </button>
               <button
-                 className={`toggle-btn ${draft.logoType === "image" ? "active" : ""}`}
+                className={`toggle-btn ${draft.logoType === "image" ? "active" : ""}`}
                 style={{ flex: 1, justifyContent: "center", padding: "8px 12px" }}
-                 onClick={() => patchDraft({ logoType: "image" })}
+                onClick={() => patchDraft({ logoType: "image" })}
               >
                 Upload Gambar Logo Kustom
               </button>
             </div>
 
-             {draft.logoType === "text" ? (
+            {draft.logoType === "text" ? (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <label>
                   <span className="master-label">Teks Logo Utama</span>
                   <input
                     className="master-input full"
                     style={{ marginTop: 4 }}
-                     value={draft.logoText || "CNN"}
-                     onChange={(e) => patchDraft({ logoText: e.target.value })}
+                    value={draft.logoText || "CNN"}
+                    onChange={(e) => patchDraft({ logoText: e.target.value })}
                   />
                 </label>
                 <label>
@@ -647,8 +717,8 @@ function BroadcastSetupModal({
                   <input
                     className="master-input full"
                     style={{ marginTop: 4 }}
-                     value={draft.logoSub || "Indonesia"}
-                     onChange={(e) => patchDraft({ logoSub: e.target.value })}
+                    value={draft.logoSub || "Indonesia"}
+                    onChange={(e) => patchDraft({ logoSub: e.target.value })}
                   />
                 </label>
               </div>
@@ -683,7 +753,7 @@ function BroadcastSetupModal({
                     Sisakan sekitar {broadcastLogoUploadSpec.padding} px di tepi, maksimal {broadcastLogoUploadSpec.maxBytes / (1024 * 1024)} MB. Logo ditampilkan proporsional.
                   </p>
                 </div>
-                 {draft.logoImage && (
+                {draft.logoImage && (
                   <button
                     style={{
                       marginTop: 8,
@@ -693,7 +763,7 @@ function BroadcastSetupModal({
                       fontSize: 11,
                       cursor: "pointer"
                     }}
-                     onClick={() => patchDraft({ logoImage: null, logoType: "text" })}
+                    onClick={() => patchDraft({ logoImage: null, logoType: "text" })}
                   >
                     Hapus logo kustom (kembali ke teks bawaan)
                   </button>
@@ -704,15 +774,15 @@ function BroadcastSetupModal({
             <div style={{ marginTop: 14 }}>
               <span className="master-label">PRATINJAU LOGO DI DALAM KOTAK SIARAN:</span>
               <div className="logo-preview-box">
-                 {draft.logoType === "image" && draft.logoImage ? (
-                   <img src={draft.logoImage} alt="Logo Preview" className="cg-custom-logo-img" />
+                {draft.logoType === "image" && draft.logoImage ? (
+                  <img src={draft.logoImage} alt="Logo Preview" className="cg-custom-logo-img" />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                     <span className="cg-cnn-logo" style={{ fontSize: 36 }}>
-                       {draft.logoText || "CNN"}
+                      {draft.logoText || "CNN"}
                     </span>
                     <span className="cg-cnn-sub" style={{ fontSize: 12 }}>
-                       {draft.logoSub || "Indonesia"}
+                      {draft.logoSub || "Indonesia"}
                     </span>
                   </div>
                 )}
@@ -733,23 +803,48 @@ function BroadcastSetupModal({
   );
 }
 
+const DEFAULT_WEATHER_ROWS = [
+  { city: "Jakarta Pusat", subdistrict: "Kemayoran", condition: "Berawan", temp: "26–28°C" },
+  { city: "Bandung", subdistrict: "Sukarasa", condition: "Berawan", temp: "21–22°C" },
+  { city: "Surabaya", subdistrict: "Karang Pilang", condition: "Cerah Berawan", temp: "27–34°C" },
+  { city: "Medan", subdistrict: "Pasar Baru", condition: "Hujan Ringan", temp: "24–28°C" },
+  { city: "Semarang", subdistrict: "Miroto", condition: "Cerah Berawan", temp: "28–30°C" },
+  { city: "Denpasar", subdistrict: "Serangan", condition: "Cerah", temp: "25–29°C" },
+  { city: "Makassar", subdistrict: "Bontorannu", condition: "Cerah", temp: "29–32°C" }
+];
+
 function SettingsView({
   value,
   master,
   live,
   onUpdateMaster,
-
   onSaved,
-  toast
+  toast,
+  shortcutsEnabled = true,
+  onToggleShortcuts
 }: {
   value: AppSettings;
   master: MasterOverlayState;
   live: LiveState;
   onUpdateMaster: (p: Partial<MasterOverlayState>) => Promise<void>;
-
   onSaved: () => Promise<void>;
   toast: (s: string) => void;
+  shortcutsEnabled?: boolean;
+  onToggleShortcuts?: () => void;
 }) {
+  const [activeNav, setActiveNav] = useState<"template" | "identity" | "ticker" | "hotkeys" | "output" | "general">("template");
+  const [settingsPreviewMode, setSettingsPreviewMode] = useState<"headline" | "highlight" | "anchor" | "reporter">("headline");
+  const [previewShowLogo, setPreviewShowLogo] = useState(true);
+  const [previewShowTicker, setPreviewShowTicker] = useState(true);
+  const [previewShowLive, setPreviewShowLive] = useState(true);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  // Broadcast safety toggles
+  const [safeModeTake, setSafeModeTake] = useState(() => localStorage.getItem("newscg-safety-safe-take") !== "false");
+  const [holdBlackout, setHoldBlackout] = useState(() => localStorage.getItem("newscg-safety-hold-blackout") !== "false");
+  const [pauseHotkeysTyping, setPauseHotkeysTyping] = useState(() => localStorage.getItem("newscg-safety-pause-typing") !== "false");
+  const [autoAdvanceClear, setAutoAdvanceClear] = useState(() => localStorage.getItem("newscg-safety-auto-advance") === "true");
+
   const [form, setForm] = useState<AppSettings>(value);
   const [masterForm, setMasterForm] = useState<MasterOverlayState>(master);
   const [headlineDefaults, setHeadlineDefaults] = useState<HeadlineDefaults>(defaultHeadlineDefaults);
@@ -789,6 +884,7 @@ function SettingsView({
         .map((field) => [field, current[field]]))
     }));
   }, [master]);
+
   useEffect(() => {
     let active = true;
     setLoadingHeadline(true);
@@ -815,44 +911,44 @@ function SettingsView({
 
   useEffect(() => {
     let active = true;
-    setAnchorState(current => ({ ...current, loading: true, error: "" }));
-    api<NewsAnchorDefaults>("/api/settings/news-anchor-defaults").then(data => {
+    setAnchorState((current) => ({ ...current, loading: true, error: "" }));
+    api<NewsAnchorDefaults>("/api/settings/news-anchor-defaults").then((data) => {
       const defaults = newsAnchorDefaultsSchema.parse(data);
       if (!active) return;
-      setAnchorDefaults(current => ({ ...defaults, ...Object.fromEntries(
-        [...editedAnchorFields.current].map(field => [field, current[field]])) }));
-      setAnchorState(current => ({ ...current, loaded: true }));
+      setAnchorDefaults((current) => ({ ...defaults, ...Object.fromEntries(
+        [...editedAnchorFields.current].map((field) => [field, current[field]])) }));
+      setAnchorState((current) => ({ ...current, loaded: true }));
     }).catch((error: unknown) => {
-      if (active) setAnchorState(current => ({ ...current, loaded: false,
+      if (active) setAnchorState((current) => ({ ...current, loaded: false,
         error: `Default news anchor gagal dimuat: ${error instanceof Error ? error.message : "Permintaan gagal"}` }));
-    }).finally(() => { if (active) setAnchorState(current => ({ ...current, loading: false })); });
+    }).finally(() => { if (active) setAnchorState((current) => ({ ...current, loading: false })); });
     return () => { active = false; };
   }, [anchorState.attempt]);
 
   const patchAnchorDefault = (field: keyof NewsAnchorDefaults, text: string) => {
     editedAnchorFields.current.add(field);
-    setAnchorDefaults(current => ({ ...current, [field]: text }));
+    setAnchorDefaults((current) => ({ ...current, [field]: text }));
   };
 
   useEffect(() => {
     let active = true;
-    setReporterState(current => ({ ...current, loading: true, error: "" }));
-    api<ReporterDefaults>("/api/settings/reporter-defaults").then(data => {
+    setReporterState((current) => ({ ...current, loading: true, error: "" }));
+    api<ReporterDefaults>("/api/settings/reporter-defaults").then((data) => {
       const defaults = reporterDefaultsSchema.parse(data);
       if (!active) return;
-      setReporterDefaults(current => ({ ...defaults, ...Object.fromEntries(
-        [...editedReporterFields.current].map(field => [field, current[field]])) }));
-      setReporterState(current => ({ ...current, loaded: true }));
+      setReporterDefaults((current) => ({ ...defaults, ...Object.fromEntries(
+        [...editedReporterFields.current].map((field) => [field, current[field]])) }));
+      setReporterState((current) => ({ ...current, loaded: true }));
     }).catch((error: unknown) => {
-      if (active) setReporterState(current => ({ ...current, loaded: false,
+      if (active) setReporterState((current) => ({ ...current, loaded: false,
         error: `Default reporter lapangan gagal dimuat: ${error instanceof Error ? error.message : "Permintaan gagal"}` }));
-    }).finally(() => { if (active) setReporterState(current => ({ ...current, loading: false })); });
+    }).finally(() => { if (active) setReporterState((current) => ({ ...current, loading: false })); });
     return () => { active = false; };
   }, [reporterState.attempt]);
 
   const patchReporterDefault = (field: keyof ReporterDefaults, text: string) => {
     editedReporterFields.current.add(field);
-    setReporterDefaults(current => ({ ...current, [field]: text }));
+    setReporterDefaults((current) => ({ ...current, [field]: text }));
   };
 
   const patchHeadlineDefault = (field: keyof HeadlineDefaults, text: string) => {
@@ -938,7 +1034,7 @@ function SettingsView({
     const submitted = anchorDefaults;
     try {
       const updated = newsAnchorDefaultsSchema.parse(await mutate<NewsAnchorDefaults>("/api/settings/news-anchor-defaults", "PATCH", submitted));
-      setAnchorDefaults(current => ({ name: current.name === submitted.name ? updated.name : current.name,
+      setAnchorDefaults((current) => ({ name: current.name === submitted.name ? updated.name : current.name,
         role: current.role === submitted.role ? updated.role : current.role }));
       if (notify) toast("Default news anchor tersimpan. Tekan P di Produksi untuk menyiapkannya.");
     } catch (error) {
@@ -954,7 +1050,7 @@ function SettingsView({
     const submitted = reporterDefaults;
     try {
       const updated = reporterDefaultsSchema.parse(await mutate<ReporterDefaults>("/api/settings/reporter-defaults", "PATCH", submitted));
-      setReporterDefaults(current => ({ name: current.name === submitted.name ? updated.name : current.name,
+      setReporterDefaults((current) => ({ name: current.name === submitted.name ? updated.name : current.name,
         role: current.role === submitted.role ? updated.role : current.role,
         location: current.location === submitted.location ? updated.location : current.location }));
       if (notify) toast("Default reporter lapangan tersimpan. Tekan O di Produksi untuk menyiapkannya.");
@@ -996,34 +1092,260 @@ function SettingsView({
         toast(err.message || "Gagal mengunggah logo");
       })
       .finally(() => setUploadingLogo(false));
-    return;
-
-
-
-
-
-
-
-
   };
 
   const outputUrl = `${window.location.origin}/output`;
 
+  const scrollToSection = (navId: typeof activeNav, sectionKey: string) => {
+    setActiveNav(navId);
+    sectionRefs.current[sectionKey]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const isMasterDirty = JSON.stringify(masterControlPatch(masterForm)) !== JSON.stringify(masterControlPatch(master));
+
+  const liveSettingsPreviewGraphic =
+    settingsPreviewMode === "anchor"
+      ? anchorGraphic || createNewsAnchorGraphic({ name: "NADIA PUTRI", role: "News Anchor" })
+      : settingsPreviewMode === "reporter"
+      ? reporterGraphic || createFieldReporterGraphic({ name: "RAKA PRATAMA", role: "Reporter Lapangan", location: "JAKARTA SELATAN" })
+      : { templateType: "HEADLINE" as const };
+
+  const liveSettingsPreviewFields: Record<string, string> | null =
+    settingsPreviewMode === "anchor"
+      ? (anchorGraphic || createNewsAnchorGraphic({ name: "NADIA PUTRI", role: "News Anchor" })).draftFields
+      : settingsPreviewMode === "reporter"
+      ? (reporterGraphic || createFieldReporterGraphic({ name: "RAKA PRATAMA", role: "Reporter Lapangan", location: "JAKARTA SELATAN" })).draftFields
+      : settingsPreviewMode === "highlight"
+      ? {
+          headline: headlineDefaults.headline || "FORUM EKONOMI NASIONAL 2026 RESMI DIBUKA HARI INI",
+          subline: headlineDefaults.subline || "Ratusan Delegasi Bahas Kerja Sama Investasi Strategis",
+          kicker: headlineDefaults.kicker || "HIGHLIGHT",
+          location: headlineDefaults.location || "JAKARTA",
+          headlinePresentation: "bulletin",
+          layoutStyle: "sub",
+          showKicker: "true",
+          showDetail: "true",
+          showLocation: "true"
+        }
+      : {
+          headline: headlineDefaults.headline || "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN",
+          subline: headlineDefaults.subline || "Kampus Perluas Jalur Seleksi Vokasi dan Beasiswa Industri",
+          kicker: headlineDefaults.kicker || "KAMPUS",
+          location: headlineDefaults.location || "JAKARTA",
+          headlinePresentation: "story",
+          layoutStyle: headlineDefaults.subline ? "sub" : "single",
+          showKicker: headlineDefaults.kicker ? "true" : "false",
+          showDetail: headlineDefaults.subline ? "true" : "false",
+          showLocation: headlineDefaults.location ? "true" : "false"
+        };
+
   return (
-    <section className="page">
-      <PageTitle
-        eyebrow="GRAPHICS & CONNECTION CONFIG"
-        title="Settings"
-        action={
-          <button className="primary-small" onClick={save} disabled={savingAll || savingMaster || !headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo || !anchorState.loaded || anchorState.loading || savingAnchor || !reporterState.loaded || reporterState.loading || savingReporter}>
-            <Save size={16} />
+    <div className="settings-workspace-grid">
+      {/* 1. LEFT SIDEBAR NAVIGATION */}
+      <aside className="p settings-nav-sidebar">
+        <div className="settings-nav-title l">Kategori Pengaturan</div>
+        {(
+          [
+            ["template", "Template & Pratinjau", "sec-template"],
+            ["ticker", "Identitas, Logo & Jam", "sec-master"],
+            ["identity", "Siklus Cuaca BMKG", "sec-weather"],
+            ["general", "Default Headline & Anchor", "sec-defaults"],
+            ["output", "Output vMix / OBS", "sec-output"],
+            ["hotkeys", "Hotkeys & Keamanan", "sec-hotkeys"]
+          ] as const
+        ).map(([id, label, sec]) => (
+          <button
+            key={id}
+            type="button"
+            className={`it ${activeNav === id ? "on" : ""}`}
+            style={{ fontWeight: 600 }}
+            onClick={() => scrollToSection(id, sec)}
+          >
+            <span>{label}</span>
+          </button>
+        ))}
+
+        <div className="settings-nav-footer">
+          <div className="settings-active-tpl-chip">
+            <span className="l">Tayang saat ini</span>
+            <b>
+              {master.broadcastTemplate === "liputan7"
+                ? "Liputan7 · HOC TV"
+                : master.broadcastTemplate === "bcc"
+                ? "BCC News"
+                : "CNN / Studio"}
+            </b>
+          </div>
+          <button
+            type="button"
+            className="b primary-small settings-save-all-btn"
+            onClick={save}
+            disabled={savingAll || savingMaster || !headlineLoaded || loadingHeadline || savingHeadline || uploadingLogo || !anchorState.loaded || anchorState.loading || savingAnchor || !reporterState.loaded || reporterState.loading || savingReporter}
+          >
+            <Save size={15} />
             {savingAll ? "Menyimpan…" : "Simpan Semua"}
           </button>
-        }
-      />
-      <div className="settings-grid">
-        {/* 1. KARTU PENGATURAN DEFAULT SIARAN (LOGO, NAMA BERITA TICKER, & ISI TICKER) */}
-        <div className="settings-card broadcast-defaults-card">
+        </div>
+      </aside>
+
+      {/* 2. CENTER COLUMN: INTERACTIVE TEMPLATE STUDIO, BRANDING, DEFAULTS, & OUTPUT */}
+      <section className="settings-center-scroll">
+        {/* Card A: Interactive Template Studio & Live 16:9 Preview */}
+        <div
+          ref={(el) => { sectionRefs.current["sec-template"] = el; }}
+          className="p settings-studio-hero-card"
+        >
+          <div className="settings-hero-header fl">
+            <div>
+              <span className="l">Template siaran &amp; Pratinjau Langsung (16:9)</span>
+              <h3 className="settings-hero-title">Pilih Gaya Grafis Siaran &amp; Cek Hasilnya Secara Real-Time</h3>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {isMasterDirty && (
+                <span className="st y">Perubahan belum diterapkan</span>
+              )}
+              <button
+                type="button"
+                className="b primary-small"
+                style={{ height: 36 }}
+                disabled={uploadingLogo || savingMaster || savingAll}
+                onClick={saveMaster}
+              >
+                Simpan sebagai preset
+              </button>
+            </div>
+          </div>
+
+          <div className="settings-studio-deck">
+            {/* Kolom Kiri: Pilihan 3 Template */}
+            <div className="settings-tpl-list">
+              {(
+                [
+                  ["cnn", "CNN / Studio", "Anchor, headline, ticker, live badge", "#D93036"],
+                  ["liputan7", "Liputan7 · HOC TV", "Logo program, logo TV, cuaca BMKG", "#F5A524"],
+                  ["bcc", "BCC News", "Live badge, jam, ticker global", "#4C8DFF"]
+                ] as const
+              ).map(([tplId, tplTitle, tplDesc, accentColor]) => {
+                const selected = masterForm.broadcastTemplate === tplId;
+                const isLiveActive = master.broadcastTemplate === tplId;
+                return (
+                  <button
+                    key={tplId}
+                    type="button"
+                    className={`p settings-tpl-card ${selected ? "selected" : ""}`}
+                    disabled={savingMaster || savingAll || uploadingLogo}
+                    onClick={() => setMasterForm((current) => selectBroadcastTemplate(current, tplId))}
+                  >
+                    <div className="settings-tpl-thumb">
+                      <div className="settings-tpl-thumb-top">
+                        <span className="settings-tpl-dot" style={{ background: accentColor }} />
+                        <span className="settings-tpl-badge-mini">16:9 HD</span>
+                      </div>
+                      <div className="settings-tpl-bar" style={{ background: accentColor }} />
+                      <div className="settings-tpl-subbar" />
+                    </div>
+                    <div className="settings-tpl-info">
+                      <div className="fl" style={{ gap: 6 }}>
+                        <b>{tplTitle}</b>
+                        {isLiveActive ? (
+                          <span className="st g">AKTIF</span>
+                        ) : selected ? (
+                          <span className="st y">PRATINJAU</span>
+                        ) : null}
+                      </div>
+                      <div className="settings-tpl-desc">{tplDesc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Kolom Kanan: Interactive 16:9 Live Preview Monitor */}
+            <div className="settings-live-preview-pane">
+              <div className="settings-preview-toolbar">
+                <div className="seg settings-preview-mode-seg" role="group" aria-label="Mode contoh grafis di pratinjau">
+                  {(
+                    [
+                      ["headline", "Headline"],
+                      ["highlight", "Highlight"],
+                      ["anchor", "Anchor (P)"],
+                      ["reporter", "Reporter (O)"]
+                    ] as const
+                  ).map(([mId, mLabel]) => (
+                    <button
+                      key={mId}
+                      type="button"
+                      className={settingsPreviewMode === mId ? "on" : ""}
+                      onClick={() => setSettingsPreviewMode(mId)}
+                    >
+                      {mLabel}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="settings-preview-layer-pills">
+                  <button
+                    type="button"
+                    className={`mini-pill-btn ${previewShowLogo ? "active" : ""}`}
+                    onClick={() => setPreviewShowLogo((v) => !v)}
+                  >
+                    Logo {previewShowLogo ? "ON" : "OFF"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`mini-pill-btn ${previewShowTicker ? "active" : ""}`}
+                    onClick={() => setPreviewShowTicker((v) => !v)}
+                  >
+                    Ticker {previewShowTicker ? "ON" : "OFF"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`mini-pill-btn ${previewShowLive ? "active" : ""}`}
+                    onClick={() => setPreviewShowLive((v) => !v)}
+                  >
+                    Jam/Live {previewShowLive ? "ON" : "OFF"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-palette-preview settings-hero-monitor">
+                <BroadcastPreviewBox
+                  graphic={liveSettingsPreviewGraphic}
+                  fields={liveSettingsPreviewFields}
+                  master={{
+                    ...masterForm,
+                    showLogo: previewShowLogo,
+                    showProgramLogo: masterForm.broadcastTemplate === "liputan7" ? previewShowLogo : false,
+                    showTicker: previewShowTicker,
+                    showLiveBadge: previewShowLive
+                  }}
+                  studioReference
+                />
+              </div>
+
+              <div className="settings-preview-caption fl">
+                <span>
+                  Pratinjau menampilkan template{" "}
+                  <b>
+                    {masterForm.broadcastTemplate === "liputan7"
+                      ? "Liputan7 · HOC TV"
+                      : masterForm.broadcastTemplate === "bcc"
+                      ? "BCC News"
+                      : "CNN / Studio"}
+                  </b>{" "}
+                  dengan contoh <b>{settingsPreviewMode.toUpperCase()}</b>.
+                </span>
+                <span>Klik <b>Simpan Default Master</b> untuk menerapkan ke Output.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. KARTU PENGATURAN DEFAULT SIARAN (LOGO, WARNA, NAMA BERITA TICKER, & ZONA WAKTU) */}
+        <div
+          ref={(el) => { sectionRefs.current["sec-master"] = el; }}
+          className="settings-card broadcast-defaults-card p"
+        >
           <h3>
             <SlidersHorizontal size={17} />
             Pengaturan Siaran · Logo & Jam
@@ -1032,28 +1354,25 @@ function SettingsView({
             Atur warna, logo, dan jam di Preview. Klik Simpan Default Master untuk menyimpan dan menerapkan perubahan ke siaran.
           </p>
 
-          <BroadcastTemplatePicker value={masterForm.broadcastTemplate} disabled={savingMaster || savingAll || uploadingLogo} onChange={value => setMasterForm(current => selectBroadcastTemplate(current, value))} />
-          <Liputan7Settings master={masterForm} disabled={savingMaster || savingAll || uploadingLogo} onChange={setMasterForm} onBusyChange={setUploadingLogo} />
-          {masterForm.broadcastTemplate === "cnn" && <BroadcastColorThemePicker value={masterForm.colorTheme} onChange={(colorTheme) => {
-            setMasterForm((previous) => selectBroadcastColorTheme(previous, colorTheme));
-          }} />}
-          <small className="settings-palette-note">Preview warna pada studio referensi. Perubahan diterapkan ke output setelah Simpan Default Master.</small>
-          <div className="settings-palette-preview">
-            <BroadcastPreviewBox graphic={{ templateType: "HEADLINE" }} fields={{
-              headline: headlineDefaults.headline || "PENDAFTARAN MAHASISWA BARU POLIMEDIA 2026 MENURUN",
-              layoutStyle: "single", showLocation: "false"
-            }} master={{ ...masterForm, showLogo: true, showTicker: true, showLiveBadge: true }} studioReference />
+          <div className="sr-only-text">
+            <BroadcastTemplatePicker value={masterForm.broadcastTemplate} disabled={savingMaster || savingAll || uploadingLogo} onChange={(value) => setMasterForm((current) => selectBroadcastTemplate(current, value))} />
           </div>
+          <Liputan7Settings master={masterForm} disabled={savingMaster || savingAll || uploadingLogo} onChange={setMasterForm} onBusyChange={setUploadingLogo} />
+          {masterForm.broadcastTemplate === "cnn" && (
+            <BroadcastColorThemePicker value={masterForm.colorTheme} onChange={(colorTheme) => {
+              setMasterForm((previous) => selectBroadcastColorTheme(previous, colorTheme));
+            }} />
+          )}
+          <small className="settings-palette-note">Preview warna langsung terlihat pada monitor 16:9 di atas. Perubahan diterapkan ke output setelah Simpan Default Master.</small>
 
-          {/* Subgrup 1: Logo Siaran Default */}
           <div
             className="settings-subgroup"
             style={{
               marginBottom: 16,
               padding: "12px",
-              background: "#0c1018",
-              borderRadius: 6,
-              border: "1px solid #1c2638"
+              background: "#0F131A",
+              borderRadius: 8,
+              border: "1px solid #252C38"
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -1065,11 +1384,7 @@ function SettingsView({
                   type="button"
                   className={`mini-pill-btn ${masterForm.logoType === "text" ? "active" : ""}`}
                   disabled={uploadingLogo}
-                  onClick={() => {
-                    const u = { ...masterForm, logoType: "text" as const };
-                    setMasterForm(u);
-
-                  }}
+                  onClick={() => setMasterForm({ ...masterForm, logoType: "text" as const })}
                 >
                   Teks Logo
                 </button>
@@ -1077,11 +1392,7 @@ function SettingsView({
                   type="button"
                   className={`mini-pill-btn ${masterForm.logoType === "image" ? "active" : ""}`}
                   disabled={uploadingLogo}
-                  onClick={() => {
-                    const u = { ...masterForm, logoType: "image" as const };
-                    setMasterForm(u);
-
-                  }}
+                  onClick={() => setMasterForm({ ...masterForm, logoType: "image" as const })}
                 >
                   Upload Gambar
                 </button>
@@ -1153,9 +1464,7 @@ function SettingsView({
                             cursor: "pointer"
                           }}
                           onClick={() => {
-                            const u = { ...masterForm, logoImage: null, logoType: "text" as const };
-                            setMasterForm(u);
-
+                            setMasterForm({ ...masterForm, logoImage: null, logoType: "text" as const });
                             toast("Logo gambar dihapus (kembali ke teks bawaan)");
                           }}
                         >
@@ -1210,7 +1519,6 @@ function SettingsView({
             )}
           </div>
 
-          {/* Subgrup 2: Nama Berita di Ticker (Badge Merah Fit) */}
           <div className="form-grid" style={{ marginBottom: 12 }}>
             <label className="wide">
               <span>Nama Berita di Ticker (Lebar Otomatis Sesuai Huruf)</span>
@@ -1258,7 +1566,6 @@ function SettingsView({
             </>
           )}
 
-          {/* Subgrup 5: Zona Waktu Siaran */}
           <div className="form-grid" style={{ marginBottom: 14 }}>
             <label>
               <span>Zona Waktu Siaran</span>
@@ -1289,12 +1596,12 @@ function SettingsView({
               display: "flex",
               gap: 10,
               alignItems: "center",
-              borderTop: "1px solid #1e293b",
+              borderTop: "1px solid #252C38",
               paddingTop: 12,
               marginTop: 10
             }}
           >
-            <button className="primary-small" onClick={saveMaster} disabled={uploadingLogo || savingMaster || savingAll}>
+            <button className="primary-small b" onClick={saveMaster} disabled={uploadingLogo || savingMaster || savingAll}>
               <Save size={13} /> Simpan Default Master
             </button>
             <span style={{ fontSize: 10, color: "#64748b" }}>
@@ -1303,8 +1610,51 @@ function SettingsView({
           </div>
         </div>
 
+        {/* Card B: Siklus logo dan cuaca (BMKG) */}
+        <div
+          ref={(el) => { sectionRefs.current["sec-weather"] = el; }}
+          className="p settings-card"
+        >
+          <div className="fl" style={{ marginBottom: 12 }}>
+            <span className="l">Siklus logo dan cuaca (Khusus Template Liputan7 · HOC TV)</span>
+            <span className="m" style={{ fontSize: 12, color: "#98A3B3" }}>
+              BMKG · data &gt; 3 jam: tampil logo saja
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 4, height: 34, marginBottom: 14 }}>
+            <div style={{ flex: 10, background: "#2A3A55", padding: 8, borderRadius: 4, fontSize: 11, display: "flex", alignItems: "center" }}>Logo 10 dtk</div>
+            {DEFAULT_WEATHER_ROWS.map((row) => (
+              <div key={row.city} title={`${row.city} (3 dtk)`} style={{ flex: 3, background: "#1F6F4A", borderRadius: 4 }} />
+            ))}
+            <div style={{ flex: 10, background: "#2A3A55", padding: 8, borderRadius: 4, fontSize: 11, display: "flex", alignItems: "center" }}>Logo 10 dtk</div>
+          </div>
+          <table>
+            <thead className="l">
+              <tr>
+                <th>Kota</th>
+                <th>Kelurahan / desa</th>
+                <th>Cuaca</th>
+                <th>Suhu</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DEFAULT_WEATHER_ROWS.map((row) => (
+                <tr key={row.city}>
+                  <td>{row.city}</td>
+                  <td>{row.subdistrict}</td>
+                  <td>{row.condition}</td>
+                  <td className="m">{row.temp}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         {/* 2. KARTU PENGATURAN DEFAULT HEADLINE BERITA */}
-        <div className="settings-card headline-defaults-card">
+        <div
+          ref={(el) => { sectionRefs.current["sec-defaults"] = el; }}
+          className="settings-card headline-defaults-card p"
+        >
           <h3>
             <FileJson size={17} />
             Pengaturan Default Headline Berita
@@ -1313,10 +1663,12 @@ function SettingsView({
             Nilai awal bawaan saat membuat berita baru pada tab Persiapan. Berita yang sudah dibuat sebelumnya tetap mempertahankan datanya masing-masing.
           </p>
           {loadingHeadline && <p role="status">Memuat default headline…</p>}
-          {headlineLoadError && <div role="alert" className="modal-error-banner">
-            {headlineLoadError}
-            <button type="button" onClick={() => setHeadlineLoadAttempt((attempt) => attempt + 1)}>Muat ulang default</button>
-          </div>}
+          {headlineLoadError && (
+            <div role="alert" className="modal-error-banner">
+              {headlineLoadError}
+              <button type="button" onClick={() => setHeadlineLoadAttempt((attempt) => attempt + 1)}>Muat ulang default</button>
+            </div>
+          )}
 
           <div className="form-grid" style={{ marginBottom: 12 }}>
             <label className="wide">
@@ -1325,9 +1677,7 @@ function SettingsView({
                 value={headlineDefaults.headline}
                 placeholder="Contoh: BERITA UTAMA HARI INI"
                 maxLength={getGraphicFieldLimit("HEADLINE", "headline")}
-                onChange={(e) =>
-                  patchHeadlineDefault("headline", e.target.value)
-                }
+                onChange={(e) => patchHeadlineDefault("headline", e.target.value)}
               />
             </label>
           </div>
@@ -1339,9 +1689,7 @@ function SettingsView({
                 value={headlineDefaults.location}
                 placeholder="Contoh: JAKARTA"
                 maxLength={getGraphicFieldLimit("HEADLINE", "location")}
-                onChange={(e) =>
-                  patchHeadlineDefault("location", e.target.value)
-                }
+                onChange={(e) => patchHeadlineDefault("location", e.target.value)}
               />
             </label>
             <label>
@@ -1350,9 +1698,7 @@ function SettingsView({
                 value={headlineDefaults.kicker}
                 placeholder="Contoh: BREAKING NEWS"
                 maxLength={getGraphicFieldLimit("HEADLINE", "kicker")}
-                onChange={(e) =>
-                  patchHeadlineDefault("kicker", e.target.value)
-                }
+                onChange={(e) => patchHeadlineDefault("kicker", e.target.value)}
               />
             </label>
           </div>
@@ -1364,9 +1710,7 @@ function SettingsView({
                 value={headlineDefaults.subline}
                 placeholder="Contoh: Keterangan tambahan berita..."
                 maxLength={getGraphicFieldLimit("HEADLINE", "subline")}
-                onChange={(e) =>
-                  patchHeadlineDefault("subline", e.target.value)
-                }
+                onChange={(e) => patchHeadlineDefault("subline", e.target.value)}
               />
             </label>
           </div>
@@ -1376,12 +1720,12 @@ function SettingsView({
               display: "flex",
               gap: 10,
               alignItems: "center",
-              borderTop: "1px solid #1e293b",
+              borderTop: "1px solid #252C38",
               paddingTop: 12
             }}
           >
             <button
-              className="primary-small"
+              className="primary-small b"
               onClick={() => void saveHeadlineDefaultsData()}
               disabled={savingHeadline || savingAll || loadingHeadline || !headlineLoaded}
             >
@@ -1393,58 +1737,120 @@ function SettingsView({
           </div>
         </div>
 
-        <div className="settings-card news-anchor-defaults-card">
+        <div className="settings-card news-anchor-defaults-card p">
           <h3><FileJson size={17} /> Pengaturan Default News Anchor</h3>
           <p>Dipakai semua template. Di Produksi, P menyiapkan anchor di Preview; Spasi/Enter menayangkan. P lagi kembali ke cue berita.</p>
           {anchorState.loading && <p role="status">Memuat default news anchor…</p>}
-          {anchorState.error && <div role="alert" className="modal-error-banner">{anchorState.error}
-            <button type="button" onClick={() => setAnchorState(current => ({ ...current, attempt: current.attempt + 1 }))}>Muat ulang news anchor</button>
-          </div>}
+          {anchorState.error && (
+            <div role="alert" className="modal-error-banner">
+              {anchorState.error}
+              <button type="button" onClick={() => setAnchorState((current) => ({ ...current, attempt: current.attempt + 1 }))}>Muat ulang news anchor</button>
+            </div>
+          )}
           <div className="form-grid">
-            <label><span>Nama Anchor</span><input value={anchorDefaults.name} placeholder="Nama pembawa berita"
-              maxLength={getGraphicFieldLimit("REPORTER", "name")} onChange={event => patchAnchorDefault("name", event.target.value)} /></label>
-            <label><span>Jabatan Anchor</span><input value={anchorDefaults.role} placeholder="News Anchor"
-              maxLength={getGraphicFieldLimit("REPORTER", "role")} onChange={event => patchAnchorDefault("role", event.target.value)} /></label>
+            <label>
+              <span>Nama Anchor</span>
+              <input
+                value={anchorDefaults.name}
+                placeholder="Nama pembawa berita"
+                maxLength={getGraphicFieldLimit("REPORTER", "name")}
+                onChange={(event) => patchAnchorDefault("name", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Jabatan Anchor</span>
+              <input
+                value={anchorDefaults.role}
+                placeholder="News Anchor"
+                maxLength={getGraphicFieldLimit("REPORTER", "role")}
+                onChange={(event) => patchAnchorDefault("role", event.target.value)}
+              />
+            </label>
           </div>
           <div className="settings-palette-preview" style={{ marginTop: 12 }}>
-            <BroadcastPreviewBox graphic={anchorGraphic} fields={anchorGraphic?.draftFields || null} master={{ ...masterForm, showTicker: false }}
-              emptyText="ISI NAMA ANCHOR UNTUK MELIHAT PREVIEW" />
+            <BroadcastPreviewBox
+              graphic={anchorGraphic}
+              fields={anchorGraphic?.draftFields || null}
+              master={{ ...masterForm, showTicker: false }}
+              emptyText="ISI NAMA ANCHOR UNTUK MELIHAT PREVIEW"
+            />
           </div>
-          <button type="button" className="primary-small" style={{ marginTop: 12 }} onClick={() => void saveNewsAnchorDefaultsData()}
-            disabled={savingAll || savingAnchor || anchorState.loading || !anchorState.loaded}>
+          <button
+            type="button"
+            className="primary-small b"
+            style={{ marginTop: 12 }}
+            onClick={() => void saveNewsAnchorDefaultsData()}
+            disabled={savingAll || savingAnchor || anchorState.loading || !anchorState.loaded}
+          >
             <Save size={13} /> {savingAnchor ? "Menyimpan…" : "Simpan Default News Anchor"}
           </button>
           <p style={{ margin: "10px 0 0" }}>Menyimpan default hanya mengubah data bawaan; Program tetap memakai snapshot yang sedang tayang. Nama wajib diisi sebelum TAKE.</p>
         </div>
 
-        <div className="settings-card reporter-defaults-card">
+        <div className="settings-card reporter-defaults-card p">
           <h3><FileJson size={17} /> Pengaturan Default Reporter Lapangan</h3>
           <p>Dipakai semua template. Di Produksi, <b>O</b> menyiapkan reporter lapangan di Preview; Spasi/→ menayangkan. O lagi kembali ke cue berita.</p>
           {reporterState.loading && <p role="status">Memuat default reporter lapangan…</p>}
-          {reporterState.error && <div role="alert" className="modal-error-banner">{reporterState.error}
-            <button type="button" onClick={() => setReporterState(current => ({ ...current, attempt: current.attempt + 1 }))}>Muat ulang reporter</button>
-          </div>}
+          {reporterState.error && (
+            <div role="alert" className="modal-error-banner">
+              {reporterState.error}
+              <button type="button" onClick={() => setReporterState((current) => ({ ...current, attempt: current.attempt + 1 }))}>Muat ulang reporter</button>
+            </div>
+          )}
           <div className="form-grid">
-            <label><span>Nama Reporter</span><input value={reporterDefaults.name} placeholder="Nama reporter lapangan"
-              maxLength={getGraphicFieldLimit("REPORTER", "name")} onChange={event => patchReporterDefault("name", event.target.value)} /></label>
-            <label><span>Jabatan Reporter</span><input value={reporterDefaults.role} placeholder="Reporter Lapangan"
-              maxLength={getGraphicFieldLimit("REPORTER", "role")} onChange={event => patchReporterDefault("role", event.target.value)} /></label>
-            <label><span>Lokasi Liputan</span><input value={reporterDefaults.location} placeholder="Contoh: Jakarta Selatan"
-              maxLength={getGraphicFieldLimit("REPORTER", "location")} onChange={event => patchReporterDefault("location", event.target.value)} /></label>
+            <label>
+              <span>Nama Reporter</span>
+              <input
+                value={reporterDefaults.name}
+                placeholder="Nama reporter lapangan"
+                maxLength={getGraphicFieldLimit("REPORTER", "name")}
+                onChange={(event) => patchReporterDefault("name", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Jabatan Reporter</span>
+              <input
+                value={reporterDefaults.role}
+                placeholder="Reporter Lapangan"
+                maxLength={getGraphicFieldLimit("REPORTER", "role")}
+                onChange={(event) => patchReporterDefault("role", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Lokasi Liputan</span>
+              <input
+                value={reporterDefaults.location}
+                placeholder="Contoh: Jakarta Selatan"
+                maxLength={getGraphicFieldLimit("REPORTER", "location")}
+                onChange={(event) => patchReporterDefault("location", event.target.value)}
+              />
+            </label>
           </div>
           <div className="settings-palette-preview" style={{ marginTop: 12 }}>
-            <BroadcastPreviewBox graphic={reporterGraphic} fields={reporterGraphic?.draftFields || null} master={{ ...masterForm, showTicker: false }}
-              emptyText="ISI NAMA REPORTER UNTUK MELIHAT PREVIEW" />
+            <BroadcastPreviewBox
+              graphic={reporterGraphic}
+              fields={reporterGraphic?.draftFields || null}
+              master={{ ...masterForm, showTicker: false }}
+              emptyText="ISI NAMA REPORTER UNTUK MELIHAT PREVIEW"
+            />
           </div>
-          <button type="button" className="primary-small" style={{ marginTop: 12 }} onClick={() => void saveReporterDefaultsData()}
-            disabled={savingAll || savingReporter || reporterState.loading || !reporterState.loaded}>
+          <button
+            type="button"
+            className="primary-small b"
+            style={{ marginTop: 12 }}
+            onClick={() => void saveReporterDefaultsData()}
+            disabled={savingAll || savingReporter || reporterState.loading || !reporterState.loaded}
+          >
             <Save size={13} /> {savingReporter ? "Menyimpan…" : "Simpan Default Reporter Lapangan"}
           </button>
           <p style={{ margin: "10px 0 0" }}>Menyimpan default hanya mengubah data bawaan; Program tetap memakai snapshot yang sedang tayang. Nama wajib diisi sebelum TAKE.</p>
         </div>
 
-        {/* 3. KARTU OUTPUT & INTEGRASI SWITCHER (VMIX / OBS / WIRECAST) */}
-        <div className="settings-card">
+        {/* 3. KARTU OUTPUT & INTEGRASI SWITCHER */}
+        <div
+          ref={(el) => { sectionRefs.current["sec-output"] = el; }}
+          className="settings-card p"
+        >
           <h3>
             <Globe size={17} />
             Output Layar Siaran (vMix / OBS Browser Input)
@@ -1473,9 +1879,9 @@ function SettingsView({
           <div
             style={{
               marginTop: 14,
-              background: "#0b1420",
-              border: "1px solid #1a3556",
-              borderRadius: 4,
+              background: "#0F131A",
+              border: "1px solid #252C38",
+              borderRadius: 8,
               padding: 14
             }}
           >
@@ -1486,11 +1892,11 @@ function SettingsView({
                 justifyContent: "space-between",
                 marginBottom: 12,
                 paddingBottom: 10,
-                borderBottom: "1px solid #162335"
+                borderBottom: "1px solid #252C38"
               }}
             >
               <span style={{ fontSize: 11, color: "#8a96a8" }}>Koneksi output NewsCG (tab/Browser Source):</span>
-              <span className={`state-badge ${live.overlayClientsCount > 0 ? "on-air" : "cued"}`}>
+              <span className={`state-badge st ${live.overlayClientsCount > 0 ? "r" : ""}`}>
                 <b>
                   {live.overlayClientsCount > 0
                     ? `${live.overlayClientsCount} klien terhubung`
@@ -1499,43 +1905,10 @@ function SettingsView({
               </span>
             </div>
 
-            <h4
-              style={{
-                margin: "0 0 8px",
-                fontSize: 12,
-                color: "#74b3f6",
-                display: "flex",
-                alignItems: "center",
-                gap: 6
-              }}
-            >
-              <Globe size={15} /> Panduan Pemasangan di vMix / OBS Studio:
-            </h4>
-            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#9cb1c9", lineHeight: 1.6 }}>
-              <li>
-                Di vMix / OBS, klik <b>Add Input → Web Browser</b> (atau <b>Browser Source</b> di OBS).
-              </li>
-              <li>
-                Masukkan URL Output berikut:{" "}
-                <code style={{ background: "#162335", color: "#6cb6ff", padding: "2px 6px", borderRadius: 3 }}>
-                  {outputUrl}
-                </code>
-              </li>
-              <li>
-                Atur Resolusi ke <b>1920 × 1080</b> (Full HD) dengan transparansi alpha aktif.
-              </li>
-              <li>
-                Samakan <b>Settings → Display → Master Frame Rate</b> di vMix dengan target {master.outputFps || 30}p. Frame rate akhir tetap ditentukan oleh proyek vMix dan kemampuan browser/GPU.
-              </li>
-              <li>
-                Pilih nomor overlay di vMix (misal Overlay 1 atau 2). Animasi grafis, ticker, dan logo siaran akan otomatis sinkron real-time saat Anda menekan TAKE / CLEAR.
-              </li>
-            </ol>
-
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <button
                 type="button"
-                className="primary-small"
+                className="primary-small b"
                 onClick={async () => {
                   const ok = await copyToClipboard(outputUrl);
                   if (ok) {
@@ -1549,19 +1922,7 @@ function SettingsView({
               </button>
               <button
                 type="button"
-                className="secondary-small"
-                style={{
-                  background: "#162335",
-                  border: "1px solid #233854",
-                  color: "#cbd5e1",
-                  borderRadius: 4,
-                  padding: "6px 12px",
-                  fontSize: 11,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  cursor: "pointer"
-                }}
+                className="secondary-small b"
                 onClick={() => window.open("/output", "_blank")}
               >
                 <ExternalLink size={13} /> Buka Preview Output di Tab Baru
@@ -1569,19 +1930,99 @@ function SettingsView({
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function PageTitle({ eyebrow, title, action }: { eyebrow: string; title: string; action?: any }) {
-  return (
-    <header className="page-title">
-      <div>
-        <small>{eyebrow}</small>
-        <h1>{title}</h1>
+      {/* 3. RIGHT COLUMN: HOTKEYS & KEAMANAN SIARAN (Settings.dc.html) */}
+      <div
+        ref={(el) => { sectionRefs.current["sec-hotkeys"] = el; }}
+        className="settings-right-scroll"
+      >
+        <aside className="p" style={{ padding: 16 }}>
+          <div className="fl" style={{ marginBottom: 8 }}>
+            <span className="l">Hotkeys</span>
+            <button
+              type="button"
+              className={`tg ${shortcutsEnabled ? "on active" : ""}`}
+              aria-label="Hotkeys"
+              aria-pressed={shortcutsEnabled}
+              onClick={onToggleShortcuts}
+            />
+          </div>
+          <div className="fl" style={{ height: 30 }}><span className="k">Space / Enter</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>TAKE atau UPDATE</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">U</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Update in-place</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">Esc / C</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>CLEAR</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">← →</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>OUT / TAKE · highlight</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">↑ ↓</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Story</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">K · PgUp/PgDn</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>SOT</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">P · O · H</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Anchor · Reporter · Bersih</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">L · T · D</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Lokasi · Topik · Detail</span></div>
+          <div className="fl" style={{ height: 30 }}><span className="k">M · 1 2 3 · 0</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Master</span></div>
+          <div style={{ borderTop: "1px solid #252C38", marginTop: 8, paddingTop: 8 }}>
+            <div className="fl" style={{ height: 30 }}><span className="k">F1–F3</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Pindah tab</span></div>
+            <div className="fl" style={{ height: 30 }}><span className="k">/</span><span style={{ fontSize: 13, color: "#C5CDD9" }}>Cari story</span></div>
+          </div>
+        </aside>
+
+        <aside className="p" style={{ padding: 16 }}>
+          <div className="l" style={{ marginBottom: 8 }}>Keamanan siaran</div>
+          <div className="fl" style={{ height: 40 }}>
+            <span style={{ fontSize: 13 }}>Safe mode: TAKE hanya jika Preview siap</span>
+            <button
+              type="button"
+              className={`tg ${safeModeTake ? "on active" : ""}`}
+              aria-label="Safe mode: TAKE hanya jika Preview siap"
+              aria-pressed={safeModeTake}
+              onClick={() => {
+                const next = !safeModeTake;
+                setSafeModeTake(next);
+                localStorage.setItem("newscg-safety-safe-take", String(next));
+              }}
+            />
+          </div>
+          <div className="fl" style={{ height: 40 }}>
+            <span style={{ fontSize: 13 }}>BLACKOUT harus ditahan 1 detik</span>
+            <button
+              type="button"
+              className={`tg ${holdBlackout ? "on active" : ""}`}
+              aria-label="BLACKOUT harus ditahan 1 detik"
+              aria-pressed={holdBlackout}
+              onClick={() => {
+                const next = !holdBlackout;
+                setHoldBlackout(next);
+                localStorage.setItem("newscg-safety-hold-blackout", String(next));
+              }}
+            />
+          </div>
+          <div className="fl" style={{ height: 40 }}>
+            <span style={{ fontSize: 13 }}>Hotkeys pause saat mengetik</span>
+            <button
+              type="button"
+              className={`tg ${pauseHotkeysTyping ? "on active" : ""}`}
+              aria-label="Hotkeys pause saat mengetik"
+              aria-pressed={pauseHotkeysTyping}
+              onClick={() => {
+                const next = !pauseHotkeysTyping;
+                setPauseHotkeysTyping(next);
+                localStorage.setItem("newscg-safety-pause-typing", String(next));
+              }}
+            />
+          </div>
+          <div className="fl" style={{ height: 40 }}>
+            <span style={{ fontSize: 13 }}>Auto-maju ke story berikutnya setelah CLEAR</span>
+            <button
+              type="button"
+              className={`tg ${autoAdvanceClear ? "on active" : ""}`}
+              aria-label="Auto-maju ke story berikutnya setelah CLEAR"
+              aria-pressed={autoAdvanceClear}
+              onClick={() => {
+                const next = !autoAdvanceClear;
+                setAutoAdvanceClear(next);
+                localStorage.setItem("newscg-safety-auto-advance", String(next));
+              }}
+            />
+          </div>
+        </aside>
       </div>
-      {action}
-    </header>
+    </div>
   );
 }

@@ -1,26 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EditableGraphic, GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
-import { getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, normalizeHeadlineTopicFields, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
+import { emptyRundownTicker, getGraphicFieldLimit, getRundownTickerSpeed, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, normalizeHeadlineTopicFields, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
   ArrowUp,
-  BookOpen,
   Bot,
   Check,
   Copy,
   Download,
   Edit3,
   FileSpreadsheet,
-  MapPin,
-  MonitorPlay,
   Plus,
-  Search,
-  SlidersHorizontal,
   Sparkles,
   Terminal,
   Trash2,
   Upload,
-  UserRound,
   X
 } from "lucide-react";
 import { api, mutate } from "./api";
@@ -28,22 +22,6 @@ import { BroadcastTemplateInfo } from "./VisualTemplatePicker";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { RundownBroadcastEditor } from "./RundownBroadcastEditor";
 import { ShimmerButton } from "./MagicUi";
-
-const duration = (seconds: number) =>
-  `${seconds < 0 ? "+" : ""}${Math.floor(Math.abs(seconds) / 60)
-    .toString()
-    .padStart(2, "0")}:${(Math.abs(seconds) % 60).toString().padStart(2, "0")}`;
-
-const graphicLabel = (g: GraphicItem) =>
-  g.templateType === "SOT"
-    ? `SOT · ${g.draftFields.name || "Narasumber"}`
-    : g.templateType === "REPORTER"
-    ? `CG · ${g.draftFields.name || "Nama"}`
-    : g.templateType === "LOCATION"
-    ? `Lokasi · ${g.draftFields.location || "Lokasi"}`
-    : `${g.draftFields.showLocation === "true" ? "Headline + Lokasi" : "Headline"}${
-        g.draftFields.subline && g.draftFields.layoutStyle !== "single" ? " + Detail" : ""
-      }`;
 
 type Props = {
   rundown?: Rundown;
@@ -55,6 +33,7 @@ type Props = {
   live: LiveState;
   onSetup: () => void;
   onPrepare?: () => void;
+  onSendToPreview?: () => void;
 };
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -162,7 +141,16 @@ Kirimkan permintaan HTTP POST dengan header "Content-Type: application/json; cha
 // =====================================================================
 // PANEL PERSIAPAN (PREPARATION / RUNDOWN MANAGEMENT)
 // =====================================================================
-export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSetup, master }: Props) {
+export function Preparation({
+  rundown,
+  rundowns,
+  onRundown,
+  reload,
+  toast,
+  master,
+  live,
+  onSendToPreview
+}: Props) {
   const [editing, setEditing] = useState<RundownItem | "new" | null>(null);
   useEffect(() => setEditing(null), [rundown?.id]);
   const editingTrigger = useRef<HTMLButtonElement | null>(null);
@@ -173,41 +161,368 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
   const [pending, setPending] = useState(false);
   const creatingRundown = useRef(false);
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [renameTarget, setRenameTarget] = useState<Rundown | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
-  const [copiedQuick, setCopiedQuick] = useState(false);
+  const [showExcelModal, setShowExcelModal] = useState(false);
 
-  const copyAiPromptQuick = async () => {
-    const host =
-      typeof window !== "undefined" && window.location.port === "5173"
-        ? `${window.location.protocol}//${window.location.hostname}:3001`
-        : typeof window !== "undefined"
-        ? window.location.origin
-        : "http://localhost:3001";
-    const prompt = buildAiAgentPrompt(host);
-    const ok = await copyTextToClipboard(prompt);
-    if (ok) {
-      setCopiedQuick(true);
-      toast("Prompt AI Agent berhasil disalin ke clipboard!");
-      setTimeout(() => setCopiedQuick(false), 2500);
+  const items = rundown?.items || [];
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(() => items[0]?.id || null);
+
+  useEffect(() => {
+    if (!items.length) {
+      setSelectedStoryId(null);
+      return;
+    }
+    if (!selectedStoryId || !items.some((i) => i.id === selectedStoryId)) {
+      setSelectedStoryId(items[0]?.id || null);
+    }
+  }, [rundown?.id, items, selectedStoryId]);
+
+  const selectedStory = useMemo(
+    () => items.find((i) => i.id === selectedStoryId) || items[0] || null,
+    [items, selectedStoryId]
+  );
+
+  const selectedStoryIndex = selectedStory ? items.findIndex((i) => i.id === selectedStory.id) : -1;
+  const primaryCue: GraphicItem | null = useMemo(() => {
+    if (!selectedStory) return null;
+    return (
+      selectedStory.graphics.find((g) => g.templateType === "HEADLINE") ||
+      selectedStory.graphics[0] ||
+      null
+    );
+  }, [selectedStory]);
+
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
+  const [inspectorSaveState, setInspectorSaveState] = useState<"idle" | "saving" | "saved">("idle");
+
+  const sotCues = useMemo(
+    () => selectedStory?.graphics.filter((g) => g.templateType === "SOT") || [],
+    [selectedStory]
+  );
+  const [selectedSotIndex, setSelectedSotIndex] = useState(0);
+  useEffect(() => {
+    setSelectedSotIndex(0);
+    setSelectedCueId(primaryCue?.id || selectedStory?.graphics[0]?.id || null);
+    setInspectorSaveState("idle");
+  }, [selectedStory?.id]);
+
+  const activeInspectorCue: GraphicItem | null = useMemo(() => {
+    if (!selectedStory) return null;
+    if (selectedCueId) {
+      const found = selectedStory.graphics.find((g) => g.id === selectedCueId);
+      if (found) return found;
+    }
+    return primaryCue;
+  }, [selectedStory, selectedCueId, primaryCue]);
+
+  // Inline inspector state for selectedStory
+  const [inspHeadline, setInspHeadline] = useState("");
+  const [inspDetail, setInspDetail] = useState("");
+  const [inspLocation, setInspLocation] = useState("");
+  const [inspKicker, setInspKicker] = useState("");
+  const [inspSotName, setInspSotName] = useState("");
+  const [inspSotRole, setInspSotRole] = useState("");
+  const inspectorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!selectedStory) {
+      setInspHeadline("");
+      setInspDetail("");
+      setInspLocation("");
+      setInspKicker("");
+      setInspSotName("");
+      setInspSotRole("");
+      return;
+    }
+    const f = primaryCue ? normalizeHeadlineTopicFields(primaryCue.templateType, primaryCue.draftFields) : {};
+    setInspHeadline(f.headline || selectedStory.title || "");
+    setInspDetail(f.subline || "");
+    setInspLocation(f.location || "");
+    setInspKicker(f.kicker || "");
+  }, [selectedStory?.id, primaryCue?.id, primaryCue?.draftFields]);
+
+  const currentSotCue = sotCues[selectedSotIndex] || null;
+  useEffect(() => {
+    if (currentSotCue) {
+      setInspSotName(currentSotCue.draftFields.name || "");
+      setInspSotRole(currentSotCue.draftFields.role || "");
     } else {
-      toast("Gagal menyalin otomatis. Silakan buka panduan untuk salin manual.");
+      setInspSotName("");
+      setInspSotRole("");
+    }
+  }, [currentSotCue?.id, currentSotCue?.draftFields]);
+
+  const saveInspectorFields = async (nextH: string, nextD: string, nextL: string, nextK?: string) => {
+    if (!selectedStory || !primaryCue) return;
+    setInspectorSaveState("saving");
+    try {
+      const kickerVal = nextK !== undefined ? nextK : inspKicker;
+      const nextFields: Record<string, string> = {
+        ...primaryCue.draftFields,
+        headline: nextH,
+        subline: nextD,
+        location: nextL,
+        kicker: kickerVal,
+        showLocation: nextL.trim() ? "true" : "false",
+        showDetail: nextD.trim() ? "true" : "false",
+        showKicker: kickerVal.trim() ? "true" : "false",
+        layoutStyle: nextD.trim() ? "sub" : "single"
+      };
+      await mutate(`/api/graphics/${primaryCue.id}`, "PATCH", { draftFields: nextFields });
+      if (nextH.trim() && nextH.trim() !== selectedStory.title) {
+        await mutate(`/api/items/${selectedStory.id}`, "PATCH", { title: nextH.trim() });
+      }
+      await reload();
+      setInspectorSaveState("saved");
+    } catch (e: any) {
+      setInspectorSaveState("idle");
+      toast(e.message || "Gagal menyimpan perubahan story");
     }
   };
 
+  const handleInspectorInput = (field: "headline" | "detail" | "location" | "kicker", val: string) => {
+    const nextH = field === "headline" ? val : inspHeadline;
+    const nextD = field === "detail" ? val : inspDetail;
+    const nextL = field === "location" ? val : inspLocation;
+    const nextK = field === "kicker" ? val : inspKicker;
+    if (field === "headline") setInspHeadline(val);
+    if (field === "detail") setInspDetail(val);
+    if (field === "location") setInspLocation(val);
+    if (field === "kicker") setInspKicker(val);
+    if (primaryCue) setSelectedCueId(primaryCue.id);
+    setInspectorSaveState("saving");
+    if (inspectorTimerRef.current) clearTimeout(inspectorTimerRef.current);
+    inspectorTimerRef.current = setTimeout(() => {
+      void saveInspectorFields(nextH, nextD, nextL, nextK);
+    }, 450);
+  };
+
+  const handleSotInlineInput = (field: "name" | "role", val: string) => {
+    if (!currentSotCue) return;
+    const nextName = field === "name" ? val : inspSotName;
+    const nextRole = field === "role" ? val : inspSotRole;
+    if (field === "name") setInspSotName(val);
+    if (field === "role") setInspSotRole(val);
+    setSelectedCueId(currentSotCue.id);
+    setInspectorSaveState("saving");
+    if (inspectorTimerRef.current) clearTimeout(inspectorTimerRef.current);
+    inspectorTimerRef.current = setTimeout(async () => {
+      try {
+        await mutate(`/api/graphics/${currentSotCue.id}`, "PATCH", {
+          draftFields: {
+            ...currentSotCue.draftFields,
+            headline: inspHeadline || selectedStory?.title || "",
+            name: nextName,
+            role: nextRole
+          }
+        });
+        await reload();
+        setInspectorSaveState("saved");
+      } catch (e: any) {
+        setInspectorSaveState("idle");
+        toast(e.message || "Gagal menyimpan narasumber SOT");
+      }
+    }, 450);
+  };
+
+  const addQuickSotToSelectedStory = async () => {
+    if (!rundown || !selectedStory || pending) return;
+    setPending(true);
+    try {
+      const nextGraphics = [
+        ...selectedStory.graphics.map((g, i) => ({
+          id: g.id,
+          templateType: g.templateType,
+          sortOrder: i,
+          draftFields: g.draftFields
+        })),
+        {
+          templateType: "SOT" as const,
+          sortOrder: selectedStory.graphics.length,
+          draftFields: {
+            headline: inspHeadline || selectedStory.title || "JUDUL BERITA",
+            name: "NAMA NARASUMBER",
+            role: "Jabatan / Institusi",
+            location: inspLocation || "",
+            contentMode: "sot",
+            showLocation: inspLocation ? "true" : "false",
+            visualTemplate: "cnn"
+          }
+        }
+      ];
+      const updated = await mutate<RundownItem>(`/api/rundowns/${rundown.id}/story`, "PUT", {
+        itemId: selectedStory.id,
+        title: selectedStory.title,
+        slug: selectedStory.slug,
+        format: selectedStory.format,
+        cgRequired: true,
+        estimatedDurationSeconds: selectedStory.estimatedDurationSeconds,
+        sortOrder: selectedStory.sortOrder,
+        graphics: nextGraphics
+      });
+      await reload();
+      const newSots = updated?.graphics?.filter((g) => g.templateType === "SOT") || [];
+      if (newSots.length > 0) {
+        setSelectedSotIndex(newSots.length - 1);
+        setSelectedCueId(newSots[newSots.length - 1]!.id);
+      }
+      toast("Slot Narasumber (SOT) ditambahkan ke story ini");
+    } catch (e: any) {
+      toast(e.message || "Gagal menambahkan narasumber");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const removeQuickSotFromSelectedStory = async (sotCueId: string) => {
+    if (!rundown || !selectedStory || pending) return;
+    setPending(true);
+    try {
+      const nextGraphics = selectedStory.graphics
+        .filter((g) => g.id !== sotCueId)
+        .map((g, i) => ({
+          id: g.id,
+          templateType: g.templateType,
+          sortOrder: i,
+          draftFields: g.draftFields
+        }));
+      await mutate<RundownItem>(`/api/rundowns/${rundown.id}/story`, "PUT", {
+        itemId: selectedStory.id,
+        title: selectedStory.title,
+        slug: selectedStory.slug,
+        format: selectedStory.format,
+        cgRequired: selectedStory.cgRequired,
+        estimatedDurationSeconds: selectedStory.estimatedDurationSeconds,
+        sortOrder: selectedStory.sortOrder,
+        graphics: nextGraphics
+      });
+      await reload();
+      setSelectedSotIndex(0);
+      setSelectedCueId(primaryCue?.id || null);
+      toast("Narasumber (SOT) dihapus");
+    } catch (e: any) {
+      toast(e.message || "Gagal menghapus narasumber");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const setInspectorMode = async (modeType: "headline" | "highlight" | "bulletin") => {
+    if (!selectedStory || !primaryCue) return;
+    try {
+      const nextFields: Record<string, string> =
+        modeType === "headline"
+          ? {
+              ...primaryCue.draftFields,
+              headlinePresentation: "story",
+              kicker: primaryCue.draftFields.kicker === "HIGHLIGHT" || primaryCue.draftFields.kicker === "BULLETIN" ? "" : (primaryCue.draftFields.kicker || ""),
+              showKicker: "false"
+            }
+          : modeType === "highlight"
+          ? {
+              ...primaryCue.draftFields,
+              ...headlineBulletinPreset,
+              kicker: "HIGHLIGHT",
+              showKicker: "true"
+            }
+          : {
+              ...primaryCue.draftFields,
+              ...headlineBulletinPreset,
+              kicker: "BULLETIN",
+              showKicker: "true"
+            };
+      await mutate(`/api/graphics/${primaryCue.id}`, "PATCH", { draftFields: nextFields });
+      await reload();
+      toast(`Tipe story diubah ke ${modeType === "headline" ? "Headline" : modeType === "highlight" ? "Highlight" : "Bulletin"}`);
+    } catch (e: any) {
+      toast(e.message || "Gagal mengubah tipe story");
+    }
+  };
+
+  async function duplicateSelectedStory() {
+    if (!rundown || !selectedStory || pending) return;
+    setPending(true);
+    try {
+      const created = await mutate<RundownItem>(`/api/rundowns/${rundown.id}/story`, "PUT", {
+        title: `${selectedStory.title} (Salinan)`,
+        slug: `${selectedStory.slug}-COPY`.slice(0, 24),
+        format: selectedStory.format,
+        cgRequired: selectedStory.cgRequired,
+        estimatedDurationSeconds: selectedStory.estimatedDurationSeconds,
+        sortOrder: rundown.items.length,
+        graphics: selectedStory.graphics.map((g, idx) => ({
+          templateType: g.templateType,
+          sortOrder: idx,
+          draftFields: { ...g.draftFields }
+        }))
+      });
+      await reload();
+      if (created?.id) setSelectedStoryId(created.id);
+      toast(`Story "${selectedStory.title}" berhasil diduplikat`);
+    } catch (e: any) {
+      toast(e.message || "Gagal menduplikat story");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function sendStoryToPreview() {
+    if (!rundown || !selectedStory) return;
+    sessionStorage.setItem(`simple-cued-story-${rundown.id}`, selectedStory.id);
+    const targetCueId = activeInspectorCue?.id || primaryCue?.id;
+    if (targetCueId) {
+      sessionStorage.setItem(`simple-cued-cue-${rundown.id}`, targetCueId);
+    }
+    toast(`Story #${selectedStoryIndex + 1} disiapkan di Kontrol Preview`);
+    onSendToPreview?.();
+  }
+
+  // Keyboard shortcuts in Rundown tab: `/`, `N`, `Ctrl+D`, `PgUp`, `PgDn`
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const inInput = Boolean(
+        target && typeof target.closest === "function" && target.closest("input,textarea,select,[contenteditable=true],[role=dialog]")
+      );
+      if (inInput || editing || renameTarget || showAiModal || showExcelModal) return;
+
+      if (event.key === "/") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      } else if ((event.key === "n" || event.key === "N") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (rundown) {
+          event.preventDefault();
+          setEditing("new");
+        }
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        void duplicateSelectedStory();
+      } else if (event.key === "PageDown" && sotCues.length > 0) {
+        event.preventDefault();
+        setSelectedSotIndex((prev) => Math.min(sotCues.length - 1, prev + 1));
+      } else if (event.key === "PageUp" && sotCues.length > 0) {
+        event.preventDefault();
+        setSelectedSotIndex((prev) => Math.max(0, prev - 1));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editing, renameTarget, showAiModal, showExcelModal, rundown, selectedStory, sotCues.length]);
+
   async function move(item: RundownItem, offset: number) {
     if (!rundown || pending) return;
-    const items = [...rundown.items];
-    const index = items.findIndex((i) => i.id === item.id);
-    const other = items[index + offset];
+    const list = [...rundown.items];
+    const index = list.findIndex((i) => i.id === item.id);
+    const other = list[index + offset];
     if (!other) return;
     setPending(true);
     try {
-      items[index] = other;
-      items[index + offset] = item;
-      const itemIds = items.map((row) => row.id);
+      list[index] = other;
+      list[index + offset] = item;
+      const itemIds = list.map((row) => row.id);
       await mutate(`/api/rundowns/${rundown.id}/reorder`, "POST", { itemIds });
-
       await reload();
     } catch (e) {
       toast((e as Error).message);
@@ -304,323 +619,689 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
     }
   }
 
-  const items = rundown?.items || [];
   const filteredItems = items.filter(
     (i) =>
       i.title.toLowerCase().includes(search.toLowerCase()) ||
       i.slug.toLowerCase().includes(search.toLowerCase())
   );
-  const totalDuration = items.reduce((s, i) => s + i.estimatedDurationSeconds, 0);
-  const noCgCount = items.filter((item) => !item.cgRequired).length;
+
+  const rundownSpeed = useMemo(
+    () => getRundownTickerSpeed(rundown?.ticker ?? emptyRundownTicker),
+    [rundown?.ticker]
+  );
+
+  const tickerPreviewText =
+    rundown?.ticker?.text?.trim() ||
+    items.map((i) => i.title.toUpperCase()).join("  •  ") ||
+    "BELUM ADA TEKS TICKER RUNDOWN";
+
+  const isStoryOnAir = (story: RundownItem) =>
+    Boolean(live.onAirGraphicId && story.graphics.some((g) => g.id === live.onAirGraphicId));
+
+  const inspectorPresentation =
+    primaryCue?.draftFields.headlinePresentation === "bulletin"
+      ? primaryCue.draftFields.kicker === "BULLETIN"
+        ? "bulletin"
+        : "highlight"
+      : "headline";
 
   return (
     <section className="prep-container">
-      {/* Top Header & Rundown Selector */}
-      <header className="prep-header-bar">
-        <div className="prep-brand-info">
-          <div className="prep-title-group">
-            <h1>{rundown?.programName || "Manajemen Rundown"}</h1>
-            <span className="prep-edition-badge">{rundown?.title || "Edisi Siaran"}</span>
-            {rundown && (
-              <button
-                className="prep-rename-btn"
-                onClick={() => setRenameTarget(rundown)}
-                title="Ubah nama program & edisi"
-              >
-                <Edit3 size={12} />
-                <span>Ubah Edisi</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="prep-actions-group">
-          <button
-            className="btn-prep-secondary"
-            disabled={pending}
-            onClick={async () => {
-              if (pending || creatingRundown.current) return;
-              creatingRundown.current = true;
-              setPending(true);
-              try {
-                const r = await mutate<Rundown>("/api/rundowns", "POST", {
-                  programName: "Program Berita",
-                  title: "Edisi Baru",
-                  items: []
-                });
-                await reload();
-                onRundown(r.id);
-                toast("Rundown baru berhasil dibuat");
-              } catch (e) {
-                toast((e as Error).message);
-              } finally {
-                creatingRundown.current = false;
-                setPending(false);
-              }
+      {/* Main 2-Column Workspace Grid matching Rundown.dc.html */}
+      <div className="rundown-workspace-grid">
+        {/* LEFT PANEL: TOOLBAR + TABLE + TICKER RUNDOWN */}
+        <section className="p rundown-left-panel">
+          {/* Edition Identity & File Actions Bar */}
+          <div
+            style={{
+              padding: "10px 16px",
+              borderBottom: "1px solid #252C38",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              background: "#0F131A",
+              borderTopLeftRadius: 12,
+              borderTopRightRadius: 12
             }}
           >
-            <Plus size={13} />
-            <span>Rundown Baru</span>
-          </button>
+            <div className="prep-title-group" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {rundowns.length > 0 && (
+                <select
+                  aria-label="Pilih Edisi Rundown"
+                  className="i"
+                  style={{ width: "auto", minWidth: 210, height: 32, marginTop: 0, padding: "0 10px", fontSize: 12.5, fontWeight: 700 }}
+                  value={rundown?.id || ""}
+                  onChange={(e) => onRundown(e.target.value)}
+                >
+                  {rundowns.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.programName} · {r.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <span className="sr-only-text">{rundown?.programName} · {rundown?.title}</span>
+              {rundown && (
+                <button
+                  type="button"
+                  className="b"
+                  style={{ height: 30, padding: "0 10px", fontSize: 12 }}
+                  onClick={() => setRenameTarget(rundown)}
+                  title="Ubah nama program & edisi"
+                >
+                  <Edit3 size={12} />
+                  <span>Ubah Edisi</span>
+                </button>
+              )}
+            </div>
 
-          {rundown && (
-            <button
-              className="btn-prep-secondary"
-              disabled={pending}
-              onClick={exportCurrentRundown}
-              title="Ekspor rundown saat ini ke berkas JSON"
-            >
-              <Download size={13} />
-              <span>Ekspor</span>
-            </button>
-          )}
-
-          <button
-            className="btn-prep-secondary"
-            disabled={pending}
-            onClick={() => importFileInputRef.current?.click()}
-            title="Impor rundown dari berkas JSON"
-          >
-            <Upload size={13} />
-            <span>Impor</span>
-          </button>
-          <input
-            ref={importFileInputRef}
-            type="file"
-            accept=".json,application/json"
-            style={{ display: "none" }}
-            onChange={handleImportFile}
-          />
-
-          {rundown && (
-            <button
-              className="btn-prep-danger"
-              disabled={pending}
-              onClick={deleteCurrentRundown}
-              title="Hapus rundown saat ini beserta seluruh berita di dalamnya"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                background: "rgba(225, 29, 72, 0.12)",
-                border: "1px solid rgba(225, 29, 72, 0.35)",
-                color: "#ff8891",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.15s ease"
-              }}
-            >
-              <Trash2 size={13} />
-              <span>Hapus Rundown</span>
-            </button>
-          )}
-
-          <ShimmerButton
-            variant="ai"
-            onClick={() => setShowAiModal(true)}
-            title="Salin prompt & panduan untuk AI Agent membuat rundown dari Excel/PDF/Word/Foto"
-          >
-            <Sparkles size={13} />
-            <span>Prompt AI Agent</span>
-          </ShimmerButton>
-
-          <ShimmerButton
-            variant="primary"
-            disabled={!rundown}
-            onClick={(event) => { editingTrigger.current = event.currentTarget; setEditing("new"); }}
-          >
-            <Plus size={14} />
-            <span>Tambah Berita</span>
-          </ShimmerButton>
-        </div>
-      </header>
-      {rundown && <RundownBroadcastEditor key={rundown.id} rundown={rundown} reload={reload} toast={toast} />}
-
-      {/* Metrics Summary Strip */}
-      {rundown && (
-        <div className="prep-metrics-strip">
-          <div className="metric-box">
-            <small>TOTAL BERITA</small>
-            <b>{items.length} Item Rundown</b>
-          </div>
-          <div className="metric-box">
-            <small>ESTIMASI DURASI SIARAN</small>
-            <b>{duration(totalDuration)}</b>
-          </div>
-          <div className="metric-box">
-            <small>TANPA CG</small>
-            <b>{noCgCount} Item</b>
-          </div>
-
-          <div className="prep-filter-box">
-            <Search size={13} />
-            <input
-              type="text"
-              placeholder="Filter berita / slug…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button onClick={() => setSearch("")}>
-                <X size={12} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="b"
+                style={{ height: 30, padding: "0 10px", fontSize: 12 }}
+                disabled={pending}
+                onClick={async () => {
+                  if (pending || creatingRundown.current) return;
+                  creatingRundown.current = true;
+                  setPending(true);
+                  try {
+                    const r = await mutate<Rundown>("/api/rundowns", "POST", {
+                      programName: "Program Berita",
+                      title: "Edisi Baru",
+                      items: []
+                    });
+                    await reload();
+                    onRundown(r.id);
+                    toast("Rundown baru berhasil dibuat");
+                  } catch (e) {
+                    toast((e as Error).message);
+                  } finally {
+                    creatingRundown.current = false;
+                    setPending(false);
+                  }
+                }}
+              >
+                <Plus size={12} />
+                <span>Rundown Baru</span>
               </button>
-            )}
+
+              {rundown && (
+                <button
+                  type="button"
+                  className="b"
+                  style={{ height: 30, padding: "0 10px", fontSize: 12 }}
+                  disabled={pending}
+                  onClick={exportCurrentRundown}
+                  title="Ekspor rundown saat ini ke berkas JSON"
+                >
+                  <Download size={12} />
+                  <span>Ekspor</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="b"
+                style={{ height: 30, padding: "0 10px", fontSize: 12 }}
+                disabled={pending}
+                onClick={() => importFileInputRef.current?.click()}
+                title="Impor rundown dari berkas JSON"
+              >
+                <Upload size={12} />
+                <span>Impor</span>
+              </button>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: "none" }}
+                onChange={handleImportFile}
+              />
+
+              <button
+                type="button"
+                className="b"
+                style={{ height: 30, padding: "0 10px", fontSize: 12 }}
+                onClick={() => setShowAiModal(true)}
+                title="Salin prompt & panduan untuk AI Agent"
+              >
+                <Sparkles size={12} />
+                <span>Prompt AI Agent</span>
+              </button>
+
+              {rundown && (
+                <button
+                  type="button"
+                  className="b"
+                  style={{ height: 30, padding: "0 10px", fontSize: 12, borderColor: "#D93036", color: "#FF6369" }}
+                  disabled={pending}
+                  onClick={deleteCurrentRundown}
+                  title="Hapus rundown saat ini"
+                >
+                  <Trash2 size={12} />
+                  <span>Hapus Rundown</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Modern Table List of Stories */}
-      {rundown && (
-        <div className="prep-table-card">
-          <div className="prep-table-header">
-            <div className="col-ord">#</div>
-            <div className="col-fmt">FORMAT</div>
-            <div className="col-main">BERITA & SLUG</div>
-            <div className="col-dur">DURASI</div>
-            <div className="col-cues">MATERI CG (CUE)</div>
-            <div className="col-act">AKSI</div>
+          {/* Primary Toolbar from Rundown.dc.html */}
+          <div className="ph">
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                data-label="+ Story baru"
+                data-key="N"
+                className="b btn-tambah-berita-styled"
+                style={{ background: "#2A3A55" }}
+                disabled={!rundown}
+                onClick={(event) => {
+                  editingTrigger.current = event.currentTarget;
+                  setEditing("new");
+                }}
+              >
+                <span className="sr-only-text">Tambah Berita</span>
+              </button>
+
+              <button
+                type="button"
+                className="b"
+                disabled={!rundown || pending}
+                onClick={() => setShowExcelModal(true)}
+              >
+                Tempel dari Excel <span className="k">Ctrl+V</span>
+              </button>
+
+              <button
+                type="button"
+                className="b"
+                disabled={!rundown || !selectedStory || pending}
+                onClick={() => void duplicateSelectedStory()}
+              >
+                Duplikat <span className="k">Ctrl+D</span>
+              </button>
+            </div>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="k">/</span>
+              <input
+                ref={searchInputRef}
+                className="i"
+                style={{ width: 240, margin: 0 }}
+                placeholder="Cari story"
+                aria-label="Cari story"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
           </div>
 
-          <div className="prep-table-body">
-            {filteredItems.map((item) => {
-              const realIndex = rundown.items.findIndex((i) => i.id === item.id);
+          {/* Story Table from Rundown.dc.html */}
+          <div className="rundown-table-scroll">
+            <table className="rundown-table">
+              <thead className="l">
+                <tr>
+                  <th style={{ width: 52 }}></th>
+                  <th style={{ width: 38 }}>#</th>
+                  <th style={{ width: 84 }}>Status</th>
+                  <th style={{ width: 96 }}>Tipe</th>
+                  <th>Headline</th>
+                  <th style={{ width: 150 }}>Lokasi</th>
+                  <th style={{ width: 54 }}>SOT</th>
+                  <th style={{ width: 68 }}>Ticker</th>
+                  <th style={{ width: 108 }}>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((item) => {
+                  const realIndex = items.findIndex((i) => i.id === item.id);
+                  const isSelected = selectedStory?.id === item.id;
+                  const onAir = isStoryOnAir(item);
+                  const headCue = item.graphics.find((g) => g.templateType === "HEADLINE") || item.graphics[0];
+                  const headFields = headCue ? normalizeHeadlineTopicFields(headCue.templateType, headCue.draftFields) : {};
+                  const itemSots = item.graphics.filter((g) => g.templateType === "SOT").length;
+                  const tipeLabel = !item.cgRequired
+                    ? "Tanpa CG"
+                    : headCue?.draftFields.headlinePresentation === "bulletin"
+                    ? "Highlight"
+                    : headCue?.templateType === "SOT"
+                    ? "SOT"
+                    : "Headline";
+                  const headlineText = headFields.headline || item.title;
+                  const locationText = headFields.location || "—";
+                  const inTicker = Boolean(
+                    rundown?.ticker?.text &&
+                      headlineText &&
+                      rundown.ticker.text.toLowerCase().includes(headlineText.slice(0, 14).toLowerCase())
+                  );
 
-              return (
-                <div key={item.id} className="prep-row-item">
-                  <div className="col-ord">
-                    <span className="order-num">{String(realIndex + 1).padStart(2, "0")}</span>
-                    <div className="order-btns">
-                      <button
-                        disabled={pending || realIndex === 0}
-                        onClick={() => move(item, -1)}
-                        title="Naikkan urutan"
-                      >
-                        <ArrowUp size={11} />
-                      </button>
-                      <button
-                        disabled={pending || realIndex === rundown.items.length - 1}
-                        onClick={() => move(item, 1)}
-                        title="Turunkan urutan"
-                      >
-                        <ArrowDown size={11} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="col-fmt">
-                    <span className={`format-chip fmt-${item.format.toLowerCase()}`}>
-                      {item.format}
-                    </span>
-                  </div>
-
-                  <div className="col-main">
-                    <strong className="story-title-text">{item.title}</strong>
-                    <span className="story-slug-code">{item.slug}</span>
-                  </div>
-
-                  <div className="col-dur">
-                    <span className="dur-badge">{duration(item.estimatedDurationSeconds)}</span>
-                  </div>
-
-                  <div className="col-cues">
-                    <div className="cue-pills-list">
-                      {item.graphics.map((g) => (
-                        <span
-                          key={g.id}
-                          className={`cg-chip cg-${g.templateType.toLowerCase()}`}
-                          title={graphicLabel(g)}
-                        >
-                          {g.templateType === "SOT" || g.templateType === "REPORTER" ? (
-                            <>
-                              <UserRound size={10} />
-                              <span>{g.draftFields.name || (g.templateType === "SOT" ? "SOT" : "Nama")}</span>
-                            </>
-                          ) : g.templateType === "LOCATION" ? (
-                            <>
-                              <MapPin size={10} />
-                              <span>{g.draftFields.location || "Lokasi"}</span>
-                            </>
-                          ) : (
-                            <>
-                              <MonitorPlay size={10} />
-                              <span>{g.draftFields.headline?.slice(0, 18) || "Headline"}…</span>
-                            </>
-                          )}
+                  return (
+                    <tr
+                      key={item.id}
+                      className={isSelected ? "on" : ""}
+                      onClick={() => setSelectedStoryId(item.id)}
+                      onDoubleClick={() => setEditing(item)}
+                    >
+                      <td className="m" style={{ color: "#6B7686" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <span>⋮⋮</span>
+                          <button
+                            type="button"
+                            style={{ background: "none", border: 0, color: "#98A3B3", padding: 2, cursor: "pointer" }}
+                            disabled={pending || realIndex === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void move(item, -1);
+                            }}
+                            title="Naikkan urutan"
+                          >
+                            <ArrowUp size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            style={{ background: "none", border: 0, color: "#98A3B3", padding: 2, cursor: "pointer" }}
+                            disabled={pending || realIndex === items.length - 1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void move(item, 1);
+                            }}
+                            title="Turunkan urutan"
+                          >
+                            <ArrowDown size={11} />
+                          </button>
                         </span>
-                      ))}
-                      {item.graphics.length === 0 && (
-                        <span className="cg-chip-empty">{item.cgRequired ? "Belum ada CG" : "CG tidak diperlukan"}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="col-act">
-                    <button
-                      className="btn-act-edit"
-                      onClick={(event) => { editingTrigger.current = event.currentTarget; setEditing(item); }}
-                      title="Edit materi berita dan daftar grafis"
-                    >
-                      <Edit3 size={12} />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      className="btn-act-delete"
-                      onClick={() => removeItem(item)}
-                      title="Hapus berita dari rundown"
-                      disabled={pending}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                      </td>
+                      <td className="m">{realIndex + 1}</td>
+                      <td>
+                        <span className={`st ${onAir ? "r" : ""}`}>
+                          {onAir ? "ON AIR" : "SIAP"}
+                        </span>
+                      </td>
+                      <td>{tipeLabel}</td>
+                      <td style={{ fontWeight: 600 }}>{headlineText}</td>
+                      <td>{locationText}</td>
+                      <td className="m">{itemSots}</td>
+                      <td>{inTicker || realIndex < 2 ? "Ya" : "Tidak"}</td>
+                      <td>
+                        <div style={{ display: "inline-flex", gap: 6 }}>
+                          <button
+                            type="button"
+                            className="b"
+                            style={{ height: 28, padding: "0 8px", fontSize: 11 }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              editingTrigger.current = event.currentTarget;
+                              setEditing(item);
+                            }}
+                            title="Edit materi berita dan daftar grafis"
+                          >
+                            <Edit3 size={11} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="b"
+                            style={{ height: 28, padding: "0 8px", fontSize: 11, color: "#FF6369" }}
+                            disabled={pending}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void removeItem(item);
+                            }}
+                            title="Hapus berita dari rundown"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
             {!filteredItems.length && (
-              search ? (
-                <div className="prep-table-empty">
-                  <span>Tidak ada berita yang cocok dengan pencarian "{search}"</span>
-                </div>
-              ) : (
-                <div className="prep-table-empty-rich">
-                  <div className="empty-rich-icon">
-                    <FileSpreadsheet size={28} />
+              <div style={{ padding: 32, textAlign: "center", color: "#98A3B3" }}>
+                {search ? (
+                  <span>Tidak ada story yang cocok dengan pencarian "{search}"</span>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                    <FileSpreadsheet size={26} />
+                    <b>Rundown Ini Belum Memiliki Story</b>
+                    <span style={{ fontSize: 12 }}>Klik "+ Story baru" atau "Tempel dari Excel" untuk mulai mengisi berita.</span>
                   </div>
-                  <h3>Rundown Ini Belum Memiliki Berita</h3>
-                  <p>
-                    Mulai siaran dengan menambah berita manual, atau gunakan <b>AI Agent</b> untuk
-                    mengonversi naskah rundown (Excel, PDF, Word, atau foto jadwal) secara instan ke server NewsCG via REST API.
-                    Semua data yang dibuat AI langsung dapat diedit di web ini.
-                  </p>
-                  <div className="empty-rich-actions">
-                    <button
-                      type="button"
-                      className="btn-prep-primary"
-                      onClick={(event) => {
-                        editingTrigger.current = event.currentTarget;
-                        setEditing("new");
-                      }}
-                    >
-                      <Plus size={14} />
-                      <span>Tambah Berita Manual</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-prep-ai"
-                      onClick={() => setShowAiModal(true)}
-                    >
-                      <Sparkles size={14} />
-                      <span>✨ Bikin via AI Agent (Salin Prompt)</span>
-                    </button>
-                  </div>
-                </div>
-              )
+                )}
+              </div>
             )}
           </div>
-        </div>
+
+          {/* Bottom Ticker Rundown Section matching Rundown.dc.html */}
+          <div style={{ marginTop: "auto", borderTop: "1px solid #252C38", padding: "14px 16px" }}>
+            <div className="fl">
+              <span className="l">Ticker rundown</span>
+              <span className="m" style={{ fontSize: 12, color: "#98A3B3" }}>
+                Kecepatan {rundownSpeed} px/dtk
+              </span>
+            </div>
+            <div
+              className="m"
+              style={{
+                marginTop: 10,
+                background: "#0F131A",
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 13,
+                color: "#C5CDD9",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
+              }}
+            >
+              {tickerPreviewText}
+            </div>
+            {rundown && (
+              <details style={{ marginTop: 10 }}>
+                <summary style={{ fontSize: 12, color: "#98A3B3", cursor: "pointer", fontWeight: 600 }}>
+                  Atur jadwal siaran &amp; teks ticker rundown
+                </summary>
+                <div style={{ marginTop: 10 }}>
+                  <RundownBroadcastEditor key={rundown.id} rundown={rundown} reload={reload} toast={toast} />
+                </div>
+              </details>
+            )}
+          </div>
+        </section>
+
+        {/* RIGHT PANEL: STORY INSPECTOR (Clean & Functional as in Rundown.dc.html + Mini Preview) */}
+        <aside className="p rundown-inspector-panel" aria-label="Inspektur Story">
+          {selectedStory ? (
+            <>
+              <div className="fl inspector-head-row">
+                <div>
+                  <div className="fl" style={{ justifyContent: "flex-start", gap: 8 }}>
+                    <b style={{ fontSize: 15 }}>Story #{selectedStoryIndex + 1}</b>
+                    <span className={`st ${isStoryOnAir(selectedStory) ? "r" : ""}`}>
+                      {isStoryOnAir(selectedStory) ? "ON AIR" : "SIAP"}
+                    </span>
+                    <span className="inspector-save-pill" style={{ color: inspectorSaveState === "saved" ? "#3DD68C" : "#98A3B3" }}>
+                      {inspectorSaveState === "saving"
+                        ? "Menyimpan…"
+                        : inspectorSaveState === "saved"
+                        ? "✓ Tersimpan"
+                        : "Auto-save"}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="b"
+                  style={{ height: 32, padding: "0 10px", fontSize: 12 }}
+                  onClick={(event) => {
+                    editingTrigger.current = event.currentTarget;
+                    setEditing(selectedStory);
+                  }}
+                  title="Buka modal editor lengkap untuk mengatur seluruh cue"
+                >
+                  <Edit3 size={12} /> Detail Cue
+                </button>
+              </div>
+
+              {isStoryOnAir(selectedStory) && (
+                <div className="ui-notice">
+                  Story sedang ON AIR. Perubahan baru tayang setelah UPDATE <span className="k">U</span> di Kontrol.
+                </div>
+              )}
+
+              {/* Compact 16:9 Live Preview Box */}
+              <div className="inspector-mini-preview-box">
+                <div className="fl inspector-mini-preview-head">
+                  <span className="l" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <i className="dt" style={{ background: "#3DD68C" }} />
+                    Pratinjau CG · {activeInspectorCue?.templateType === "SOT" ? "SOT" : inspectorPresentation === "highlight" ? "Highlight" : inspectorPresentation === "bulletin" ? "Bulletin" : "Headline"}
+                  </span>
+                  {selectedStory.graphics.length > 1 && (
+                    <div className="inspector-cue-pills">
+                      {selectedStory.graphics.map((g, gIdx) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          className={`inspector-cue-pill ${activeInspectorCue?.id === g.id ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedCueId(g.id);
+                            if (g.templateType === "SOT") {
+                              const sIdx = sotCues.findIndex((s) => s.id === g.id);
+                              if (sIdx >= 0) setSelectedSotIndex(sIdx);
+                            }
+                          }}
+                        >
+                          #{gIdx + 1} {g.templateType === "SOT" ? "SOT" : g.draftFields.headlinePresentation === "bulletin" ? "HL" : "HEAD"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="inspector-mini-preview-stage">
+                  <BroadcastPreviewBox
+                    graphic={activeInspectorCue}
+                    fields={
+                      activeInspectorCue?.templateType === "SOT"
+                        ? {
+                            ...activeInspectorCue.draftFields,
+                            headline: inspHeadline || selectedStory.title,
+                            name: inspSotName || activeInspectorCue.draftFields.name || "NAMA NARASUMBER",
+                            role: inspSotRole || activeInspectorCue.draftFields.role || "Jabatan"
+                          }
+                        : {
+                            ...(primaryCue?.draftFields || {}),
+                            headline: inspHeadline || selectedStory.title,
+                            subline: inspDetail,
+                            location: inspLocation,
+                            kicker: inspKicker || primaryCue?.draftFields.kicker || "",
+                            showLocation: inspLocation.trim() ? "true" : "false",
+                            showDetail: inspDetail.trim() ? "true" : "false",
+                            showKicker: (inspKicker || primaryCue?.draftFields.kicker || "").trim() ? "true" : "false",
+                            layoutStyle: inspDetail.trim() ? "sub" : "single"
+                          }
+                    }
+                    master={{ ...master, tickerText: rundown?.ticker?.text ?? "", tickerSpeed: rundownSpeed }}
+                    emptyText="STORY TANPA CG"
+                  />
+                </div>
+              </div>
+
+              <div className="inspector-field-block">
+                <div className="seg" role="group" aria-label="Tipe sajian story">
+                  <button
+                    type="button"
+                    className={inspectorPresentation === "headline" ? "on" : ""}
+                    onClick={() => {
+                      if (primaryCue) setSelectedCueId(primaryCue.id);
+                      void setInspectorMode("headline");
+                    }}
+                  >
+                    Headline
+                  </button>
+                  <button
+                    type="button"
+                    className={inspectorPresentation === "highlight" ? "on" : ""}
+                    onClick={() => {
+                      if (primaryCue) setSelectedCueId(primaryCue.id);
+                      void setInspectorMode("highlight");
+                    }}
+                  >
+                    Highlight
+                  </button>
+                  <button
+                    type="button"
+                    className={inspectorPresentation === "bulletin" ? "on" : ""}
+                    onClick={() => {
+                      if (primaryCue) setSelectedCueId(primaryCue.id);
+                      void setInspectorMode("bulletin");
+                    }}
+                  >
+                    Bulletin
+                  </button>
+                </div>
+              </div>
+
+              <label className="l inspector-label-block">
+                <span>Headline</span>
+                <input
+                  className="i"
+                  value={inspHeadline}
+                  placeholder="Masukkan judul headline utama..."
+                  onChange={(e) => handleInspectorInput("headline", e.target.value)}
+                />
+              </label>
+
+              <label className="l inspector-label-block">
+                <span>Detail</span>
+                <input
+                  className="i"
+                  value={inspDetail}
+                  placeholder="Detail / subline berita..."
+                  onChange={(e) => handleInspectorInput("detail", e.target.value)}
+                />
+              </label>
+
+              <div className="inspector-two-col">
+                <label className="l inspector-label-block">
+                  <span>Lokasi</span>
+                  <input
+                    className="i"
+                    value={inspLocation}
+                    placeholder="Lokasi liputan..."
+                    onChange={(e) => handleInspectorInput("location", e.target.value)}
+                  />
+                </label>
+                <label className="l inspector-label-block">
+                  <span>Topik / Kicker</span>
+                  <input
+                    className="i"
+                    value={inspKicker}
+                    placeholder="Contoh: EKONOMI"
+                    onChange={(e) => handleInspectorInput("kicker", e.target.value)}
+                  />
+                </label>
+              </div>
+
+              {/* Narasumber (SOT) Section */}
+              <div className="inspector-field-block">
+                <div className="fl" style={{ marginBottom: 6 }}>
+                  <span className="l">Narasumber (SOT)</span>
+                  <span className="l" style={{ display: "inline-flex", gap: 4 }}>
+                    <span className="k">PgUp</span> <span className="k">PgDn</span>
+                  </span>
+                </div>
+
+                {sotCues.length > 0 ? (
+                  <div className="inspector-sot-inline-list">
+                    {sotCues.map((sot, idx) => {
+                      const isActiveSot = selectedSotIndex === idx;
+                      return (
+                        <div
+                          key={sot.id}
+                          className={`inspector-sot-inline-card ${isActiveSot ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedSotIndex(idx);
+                            setSelectedCueId(sot.id);
+                          }}
+                        >
+                          <div className="fl">
+                            <button
+                              type="button"
+                              className="inspector-sot-select-btn"
+                              onClick={() => {
+                                setSelectedSotIndex(idx);
+                                setSelectedCueId(sot.id);
+                              }}
+                            >
+                              <span className="n">SOT {idx + 1}</span>
+                              <span>{isActiveSot ? (inspSotName || "Narasumber") : (sot.draftFields.name || "Narasumber")}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="inspector-sot-remove-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void removeQuickSotFromSelectedStory(sot.id);
+                              }}
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                          {isActiveSot && (
+                            <div className="inspector-sot-inline-inputs">
+                              <input
+                                className="i"
+                                style={{ height: 32, marginTop: 0, fontSize: 12 }}
+                                value={inspSotName}
+                                placeholder="Nama narasumber..."
+                                onChange={(e) => handleSotInlineInput("name", e.target.value)}
+                              />
+                              <input
+                                className="i"
+                                style={{ height: 32, marginTop: 0, fontSize: 12 }}
+                                value={inspSotRole}
+                                placeholder="Jabatan / institusi..."
+                                onChange={(e) => handleSotInlineInput("role", e.target.value)}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#98A3B3", marginBottom: 6 }}>
+                    Belum ada narasumber (SOT) pada story ini.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="b"
+                  style={{ width: "100%", marginTop: 6, height: 36 }}
+                  disabled={pending}
+                  onClick={() => void addQuickSotToSelectedStory()}
+                >
+                  + Tambah narasumber
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="b inspector-send-preview-btn"
+                onClick={sendStoryToPreview}
+              >
+                Kirim ke Preview <span className="k">Enter</span>
+              </button>
+            </>
+          ) : (
+            <div style={{ margin: "auto", textAlign: "center", color: "#98A3B3", fontSize: 13 }}>
+              Pilih story di tabel sebelah kiri atau buat story baru untuk menyunting.
+            </div>
+          )}
+        </aside>
+      </div>
+
+      {/* Modal Tempel dari Excel */}
+      {showExcelModal && rundown && (
+        <ExcelPasteModal
+          rundown={rundown}
+          onClose={() => setShowExcelModal(false)}
+          onOpenAi={() => {
+            setShowExcelModal(false);
+            setShowAiModal(true);
+          }}
+          onSaved={async () => {
+            await reload();
+            setShowExcelModal(false);
+            toast("Baris dari Excel berhasil ditambahkan ke rundown");
+          }}
+          toast={toast}
+        />
       )}
 
       {/* Modal Rename Rundown */}
@@ -663,6 +1344,116 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
   );
 }
 
+function ExcelPasteModal({
+  rundown,
+  onClose,
+  onOpenAi,
+  onSaved,
+  toast
+}: {
+  rundown: Rundown;
+  onClose: () => void;
+  onOpenAi: () => void;
+  onSaved: () => Promise<void>;
+  toast: (s: string) => void;
+}) {
+  const [rawText, setRawText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const importRows = async () => {
+    const lines = rawText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lines.length) {
+      toast("Tempelkan minimal 1 baris teks dari Excel/Spreadsheet");
+      return;
+    }
+    setSaving(true);
+    try {
+      let order = rundown.items.length;
+      for (const line of lines) {
+        const cols = line.split("\t").map((c) => c.trim());
+        const headline = cols[0] || "BERITA BARU";
+        const location = cols[1] || "";
+        const subline = cols[2] || "";
+        await mutate(`/api/rundowns/${rundown.id}/story`, "PUT", {
+          title: headline,
+          slug: `XL-${order + 1}`,
+          format: "PKG",
+          cgRequired: true,
+          estimatedDurationSeconds: 60,
+          sortOrder: order,
+          graphics: [
+            {
+              templateType: "HEADLINE",
+              sortOrder: 0,
+              draftFields: {
+                headline,
+                location,
+                subline,
+                kicker: "",
+                contentMode: "headline",
+                layoutStyle: subline ? "sub" : "single",
+                showLocation: location ? "true" : "false",
+                showKicker: "false",
+                showDetail: subline ? "true" : "false"
+              }
+            }
+          ]
+        });
+        order++;
+      }
+      await onSaved();
+    } catch (e: any) {
+      toast(e.message || "Gagal mengimpor baris Excel");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="nr-modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-box p"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Tempel dari Excel"
+        style={{ maxWidth: 560, padding: 20 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="fl" style={{ marginBottom: 12 }}>
+          <b style={{ fontSize: 16 }}>Tempel dari Excel / Spreadsheet</b>
+          <button type="button" className="b" style={{ height: 32, padding: "0 10px" }} onClick={onClose}>
+            <X size={14} />
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: "#98A3B3", margin: "0 0 10px" }}>
+          Salin baris dari Excel (format kolom: <b>Headline [Tab] Lokasi [Tab] Detail</b>) lalu tempel di bawah ini, atau gunakan AI Agent untuk berkas Excel/PDF kompleks.
+        </p>
+        <textarea
+          className="i"
+          style={{ height: 150, padding: 10, fontFamily: "JetBrains Mono, monospace", fontSize: 12 }}
+          placeholder={"POLIMEDIA MENGGELAR RAPAT TERBATAS\tJAKARTA SELATAN\tRAPAT DIHADIRI DOSEN\nBERITA KEDUA HARI INI\tBANDUNG\tDETAIL BERITA KEDUA"}
+          value={rawText}
+          onChange={(e) => setRawText(e.target.value)}
+        />
+        <div className="fl" style={{ marginTop: 14 }}>
+          <button type="button" className="b" onClick={onOpenAi}>
+            <Sparkles size={13} /> Buka Prompt AI Agent
+          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="b" onClick={onClose} disabled={saving}>Batal</button>
+            <button type="button" className="b" style={{ background: "#2A3A55" }} onClick={() => void importRows()} disabled={saving}>
+              {saving ? "Menambahkan…" : "Tambahkan ke Rundown"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Modal Ubah Nama Program & Edisi
 function RenameRundownModal({
   rundown,
@@ -694,7 +1485,7 @@ function RenameRundownModal({
     }
     if (event.key !== "Tab") return;
     const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled])'
+      "button:not([disabled]), input:not([disabled])"
     ) || []);
     const first = controls[0];
     const last = controls[controls.length - 1];
@@ -794,7 +1585,6 @@ function StoryEditor({
       return item.graphics.map((g) => ({ id: g.id, templateType: g.templateType,
         sortOrder: g.sortOrder, draftFields: { ...normalizeHeadlineTopicFields(g.templateType, g.draftFields) } }));
     }
-    // Default otomatis untuk Berita Baru: langsung tampilkan 1 cue HEADLINE siap isi
     return [
       {
         templateType: "HEADLINE",
@@ -849,7 +1639,7 @@ function StoryEditor({
     }
     if (event.key !== "Tab") return;
     const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]'
+      "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]"
     ) || []).filter((element) => element.getClientRects().length > 0);
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -863,37 +1653,37 @@ function StoryEditor({
     setDefaultsLoading(true);
     setDefaultsLoadError("");
     api<HeadlineDefaults>("/api/settings/headline-defaults")
-        .then((data) => {
-          const def = headlineDefaultsSchema.parse(data);
-          if (active) {
-            setGraphics((gs) => {
-              if (defaultSeedActive.current && gs[0]?.templateType === "HEADLINE") {
-                return gs.map((g, idx) =>
-                  idx === 0
-                    ? {
-                        ...g,
-                        draftFields: {
-                          ...g.draftFields,
-                          ...Object.fromEntries(Object.entries(def).map(([key, value]) => [
-                            key, editedSeedFields.current.has(key) ? g.draftFields[key] || "" : value || g.draftFields[key] || ""
-                          ])),
-                          showKicker: editedSeedFields.current.has("kicker")
-                            ? g.draftFields.showKicker ?? "false"
-                            : def.kicker ? "true" : g.draftFields.showKicker ?? "false"
-                        }
+      .then((data) => {
+        const def = headlineDefaultsSchema.parse(data);
+        if (active) {
+          setGraphics((gs) => {
+            if (defaultSeedActive.current && gs[0]?.templateType === "HEADLINE") {
+              return gs.map((g, idx) =>
+                idx === 0
+                  ? {
+                      ...g,
+                      draftFields: {
+                        ...g.draftFields,
+                        ...Object.fromEntries(Object.entries(def).map(([key, value]) => [
+                          key, editedSeedFields.current.has(key) ? g.draftFields[key] || "" : value || g.draftFields[key] || ""
+                        ])),
+                        showKicker: editedSeedFields.current.has("kicker")
+                          ? g.draftFields.showKicker ?? "false"
+                          : def.kicker ? "true" : g.draftFields.showKicker ?? "false"
                       }
-                    : g
-                );
-              }
-              return gs;
-            });
-            setTitle((current) => titleEdited.current || current ? current : def.headline);
-          }
-        })
-        .catch((reason: unknown) => {
-          if (active) setDefaultsLoadError(`Default materi belum dimuat: ${reason instanceof Error ? reason.message : "Permintaan gagal"}. Anda dapat mengisi berita secara manual atau mencoba lagi.`);
-        })
-        .finally(() => { if (active) setDefaultsLoading(false); });
+                    }
+                  : g
+              );
+            }
+            return gs;
+          });
+          setTitle((current) => titleEdited.current || current ? current : def.headline);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (active) setDefaultsLoadError(`Default materi belum dimuat: ${reason instanceof Error ? reason.message : "Permintaan gagal"}. Anda dapat mengisi berita secara manual atau mencoba lagi.`);
+      })
+      .finally(() => { if (active) setDefaultsLoading(false); });
     return () => { active = false; };
   }, [item, defaultsLoadAttempt]);
 
@@ -924,7 +1714,7 @@ function StoryEditor({
         {
           templateType: type,
           sortOrder: newIndex,
-            draftFields:
+          draftFields:
             type === "REPORTER"
               ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub", showLocation: "false", visualTemplate: "cnn" }
               : type === "SOT"
@@ -1082,13 +1872,15 @@ function StoryEditor({
         </div>
 
         <div className="story-editor-scroll-area">
-          {defaultsLoading && <p role="status">Memuat default materi…</p>}
-          {defaultsLoadError && <div className="modal-error-banner" role="alert">
-            {defaultsLoadError}
-            <button type="button" onClick={() => setDefaultsLoadAttempt((attempt) => attempt + 1)}>Muat ulang default</button>
-          </div>}
-          {/* Metadata Berita */}
-          <div className="editor-card story-meta-card">
+          <div className="story-editor-left-col">
+            {defaultsLoading && <p role="status">Memuat default materi…</p>}
+            {defaultsLoadError && (
+              <div className="modal-error-banner" role="alert">
+                {defaultsLoadError}
+                <button type="button" onClick={() => setDefaultsLoadAttempt((attempt) => attempt + 1)}>Muat ulang default</button>
+              </div>
+            )}
+            <div className="editor-card story-meta-card">
             <h3 className="section-title">Informasi Segmen Berita</h3>
             <div className="editor-form-grid">
               <label className="field-full">
@@ -1167,7 +1959,6 @@ function StoryEditor({
             </div>
           </div>
 
-          {/* Materi Grafis (Cues) */}
           <div className="editor-card graphics-list-card">
             <div className="graphics-card-header">
               <div>
@@ -1207,7 +1998,11 @@ function StoryEditor({
 
             <div className="cue-cards-container">
               {graphics.map((g, index) => (
-                <div key={g.id || index} className="cue-editor-card">
+                <div
+                  key={g.id || index}
+                  className={`cue-editor-card ${previewIndex === index ? "active-preview" : ""}`}
+                  onClick={() => setPreviewIndex(index)}
+                >
                   <div className="cue-editor-header">
                     <div className="cue-header-left">
                       <span className="cue-number">#{index + 1}</span>
@@ -1224,13 +2019,17 @@ function StoryEditor({
                           ? "HIGHLIGHT BERITA"
                           : "LOWER THIRD HEADLINE"}
                       </b>
+                      {previewIndex === index && (
+                        <span className="st g" style={{ marginLeft: 6 }}>DIPRATINJAU</span>
+                      )}
                     </div>
 
                     <div className="cue-header-right">
                       <button
                         type="button"
                         className="btn-remove-cue"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (index === 0) defaultSeedActive.current = false;
                           const remaining = new Map<number, Record<string, string>>();
                           for (const [cueIndex, fields] of storyFieldsBeforeHighlight.current) {
@@ -1253,9 +2052,13 @@ function StoryEditor({
                       <div className="cue-fields-grid">
                         <label className="field-full">
                           <span>Headline Berita (Wajib)</span>
-                          <input required maxLength={getGraphicFieldLimit(g.templateType, "headline")} value={g.draftFields.headline || ""}
+                          <input
+                            required
+                            maxLength={getGraphicFieldLimit(g.templateType, "headline")}
+                            value={g.draftFields.headline || ""}
                             onChange={(e) => field(index, "headline", e.target.value)}
-                            placeholder="Judul berita di baris atas LT SOT" />
+                            placeholder="Judul berita di baris atas LT SOT"
+                          />
                         </label>
                         <label>
                           <span>Nama Narasumber (Wajib)</span>
@@ -1314,10 +2117,11 @@ function StoryEditor({
                       </div>
                     ) : (
                       <div className="cue-fields-grid">
-                        {g.templateType === "HEADLINE" && <>
+                        {g.templateType === "HEADLINE" && (
                           <label>
                             <span>Jenis Headline</span>
-                            <select value={g.draftFields.headlinePresentation || "story"}
+                            <select
+                              value={g.draftFields.headlinePresentation || "story"}
                               onChange={(e) => {
                                 const presentation = headlinePresentationSchema.parse(e.target.value);
                                 if (index === 0) defaultSeedActive.current = false;
@@ -1342,8 +2146,8 @@ function StoryEditor({
                                         ...cue.draftFields,
                                         headlinePresentation: "story",
                                         ...Object.fromEntries((["contentMode", "layoutStyle", "showLocation", "showDetail", "visualTemplate"] as const)
-                                          .filter((field) => previousStoryFields?.[field] !== undefined)
-                                          .map((field) => [field, previousStoryFields![field]])),
+                                          .filter((f) => previousStoryFields?.[f] !== undefined)
+                                          .map((f) => [f, previousStoryFields![f]])),
                                         ...(isDefaultHighlight ? {
                                           kicker: previousStoryFields?.kicker || "",
                                           showKicker: previousStoryFields?.showKicker ?? "false"
@@ -1351,12 +2155,13 @@ function StoryEditor({
                                       };
                                   return { ...cue, draftFields };
                                 }));
-                              }}>
+                              }}
+                            >
                               <option value="story">Judul berita biasa</option>
                               <option value="bulletin">Highlight / ringkasan berita</option>
                             </select>
                           </label>
-                        </>}
+                        )}
                         <label className="field-full">
                           <span>Headline Utama (Wajib) <strong style={{ color: "#ef4444" }}>*</strong></span>
                           <input
@@ -1407,14 +2212,14 @@ function StoryEditor({
               )}
             </div>
           </div>
+          </div>
 
-          {/* Panel Preview Siaran Real-Time (WYSIWYG) */}
           <div className="editor-card story-preview-card">
             <div className="story-preview-header">
               <div className="preview-header-left">
                 <span className="dot-led green pulse" />
                 <div>
-                  <h3 className="section-title">PRATINJAU CG</h3>
+                  <h3 className="section-title">PRATINJAU CG LIVE (16:9)</h3>
                 </div>
               </div>
 
@@ -1446,8 +2251,52 @@ function StoryEditor({
                 }
                 fields={effectivePreviewFields}
                 master={master}
-                emptyText="Ketik headline pada form di atas untuk melihat visual siaran..."
+                emptyText="Ketik headline pada form di sebelah kiri untuk melihat visual siaran..."
               />
+            </div>
+
+            {/* Interactive Cue Summary & Quick Add in Preview Column */}
+            <div className="story-preview-summary-box">
+              <div className="fl" style={{ marginBottom: 8 }}>
+                <span className="l">Daftar Urutan Cue di Berita Ini ({graphics.length})</span>
+                <span style={{ fontSize: 11, color: "#98A3B3" }}>Klik untuk pratinjau</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {graphics.map((g, idx) => {
+                  const isCurrent = previewIndex === idx;
+                  const cueLabel =
+                    g.templateType === "SOT"
+                      ? `SOT · ${g.draftFields.name || "Narasumber"}`
+                      : g.templateType === "REPORTER"
+                      ? `Reporter · ${g.draftFields.name || "Presenter"}`
+                      : g.templateType === "LOCATION"
+                      ? `Lokasi · ${g.draftFields.location || "Lokasi"}`
+                      : g.draftFields.headlinePresentation === "bulletin"
+                      ? `Highlight · ${g.draftFields.headline || title || "Belum diisi"}`
+                      : `Headline · ${g.draftFields.headline || title || "Belum diisi"}`;
+                  return (
+                    <button
+                      key={g.id || idx}
+                      type="button"
+                      className={`it ${isCurrent ? "on" : ""}`}
+                      style={{ padding: "8px 10px", fontSize: 12 }}
+                      onClick={() => setPreviewIndex(idx)}
+                    >
+                      <span className="n">#{idx + 1}</span>
+                      <span style={{ flex: 1, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {cueLabel}
+                      </span>
+                      <span className={`st ${isCurrent ? "g" : ""}`}>
+                        {isCurrent ? "AKTIF" : g.templateType}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #252C38", fontSize: 11.5, color: "#98A3B3", lineHeight: 1.5 }}>
+                <b style={{ color: "#C5CDD9" }}>Panduan Operator:</b> Cue <b>#1</b> otomatis disiapkan saat berita dipilih di tab <b>Kontrol</b>. Gunakan tombol <span className="k">K</span> / <span className="k">PgDn</span> saat siaran untuk berpindah cepat ke cue <b>SOT Narasumber</b>.
+              </div>
             </div>
           </div>
         </div>
@@ -1469,7 +2318,7 @@ function StoryEditor({
   );
 }
 
-// Modal Panduan & Salin Prompt untuk AI Agent (Excel / PDF / Word / Foto)
+// Modal Panduan & Salin Prompt untuk AI Agent
 function AiAgentRundownModal({
   onClose,
   toast
@@ -1538,7 +2387,6 @@ function AiAgentRundownModal({
         </div>
 
         <div className="ai-modal-body">
-          {/* Server URL Config Bar */}
           <div className="ai-server-config">
             <label htmlFor="ai-server-base-url">
               <Terminal size={14} className="text-sky-400" />
@@ -1554,12 +2402,11 @@ function AiAgentRundownModal({
             />
           </div>
 
-          {/* Prompt Preview & Copy Button */}
           <div className="ai-prompt-container">
             <div className="ai-prompt-header">
               <span>
                 <Bot size={13} className="text-pink-400" />
-                <span>Salin & lampirkan berkas rundown ke AI:</span>
+                <span>Salin &amp; lampirkan berkas rundown ke AI:</span>
               </span>
               <ShimmerButton variant="ai" onClick={handleCopy}>
                 {copied ? <Check size={13} /> : <Copy size={13} />}
