@@ -24,7 +24,7 @@ import { createNewsAnchorGraphic, newsAnchorDefaultsSchema, newsAnchorGraphicId 
 import { createFieldReporterGraphic, fieldReporterGraphicId, reporterDefaultsSchema, type ReporterDefaults } from "@newscg/shared";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
-import { broadcastTemplates, emptyRundownTicker, getBroadcastColorTheme, getGraphicFieldLimit, getRundownTickerSpeed, hasVisibleMasterLayers, masterControlPatch, normalizeHeadlineTopicFields, selectBroadcastColorTheme, selectBroadcastTemplate } from "@newscg/shared";
+import { broadcastTemplates, getBroadcastColorTheme, getGraphicFieldLimit, hasVisibleMasterLayers, masterControlPatch, normalizeHeadlineTopicFields, selectBroadcastColorTheme, selectBroadcastTemplate } from "@newscg/shared";
 import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemplatePicker";
 import { Liputan7Settings } from "./Liputan7Settings";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
@@ -66,7 +66,6 @@ export function SimpleProductionEditor({
   live,
   onUpdateMaster
 }: Props) {
-  const rundownTickerSpeed = useMemo(() => getRundownTickerSpeed(rundown?.ticker ?? emptyRundownTicker), [rundown?.ticker]);
   const [localCueFields, setLocalCueFields] = useState<Record<string, Record<string, string>>>({});
   const localCueFieldsRef = useRef(localCueFields);
   const items = useMemo(() => (rundown?.items || []).map((item) => {
@@ -201,9 +200,8 @@ export function SimpleProductionEditor({
     stagedMaster.showLogo !== master.showLogo ||
     stagedMaster.showTicker !== master.showTicker ||
     stagedMaster.showLiveBadge !== master.showLiveBadge ||
-    (stagedMaster.broadcastTemplate === "bcc"
-      ? ((stagedMaster.tickerText ?? "") !== (master.tickerText ?? "") || (stagedMaster.tickerSpeed ?? 85) !== (master.tickerSpeed ?? 85))
-      : (rundown && stagedMaster.showTicker && (master.tickerRundownId !== rundown.id || master.tickerText !== (rundown.ticker?.text ?? "") || master.tickerSpeed !== rundownTickerSpeed))) ||
+    (stagedMaster.tickerText ?? "") !== (master.tickerText ?? "") ||
+    (stagedMaster.tickerSpeed ?? 85) !== (master.tickerSpeed ?? 85) ||
     getBroadcastColorTheme(stagedMaster.colorTheme).id !== getBroadcastColorTheme(master.colorTheme).id ||
     stagedMaster.brandText !== master.brandText ||
     stagedMaster.logoText !== master.logoText ||
@@ -575,35 +573,57 @@ export function SimpleProductionEditor({
     commandLock.current = true;
     setBusy(true);
     try {
-      if (stagedMaster.broadcastTemplate === "bcc") {
-        const patch: Partial<MasterOverlayState> = masterControlPatch(stagedMaster);
-        const textChanged = (stagedMaster.tickerText ?? "") !== (master.tickerText ?? "");
-        const speedChanged = (stagedMaster.tickerSpeed ?? 85) !== (master.tickerSpeed ?? 85);
-        if (urgent || textChanged || speedChanged) {
-          patch.tickerRevision = (master.tickerRevision ?? 0) + 1;
-        }
-        await onUpdateMaster(patch);
-        if (!urgent) isUserStagingMasterRef.current = false;
-        void reload().catch(() => {});
-        toast(urgent ? "Ticker global BCC diterapkan segera" : "Master BCC diterapkan");
-      } else {
-        const masterPatch = urgent ? null : masterControlPatch(stagedMaster);
-        if (urgent || (stagedMaster.showTicker && rundown)) {
-          if (!rundown) throw new Error("Pilih rundown sebelum menerapkan ticker");
-          await mutate("/api/live/ticker", "POST", { rundownId: rundown.id, immediate: urgent }, true);
-        }
-        if (masterPatch) await onUpdateMaster(masterPatch);
-        if (!urgent) isUserStagingMasterRef.current = false;
-        void reload().catch(() => {});
-        toast(urgent ? "Ticker diterapkan segera" : "Master diterapkan; isi ticker baru masuk pada batas segmen");
+      const patch: Partial<MasterOverlayState> = masterControlPatch(stagedMaster);
+      if (urgent && !stagedMaster.tickerText?.trim() && rundown?.ticker?.text?.trim()) {
+        patch.tickerText = rundown.ticker.text.trim();
+        setStagedMaster(prev => ({ ...prev, tickerText: rundown.ticker!.text.trim() }));
       }
+      const textChanged = (patch.tickerText ?? stagedMaster.tickerText ?? "") !== (master.tickerText ?? "");
+      const speedChanged = (stagedMaster.tickerSpeed ?? 85) !== (master.tickerSpeed ?? 85);
+      if (urgent || textChanged || speedChanged) {
+        patch.tickerRevision = (master.tickerRevision ?? 0) + 1;
+      }
+      await onUpdateMaster(patch);
+      if (!urgent) isUserStagingMasterRef.current = false;
+      void reload().catch(() => {});
+      toast(urgent ? "Ticker global siaran diterapkan segera" : "Master siaran diterapkan");
     } catch (error: any) {
       toast(error.message || "Master gagal diterapkan");
     } finally {
       commandLock.current = false;
       setBusy(false);
     }
-  }, [isMasterChanged, stagedMaster, rundown, onUpdateMaster, reload, toast, master.tickerRevision]);
+  }, [isMasterChanged, stagedMaster, master, rundown?.ticker?.text, onUpdateMaster, reload, toast]);
+
+  const executeAllMasterLive = useCallback(async () => {
+    if (commandLock.current) return;
+    commandLock.current = true;
+    setBusy(true);
+    try {
+      const basePatch = masterControlPatch(stagedMaster);
+      const nextMaster: Partial<MasterOverlayState> = {
+        ...basePatch,
+        showLogo: true,
+        showLiveBadge: true,
+        showTicker: true,
+        showProgramLogo: stagedMaster.broadcastTemplate === "liputan7",
+        showWeather: true
+      };
+      if (!stagedMaster.tickerText?.trim() && rundown?.ticker?.text?.trim() && stagedMaster.broadcastTemplate === "bcc") {
+        nextMaster.tickerText = rundown.ticker.text.trim();
+      }
+      isUserStagingMasterRef.current = false;
+      setStagedMaster((previous) => ({ ...previous, ...nextMaster }));
+      await onUpdateMaster(nextMaster);
+      void reload().catch(() => {});
+      toast("ALL MASTER LIVE — Seluruh layer master (1, 2, 3, 4) aktif ke Program");
+    } catch (error: any) {
+      toast(error.message || "Gagal mengaktifkan master live");
+    } finally {
+      commandLock.current = false;
+      setBusy(false);
+    }
+  }, [stagedMaster, rundown?.ticker?.text, onUpdateMaster, reload, toast]);
 
   // OUT preserves the selected cue and any unsent draft.
   const executeClear = useCallback(async () => {
@@ -643,21 +663,25 @@ export function SimpleProductionEditor({
   // Aksi Master 1: Toggle Logo di Preview (Safety: Tekan M untuk kirim ke ON AIR)
   const toggleMasterLogo = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    const nextVal = !stagedMaster.showLogo;
-    setStagedMaster((prev) => ({ ...prev, showLogo: nextVal }));
+    const nextVal = !(stagedMaster.showLogo || stagedMaster.showProgramLogo);
+    setStagedMaster((prev) => ({ ...prev, showLogo: nextVal, showProgramLogo: nextVal }));
     toast(
       nextVal
-        ? "Preview: Logo AKTIF (Tekan M untuk terapkan master)"
-        : "Preview: Logo NONAKTIF (Tekan M untuk terapkan master)"
+        ? "Preview: Logo Program AKTIF (Tekan M untuk terapkan master)"
+        : "Preview: Logo Program NONAKTIF (Tekan M untuk terapkan master)"
     );
-  }, [stagedMaster.showLogo, toast]);
+  }, [stagedMaster.showLogo, stagedMaster.showProgramLogo, toast]);
 
-  const toggleMasterProgram = useCallback(() => {
+  const toggleMasterLive = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    const nextVal = !stagedMaster.showProgramLogo;
-    setStagedMaster(previous => ({ ...previous, showProgramLogo: nextVal }));
-    toast(nextVal ? "Preview: Logo Program AKTIF (Tekan M untuk terapkan master)" : "Preview: Logo Program NONAKTIF (Tekan M untuk terapkan master)");
-  }, [stagedMaster.showProgramLogo, toast]);
+    const nextVal = !stagedMaster.showLiveBadge;
+    setStagedMaster((prev) => ({ ...prev, showLiveBadge: nextVal }));
+    toast(
+      nextVal
+        ? "Preview: LIVE AKTIF (Tekan M untuk terapkan master)"
+        : "Preview: LIVE NONAKTIF (Tekan M untuk terapkan master)"
+    );
+  }, [stagedMaster.showLiveBadge, toast]);
 
   const toggleMasterTicker = useCallback(() => {
     isUserStagingMasterRef.current = true;
@@ -666,28 +690,12 @@ export function SimpleProductionEditor({
     toast(nextVal ? "Preview: Ticker AKTIF (Tekan M untuk terapkan master)" : "Preview: Ticker NONAKTIF (Tekan M untuk terapkan master)");
   }, [stagedMaster.showTicker, toast]);
 
-  const toggleMasterLive = useCallback(() => {
+  const toggleMasterWeather = useCallback(() => {
     isUserStagingMasterRef.current = true;
-    const nextVal = !stagedMaster.showLiveBadge;
-    setStagedMaster(previous => ({ ...previous, showLiveBadge: nextVal }));
-    toast(nextVal ? "Preview: LIVE AKTIF (Tekan M untuk terapkan master)" : "Preview: LIVE NONAKTIF (Tekan M untuk terapkan master)");
-  }, [stagedMaster.showLiveBadge, toast]);
-
-  // Aksi Master 2: Toggle Ticker + Live di Preview (Safety: Tekan M untuk kirim ke ON AIR)
-  const toggleMasterTickerLive = useCallback(() => {
-    isUserStagingMasterRef.current = true;
-    const bothActive = stagedMaster.showTicker && stagedMaster.showLiveBadge;
-    setStagedMaster((prev) => ({
-      ...prev,
-      showTicker: !bothActive,
-      showLiveBadge: !bothActive
-    }));
-    toast(
-      !bothActive
-        ? "Preview: Ticker+Live AKTIF (Tekan M untuk terapkan master)"
-        : "Preview: Ticker+Live NONAKTIF (Tekan M untuk terapkan master)"
-    );
-  }, [stagedMaster.showTicker, stagedMaster.showLiveBadge, toast]);
+    const nextVal = !stagedMaster.showWeather;
+    setStagedMaster(previous => ({ ...previous, showWeather: nextVal }));
+    toast(nextVal ? "Preview: Cuaca AKTIF (Tekan M untuk terapkan master)" : "Preview: Cuaca NONAKTIF (Tekan M untuk terapkan master)");
+  }, [stagedMaster.showWeather, toast]);
 
   // Aksi Quick Action Headline (H) - Safety: stage di preview, tekan SPASI untuk kirim ke ON AIR
   const actionNewsAnchor = useCallback(async () => {
@@ -854,13 +862,22 @@ export function SimpleProductionEditor({
           navigateStory(1);
           break;
         case "logo":
-          if (stagedMaster.broadcastTemplate === "liputan7") toggleMasterProgram();
-          else toggleMasterLogo();
+          toggleMasterLogo();
+          break;
+        case "live":
+          toggleMasterLive();
+          break;
+        case "ticker":
+          toggleMasterTicker();
           break;
         case "full":
-          if (stagedMaster.broadcastTemplate === "liputan7") toggleMasterLogo();
-          else if (stagedMaster.broadcastTemplate === "bcc") toggleMasterLive();
-          else toggleMasterTickerLive();
+          toggleMasterWeather();
+          break;
+        case "weather":
+          toggleMasterWeather();
+          break;
+        case "all-live":
+          void executeAllMasterLive();
           break;
         case "reporter":
           void actionReporter();
@@ -893,9 +910,6 @@ export function SimpleProductionEditor({
           }
           break;
         }
-        case "ticker":
-          toggleMasterTicker();
-          break;
         case "headline":
           void actionHeadline();
           break;
@@ -934,23 +948,28 @@ export function SimpleProductionEditor({
           break;
         case "clear-all": {
           const hasActive = hasVisibleMasterLayers(master);
+          isUserStagingMasterRef.current = false;
           if (hasActive) {
-            void onUpdateMaster({
+            const nextMaster = {
               showLogo: false,
               showTicker: false,
               showLiveBadge: false,
               showProgramLogo: false,
               showWeather: false
-            });
+            };
+            setStagedMaster((previous) => ({ ...previous, ...nextMaster }));
+            void onUpdateMaster(nextMaster);
             toast("MASTER OUT — Seluruh layer master dimatikan");
           } else {
-            void onUpdateMaster({
+            const nextMaster = {
               showLogo: true,
               showTicker: true,
               showLiveBadge: true,
               showProgramLogo: stagedMaster.broadcastTemplate === "liputan7",
-              showWeather: false
-            });
+              showWeather: true
+            };
+            setStagedMaster((previous) => ({ ...previous, ...nextMaster }));
+            void onUpdateMaster(nextMaster);
             toast("MASTER IN — Layer master diaktifkan");
           }
           break;
@@ -966,10 +985,10 @@ export function SimpleProductionEditor({
     quickEditOpen,
     navigateStory,
     toggleMasterLogo,
-    toggleMasterProgram,
+    toggleMasterLive,
     toggleMasterTicker,
     stagedMaster.broadcastTemplate,
-    toggleMasterTickerLive,
+    toggleMasterWeather,
     actionHeadline,
     actionNewsAnchor,
     actionToggleLocation,
@@ -981,7 +1000,11 @@ export function SimpleProductionEditor({
     executePrimary,
     executeUpdate,
     executeClear,
-    executeClearAll
+    executeClearAll,
+    executeAllMasterLive,
+    master,
+    onUpdateMaster,
+    toast
   ]);
 
   // Efektif preview field yang dikirim ke renderer
@@ -1132,102 +1155,77 @@ export function SimpleProductionEditor({
           <span className="master-label">MASTER LAYER:</span>
           <div className="master-btn-group">
             <button type="button" className="master-btn" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER <kbd>M</kbd></button>
-            {stagedMaster.broadcastTemplate === "bcc" ? (
-              <>
-                <button
-                  type="button"
-                  aria-label="Logo"
-                  aria-pressed={stagedMaster.showLogo}
-                  className={`master-btn ${stagedMaster.showLogo ? "active" : ""} ${stagedMaster.showLogo !== master.showLogo ? "staged-pending" : ""}`}
-                  disabled={busy}
-                  onClick={toggleMasterLogo}
-                  title="Siapkan logo di Preview (1), lalu terapkan MASTER (M)"
-                >
-                  <span className="btn-kbd">1</span>
-                  <span>LOGO · {master.showLogo ? "TAYANG" : "MATI"}</span>
-                  <span className={`indicator-dot ${stagedMaster.showLogo ? "on" : ""}`} />
-                  {stagedMaster.showLogo !== master.showLogo && <span className="staged-pill">STAGE</span>}
-                </button>
-                <button
-                  type="button"
-                  aria-label="Live Badge"
-                  aria-pressed={stagedMaster.showLiveBadge}
-                  className={`master-btn ${stagedMaster.showLiveBadge ? "active" : ""} ${stagedMaster.showLiveBadge !== master.showLiveBadge ? "staged-pending" : ""}`}
-                  disabled={busy}
-                  onClick={toggleMasterLive}
-                  title="Siapkan live badge di Preview (2), lalu terapkan MASTER (M)"
-                >
-                  <span className="btn-kbd">2</span>
-                  <span>LIVE · {master.showLiveBadge ? "TAYANG" : "MATI"}</span>
-                  <span className={`indicator-dot ${stagedMaster.showLiveBadge ? "on" : ""}`} />
-                  {stagedMaster.showLiveBadge !== master.showLiveBadge && <span className="staged-pill">STAGE</span>}
-                </button>
-                <button
-                  type="button"
-                  aria-label="Ticker"
-                  aria-pressed={stagedMaster.showTicker}
-                  className={`master-btn ${stagedMaster.showTicker ? "active" : ""} ${stagedMaster.showTicker !== master.showTicker ? "staged-pending" : ""}`}
-                  disabled={busy}
-                  onClick={toggleMasterTicker}
-                  title="Siapkan ticker di Preview (3), lalu terapkan MASTER (M)"
-                >
-                  <span className="btn-kbd">3</span>
-                  <span>TICKER · {master.showTicker ? "TAYANG" : "MATI"}</span>
-                  <span className={`indicator-dot ${stagedMaster.showTicker ? "on" : ""}`} />
-                  {stagedMaster.showTicker !== master.showTicker && <span className="staged-pill">STAGE</span>}
-                </button>
-              </>
-            ) : stagedMaster.broadcastTemplate === "liputan7" ? <>
-              <button type="button" aria-label="Logo Program" aria-pressed={Boolean(stagedMaster.showProgramLogo)}
-                className={`master-btn ${stagedMaster.showProgramLogo ? "active" : ""} ${stagedMaster.showProgramLogo !== master.showProgramLogo ? "staged-pending" : ""}`}
-                disabled={busy} onClick={toggleMasterProgram} title="Siapkan logo program dan cuacanya di Preview (1), lalu terapkan MASTER (M)">
-                <span className="btn-kbd">1</span><span>LOGO PROGRAM · {master.showProgramLogo ? "TAYANG" : "MATI"}</span>
-                <span className={`indicator-dot ${stagedMaster.showProgramLogo ? "on" : ""}`} />
-                {stagedMaster.showProgramLogo !== master.showProgramLogo && <span className="staged-pill">STAGE</span>}
-              </button>
-              <button type="button" aria-label="Logo TV" aria-pressed={stagedMaster.showLogo}
-                className={`master-btn ${stagedMaster.showLogo ? "active" : ""} ${stagedMaster.showLogo !== master.showLogo ? "staged-pending" : ""}`}
-                disabled={busy} onClick={toggleMasterLogo} title="Siapkan logo TV di Preview (2), lalu terapkan MASTER (M)">
-                <span className="btn-kbd">2</span><span>LOGO TV · {master.showLogo ? "TAYANG" : "MATI"}</span>
-                <span className={`indicator-dot ${stagedMaster.showLogo ? "on" : ""}`} />
-                {stagedMaster.showLogo !== master.showLogo && <span className="staged-pill">STAGE</span>}
-              </button>
-              <button type="button" aria-label="Ticker" aria-pressed={stagedMaster.showTicker}
-                className={`master-btn ${stagedMaster.showTicker ? "active" : ""} ${stagedMaster.showTicker !== master.showTicker ? "staged-pending" : ""}`}
-                disabled={busy} onClick={toggleMasterTicker} title="Siapkan ticker dan jam di Preview (3), lalu terapkan MASTER (M)">
-                <span className="btn-kbd">3</span><span>TICKER · {master.showTicker ? "TAYANG" : "MATI"}</span>
-                <span className={`indicator-dot ${stagedMaster.showTicker ? "on" : ""}`} />
-                {stagedMaster.showTicker !== master.showTicker && <span className="staged-pill">STAGE</span>}
-              </button>
-            </> : <>
             <button
               type="button"
-              className={`master-btn ${stagedMaster.showLogo ? "active" : ""} ${stagedMaster.showLogo !== master.showLogo ? "staged-pending" : ""}`}
+              aria-label="Logo Program"
+              aria-pressed={Boolean(stagedMaster.showLogo || stagedMaster.showProgramLogo)}
+              className={`master-btn ${(stagedMaster.showLogo || stagedMaster.showProgramLogo) ? "active" : ""} ${(stagedMaster.showLogo !== master.showLogo || stagedMaster.showProgramLogo !== master.showProgramLogo) ? "staged-pending" : ""}`}
               disabled={busy}
               onClick={toggleMasterLogo}
-              title="Siapkan logo di Preview (1), lalu terapkan MASTER (M)"
+              title="Siapkan Logo Program di Preview (1), lalu terapkan MASTER (M)"
             >
               <span className="btn-kbd">1</span>
-              <span>LOGO · {master.showLogo ? "TAYANG" : "MATI"}</span>
-              <span className={`indicator-dot ${stagedMaster.showLogo ? "on" : ""}`} />
-              {stagedMaster.showLogo !== master.showLogo && <span className="staged-pill">STAGE</span>}
+              <span>LOGO PROGRAM · {(master.showLogo || master.showProgramLogo) ? "TAYANG" : "MATI"}</span>
+              <span className={`indicator-dot ${(stagedMaster.showLogo || stagedMaster.showProgramLogo) ? "on" : ""}`} />
+              {(stagedMaster.showLogo !== master.showLogo || stagedMaster.showProgramLogo !== master.showProgramLogo) && <span className="staged-pill">STAGE</span>}
             </button>
 
             <button
               type="button"
-              className={`master-btn ${stagedMaster.showTicker && stagedMaster.showLiveBadge ? "active" : ""} ${(stagedMaster.showTicker !== master.showTicker || stagedMaster.showLiveBadge !== master.showLiveBadge) ? "staged-pending" : ""}`}
+              aria-label="Live"
+              aria-pressed={Boolean(stagedMaster.showLiveBadge)}
+              className={`master-btn ${stagedMaster.showLiveBadge ? "active" : ""} ${stagedMaster.showLiveBadge !== master.showLiveBadge ? "staged-pending" : ""}`}
               disabled={busy}
-              onClick={toggleMasterTickerLive}
-              title="Siapkan ticker + live di Preview (2), lalu terapkan MASTER (M)"
+              onClick={toggleMasterLive}
+              title="Siapkan LIVE di Preview (2), lalu terapkan MASTER (M)"
             >
               <span className="btn-kbd">2</span>
-              <span>TICKER + LIVE · {master.showTicker && master.showLiveBadge ? "TAYANG" : "BELUM LENGKAP"}</span>
-              <span
-                className={`indicator-dot ${stagedMaster.showTicker && stagedMaster.showLiveBadge ? "on" : ""}`}
-              />
-              {(stagedMaster.showTicker !== master.showTicker || stagedMaster.showLiveBadge !== master.showLiveBadge) && <span className="staged-pill">STAGE</span>}
+              <span>LIVE · {master.showLiveBadge ? "TAYANG" : "MATI"}</span>
+              <span className={`indicator-dot ${stagedMaster.showLiveBadge ? "on" : ""}`} />
+              {stagedMaster.showLiveBadge !== master.showLiveBadge && <span className="staged-pill">STAGE</span>}
             </button>
-            </>}
+
+            <button
+              type="button"
+              aria-label="Ticker"
+              aria-pressed={stagedMaster.showTicker}
+              className={`master-btn ${stagedMaster.showTicker ? "active" : ""} ${stagedMaster.showTicker !== master.showTicker ? "staged-pending" : ""}`}
+              disabled={busy}
+              onClick={toggleMasterTicker}
+              title="Siapkan Ticker di Preview (3), lalu terapkan MASTER (M)"
+            >
+              <span className="btn-kbd">3</span>
+              <span>TICKER · {master.showTicker ? "TAYANG" : "MATI"}</span>
+              <span className={`indicator-dot ${stagedMaster.showTicker ? "on" : ""}`} />
+              {stagedMaster.showTicker !== master.showTicker && <span className="staged-pill">STAGE</span>}
+            </button>
+
+            <button
+              type="button"
+              aria-label="Cuaca"
+              aria-pressed={Boolean(stagedMaster.showWeather)}
+              className={`master-btn ${stagedMaster.showWeather ? "active" : ""} ${stagedMaster.showWeather !== master.showWeather ? "staged-pending" : ""}`}
+              disabled={busy}
+              onClick={toggleMasterWeather}
+              title="Siapkan Cuaca di Preview (4), lalu terapkan MASTER (M)"
+            >
+              <span className="btn-kbd">4</span>
+              <span>CUACA · {master.showWeather ? "TAYANG" : "MATI"}</span>
+              <span className={`indicator-dot ${stagedMaster.showWeather ? "on" : ""}`} />
+              {stagedMaster.showWeather !== master.showWeather && <span className="staged-pill">STAGE</span>}
+            </button>
+
+            <button
+              type="button"
+              aria-label="All Live"
+              className={`master-btn btn-all-live ${((master.showLogo || master.showProgramLogo) && master.showLiveBadge && master.showTicker && master.showWeather) ? "active" : ""}`}
+              disabled={busy}
+              onClick={() => void executeAllMasterLive()}
+              title="Tayangkan seluruh master layer (Logo, Live, Ticker, Cuaca) langsung ke Program ON AIR (5)"
+            >
+              <span className="btn-kbd">5</span>
+              <span>ALL LIVE</span>
+            </button>
           </div>
         </div>
 
@@ -1243,56 +1241,55 @@ export function SimpleProductionEditor({
           <small>{isMasterChanged ? "Perubahan di Preview · terapkan dengan M" : `Siaran: ${master.broadcastTemplate === "liputan7" ? broadcastTemplates.liputan7.label : getBroadcastColorTheme(master.colorTheme).label}`}</small>
         </div>
         <details className="live-ticker-settings">
-          <summary>{stagedMaster.broadcastTemplate === "liputan7"
-            ? `Master · Program ${master.showProgramLogo ? "aktif" : "mati"} · TV ${master.showLogo ? "aktif" : "mati"} · Ticker ${master.showTicker ? "aktif" : "mati"}`
-            : stagedMaster.broadcastTemplate === "bcc"
-            ? `Ticker & Master BCC · Logo ${master.showLogo ? "aktif" : "mati"} · Ticker ${master.showTicker ? "aktif" : "mati"} · Jam ${master.showLiveBadge ? "aktif" : "mati"}`
-            : `Ticker & master · ${master.showLogo ? "Logo aktif" : "Logo mati"} · ${master.showTicker ? "Ticker aktif" : "Ticker mati"} · ${master.showLiveBadge ? "Live aktif" : "Live mati"}`}</summary>
+          <summary>{`Master Siaran · Program ${(master.showLogo || master.showProgramLogo) ? "aktif" : "mati"} · Ticker ${master.showTicker ? "aktif" : "mati"} · Cuaca ${master.showWeather ? "aktif" : "mati"}`}</summary>
           <Liputan7Settings master={stagedMaster} disabled={busy} onBusyChange={value => { commandLock.current = value; setBusy(value); }} onChange={next => { isUserStagingMasterRef.current = true; setStagedMaster(next); }} />
-          {stagedMaster.broadcastTemplate === "bcc" ? (
-            <>
-              <label>Ticker Global BCC News
-                <textarea
-                  rows={3}
-                  value={stagedMaster.tickerText ?? ""}
-                  placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS"
-                  disabled={busy}
-                  onChange={(e) => {
-                    isUserStagingMasterRef.current = true;
-                    setStagedMaster(prev => ({ ...prev, tickerText: e.target.value }));
-                  }}
-                />
-              </label>
-              <small>Ticker BCC bersifat global dan tampil di seluruh tayangan tanpa terikat jadwal rundown.</small>
-              <label>Kecepatan Ticker
-                <select
-                  value={stagedMaster.tickerSpeed ?? 85}
-                  disabled={busy}
-                  onChange={(e) => {
-                    isUserStagingMasterRef.current = true;
-                    setStagedMaster(prev => ({ ...prev, tickerSpeed: Number(e.target.value) }));
-                  }}
-                >
-                  <option value={65}>Lambat (65 px/detik)</option>
-                  <option value={85}>Normal (85 px/detik)</option>
-                  <option value={105}>Cepat (105 px/detik)</option>
-                </select>
-              </label>
-              <button type="button" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER · M</button>
-              <button type="button" disabled={busy || !stagedMaster.showTicker} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
-            </>
-          ) : (
-            <>
-              <label>Ticker rundown · {rundown?.title || "Belum dipilih"}
-                <textarea rows={3} value={rundown?.ticker?.text ?? ""} readOnly />
-              </label>
-              <label>Kecepatan
-                <input readOnly value={`${rundownTickerSpeed} px/detik · ${rundown?.ticker?.speedMode === "manual" ? "Manual" : "Otomatis seimbang"}`} />
-              </label>
-              <button type="button" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER · M</button>
-              <button type="button" disabled={busy || !stagedMaster.showTicker || !rundown} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
-            </>
-          )}
+          <label>Ticker Global Siaran
+            <textarea
+              rows={3}
+              value={stagedMaster.tickerText ?? ""}
+              placeholder="INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI NEWS CG"
+              disabled={busy}
+              onChange={(e) => {
+                isUserStagingMasterRef.current = true;
+                setStagedMaster(prev => ({ ...prev, tickerText: e.target.value }));
+              }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
+            <small style={{ flex: 1 }}>Ticker global berlaku universal di semua template (CNN, Liputan7, BCC).</small>
+            {rundown?.ticker?.text && (
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ fontSize: "11px", padding: "2px 8px" }}
+                onClick={() => {
+                  isUserStagingMasterRef.current = true;
+                  setStagedMaster(prev => ({ ...prev, tickerText: rundown?.ticker?.text || "" }));
+                  toast("Teks ticker disalin dari rundown saat ini");
+                }}
+              >
+                Salin dari Rundown
+              </button>
+            )}
+          </div>
+          <label>Kecepatan Ticker
+            <select
+              value={stagedMaster.tickerSpeed ?? 85}
+              disabled={busy}
+              onChange={(e) => {
+                isUserStagingMasterRef.current = true;
+                setStagedMaster(prev => ({ ...prev, tickerSpeed: Number(e.target.value) }));
+              }}
+            >
+              <option value={65}>Lambat (65 px/detik)</option>
+              <option value={85}>Normal (85 px/detik)</option>
+              <option value={105}>Cepat (105 px/detik)</option>
+            </select>
+          </label>
+          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            <button type="button" disabled={busy || !isMasterChanged} onClick={() => executeMaster()}>TERAPKAN MASTER · M</button>
+            <button type="button" disabled={busy || !stagedMaster.showTicker || !(stagedMaster.tickerText?.trim() || rundown?.ticker?.text?.trim())} onClick={() => executeMaster(true)}>TICKER SEGERA</button>
+          </div>
         </details>
 
         {/* Monitor Pratinjau Dual Deck (Standby Stage Preview + Mini Live Monitor) */}
@@ -1310,9 +1307,11 @@ export function SimpleProductionEditor({
             <BroadcastPreviewBox
               graphic={previewCue}
               fields={effectivePreviewFields}
-              master={stagedMaster.broadcastTemplate === "bcc"
-                ? { ...stagedMaster, tickerText: stagedMaster.tickerText?.trim() || master.tickerText?.trim() || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS", tickerSpeed: stagedMaster.tickerSpeed ?? master.tickerSpeed ?? 85 }
-                : { ...stagedMaster, tickerText: rundown?.ticker?.text ?? "", tickerSpeed: rundownTickerSpeed, tickerRundownId: rundown?.id ?? null }}
+              master={{
+                ...stagedMaster,
+                tickerText: stagedMaster.tickerText?.trim() || master.tickerText?.trim() || "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI NEWS CG",
+                tickerSpeed: stagedMaster.tickerSpeed ?? master.tickerSpeed ?? 85
+              }}
               emptyText="LAYAR BERSIH — TEKAN ↑ / ↓ UNTUK MEMILIH BERITA"
             />
             {previewCue && <BorderBeam colorFrom="#38bdf8" colorTo="#818cf8" duration={6} size={90} theme="cyan" />}

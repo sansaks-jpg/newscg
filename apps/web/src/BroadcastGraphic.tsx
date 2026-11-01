@@ -7,6 +7,7 @@ import { useLayerPresence } from "./useLayerPresence";
 import { AutoSquishText } from "./AutoSquishText";
 import { Liputan7Graphic } from "./Liputan7Graphic";
 import { BccGraphic } from "./BccGraphic";
+import { useBroadcastWeather, WeatherSymbol } from "./BroadcastWeather";
 
 const motionStyle = Object.fromEntries(Object.entries(broadcastMotion).map(([name, milliseconds]) =>
   [`--cg-${name}`, `${milliseconds}ms`])) as CSSProperties;
@@ -37,7 +38,9 @@ function CnnGraphic({
     ...motionStyle,
     ...Object.fromEntries(Object.entries(colorTheme.colors).map(([name, color]) => [`--cg-color-${name}`, color]))
   } as CSSProperties;
-  const logoLayer = useLayerPresence(master.showLogo, broadcastMotion.logoOutMs + 20);
+
+  const showProgramLogo = Boolean(master.showLogo || master.showProgramLogo);
+  const logoLayer = useLayerPresence(showProgramLogo, broadcastMotion.logoOutMs + 20);
   const liveLayer = useLayerPresence(master.showLiveBadge, broadcastMotion.liveOutMs + 20);
   const tickerLayer = useLayerPresence(master.showTicker, broadcastMotion.tickerOutMs + 20);
   const exitClass = isExiting ? "cg-exit" : "";
@@ -72,11 +75,13 @@ function CnnGraphic({
   useEffect(() => { if (effectiveFields.kicker) setLastKicker(effectiveFields.kicker); }, [effectiveFields.kicker]);
   const kickerText = effectiveFields.kicker || (isBreaking ? "BREAKING NEWS" : "");
 
-  const headlineText = (isReporter || contentMode === "presenter")
-    ? effectiveFields.name || effectiveFields.headline || "NAMA PEMBAWA BERITA"
+  // SOT standard: Title plate = Nama Narasumber, Detail plate = Jabatan (mengikuti standar Liputan7)
+  const isNameMode = isReporter || isSot || contentMode === "presenter" || contentMode === "sot";
+  const headlineText = isNameMode
+    ? effectiveFields.name || effectiveFields.headline || (isSot ? "NAMA NARASUMBER" : "NAMA PEMBAWA BERITA")
     : effectiveFields.headline || effectiveFields.text || "";
 
-  const sublineText = isReporter || isSot
+  const sublineText = isNameMode
     ? (effectiveFields.role || effectiveFields.subline || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
 
@@ -108,18 +113,22 @@ function CnnGraphic({
   useEffect(() => { if (socialText) setLastSocialText(socialText); }, [socialText]);
   const detailLayer = useLayerPresence(hasSubline && !isSingleLayout && !isExiting && contentMode === "headline", broadcastMotion.detailOutMs + 20);
   const sotLayer = useLayerPresence(contentMode === "sot" && effectiveFields.showSot !== "false" && !isExiting, broadcastMotion.detailOutMs + 20);
-  const [lastSot, setLastSot] = useState({ name: effectiveFields.name || "", role: effectiveFields.role || "" });
-  useEffect(() => {
-    if (contentMode === "sot" && effectiveFields.showSot !== "false")
-      setLastSot({ name: effectiveFields.name || "", role: effectiveFields.role || "" });
-  }, [contentMode, effectiveFields.showSot, effectiveFields.name, effectiveFields.role]);
   const [lastSubline, setLastSubline] = useState(sublineText);
   useEffect(() => { if (sublineText) setLastSubline(sublineText); }, [sublineText]);
   const isEffectiveSingleLayout = isSingleLayout && !ghostSublineText && !detailLayer.present && !sotLayer.present;
 
-  const brandText = master.brandText?.trim() || "CNNINDONESIA.COM";
-  // Only the explicitly applied rundown snapshot supplies ticker content.
+  // Weather (Morphing Logo Box)
+  const weatherEnabled = Boolean(!exitAll && showProgramLogo && master.showWeather);
+  const { weather, weatherLayer, displayedWeather, weatherVisible } = useBroadcastWeather(
+    weatherEnabled,
+    master.weatherLocations
+  );
+
+  // Global ticker content
   const tickerText = master.tickerText?.trim() || "";
+
+  const hasAnyLayer = Boolean(hasContent || locationLayer.present || tickerLayer.present || logoLayer.present || liveLayer.present || ghostLocationText);
+  if (!hasAnyLayer) return null;
 
   return (
     <>
@@ -141,10 +150,10 @@ function CnnGraphic({
         data-color-theme={colorTheme.id}
         className={`cg-lower-third ${cnn ? "cnn-template" : ""} ${exitAll ? "cg-sequential-out" : ""} ${isBreaking ? "breaking" : ""} ${isReporter ? "reporter" : ""} ${isMini ? "mini" : ""} ${!tickerLayer.present ? "no-ticker" : ""}`}
       >
-        {/* Layer Konten (Kicker & Main White Box) — Tampil jika ada materi ON AIR */}
+        {/* Layer Konten (Kicker & Main Box) — Tampil jika ada materi ON AIR */}
         {hasContent && (
           <div key={contentKey} className={`cg-content-layer ${kickerLayer.present ? "cg-has-topic" : ""} ${exitClass}`}>
-            {/* Kicker Tab di Atas Kotak Putih (Opsional sesuai Gambar 5 / Gambar 3 — Aktif atau Bayangan Ghost) */}
+            {/* Kicker Tab di Atas Kotak Putih */}
             {kickerLayer.present ? (
               <div className={`cg-kicker-tab ${kickerLayer.exiting ? "cg-kicker-out" : ""}`}>
                 <AutoSquishText text={effectiveFields.kicker || lastKicker || kickerText} minScale={0.7} />
@@ -156,10 +165,9 @@ function CnnGraphic({
               </div>
             ) : null}
 
-            {/* Kotak Utama Putih */}
+            {/* Kotak Utama */}
             <div className={`cg-main-box ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
               <div className={`cg-text-area ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
-                {/* Varian A: Paragraf / Keterangan Tunggal (Gambar 3 - Sentence Case Wardah Style) */}
                 {contentMode === "paragraph" ? (
                   <div className="cg-paragraph-row">
                     <div className="cg-copy-motion">
@@ -171,7 +179,6 @@ function CnnGraphic({
                     </div>
                   </div>
                 ) : contentMode === "presenter" ? (
-                  /* Varian B: Nama Pembawa Acara + Akun Instagram (Gambar 4) */
                   <div className="cg-presenter-block">
                     <div className="cg-presenter-row">
                       <div className="cg-copy-motion">
@@ -202,12 +209,14 @@ function CnnGraphic({
                       </div>
                     </div>
                     {sotLayer.present ? (
-                      <div className={`cg-sot-name-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
-                        <div className="cg-copy-motion"><AutoSquishText text={sotLayer.exiting ? lastSot.name : effectiveFields.name || lastSot.name} minScale={0.35} className="cg-presenter-squish" style={{ width: "max-content", maxWidth: "100%" }} /></div>
-                        {(sotLayer.exiting ? lastSot.role : effectiveFields.role) && <div className="cg-sot-role-row">
-                          <span className="cg-sot-divider" aria-hidden="true" />
-                          <div className="cg-copy-motion"><AutoSquishText text={sotLayer.exiting ? lastSot.role : effectiveFields.role || lastSot.role} minScale={0.45} className="cg-subline-squish" /></div>
-                        </div>}
+                      <div className={`cg-subline-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
+                        <div className="cg-copy-motion">
+                          <AutoSquishText
+                            text={sublineText || lastSubline}
+                            minScale={0.45}
+                            className="cg-subline-squish"
+                          />
+                        </div>
                       </div>
                     ) : detailLayer.present ? (
                       <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
@@ -233,16 +242,15 @@ function CnnGraphic({
                 )}
               </div>
 
-              {/* Logo Box terintegrasi jika konten aktif dan logo master aktif */}
+              {/* Ruang kosong penahan di sebelah kanan agar headline berdampingan dengan logo box */}
               {logoLayer.present && (
                 <div className="cg-logo-box cg-logo-space" aria-hidden="true" />
               )}
             </div>
-
           </div>
         )}
 
-        {/* Jika konten lower third sedang kosong tapi Logo atau Live aktif */}
+        {/* Layer Master Permanen (Logo Program & Live Badge Kanan) */}
         {(logoLayer.present || liveLayer.present) && (
           <div className={`cg-standalone-master-wrap cg-persistent-master ${!master.showTicker ? "logo-only" : ""}`}>
             {liveLayer.present && (
@@ -252,19 +260,29 @@ function CnnGraphic({
               </div>
             )}
             {logoLayer.present && (
-              <div className={`cg-logo-box standalone ${!tickerLayer.present ? "no-ticker" : ""} ${logoLayer.exiting ? "cg-layer-out" : "cg-layer-in"}`}>
-                <LogoRenderer master={master} cnn={colorTheme.id === "cnn"} />
+              <div className={`cg-logo-box standalone ${weatherVisible ? "cnn-weather-active" : ""} ${!tickerLayer.present ? "no-ticker" : ""} ${logoLayer.exiting ? "cg-layer-out" : "cg-layer-in"}`}>
+                <div className="cnn-logo-face">
+                  <LogoRenderer master={master} cnn={colorTheme.id === "cnn"} />
+                </div>
+                {weatherLayer.present && displayedWeather && (
+                  <div className={`cnn-weather-strip ${weatherLayer.exiting ? "cg-weather-out" : ""}`}>
+                    <div key={`${weather.cycle}-${displayedWeather.forecast.adm4}`} className="cg-weather-row">
+                      <div className="cg-weather-place">
+                        <AutoSquishText className="cg-weather-city" text={displayedWeather.label} minScale={1} />
+                      </div>
+                      <WeatherSymbol condition={displayedWeather.forecast.condition} isDaytime={displayedWeather.forecast.isDaytime} className="cg-weather-symbol" />
+                      <span className="cg-weather-temperature">{displayedWeather.forecast.temperature}°C</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* 3. Baris Ticker Bawah (Badge Merah + Running Ticker + Jam Realtime) */}
+        {/* 3. Baris Ticker Bawah (Running Ticker + Jam Realtime di Kanan) */}
         {tickerLayer.present && (
           <div className={`cg-ticker-bar ${tickerLayer.exiting ? "cg-ticker-out" : "cg-ticker-in"}`}>
-            <div className="cg-ticker-badge" title="Nama Berita / Kategori Ticker">
-              <AutoSquishText text={brandText} style={{ width: "max-content", maxWidth: "100%" }} />
-            </div>
             <BroadcastTicker text={tickerText} speed={master.tickerSpeed} revision={master.tickerRevision} fps={master.outputFps} />
             <div className="cg-ticker-clock">
               <BroadcastClock
@@ -280,10 +298,11 @@ function CnnGraphic({
 }
 
 function LogoRenderer({ master, cnn = false }: { master: MasterOverlayState; cnn?: boolean }) {
-  if (master.logoType === "image" && master.logoImage) {
+  const customImg = master.logoImage || master.programLogoImage;
+  if (master.logoType === "image" && customImg) {
     return (
       <img
-        src={master.logoImage}
+        src={customImg}
         alt="Logo Siaran"
         className="cg-custom-logo-img"
       />
@@ -381,7 +400,6 @@ export function BroadcastPreviewBox({
       const w = containerRef.current.clientWidth;
       const h = containerRef.current.clientHeight;
       if (w > 0 && h > 0) {
-        // Strict proportional 16:9 fitting inside viewport (matching 1920x1080 canvas)
         const s = Math.min(w / 1920, h / 1080);
         setScale((prev) => (Math.abs(prev - s) > 0.001 ? s : prev));
       }
@@ -405,7 +423,6 @@ export function BroadcastPreviewBox({
 
   return (
     <div ref={containerRef} className="broadcast-preview-container">
-      {/* 16:9 Viewport Box - Strictly proportional to 1920x1080 */}
       <div
         className="preview-16-9-viewport"
         style={{
@@ -415,7 +432,6 @@ export function BroadcastPreviewBox({
           overflow: "hidden"
         }}
       >
-        {/* Studio Ambient Stage Backdrop */}
         <div className="preview-studio-backdrop">
           {studioReference ? <img className="preview-studio-reference" src="/templates/studio-reference.png" alt="Virtual set studio referensi" /> : <>
             <div className="studio-ambient-light" />
@@ -423,7 +439,6 @@ export function BroadcastPreviewBox({
           </>}
         </div>
 
-        {/* 1920x1080 Stage identical to /output */}
         <div
           className="overlay-stage-1080"
           data-broadcast-motion

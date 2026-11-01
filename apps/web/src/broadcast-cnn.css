@@ -188,7 +188,7 @@
   }
 }
 @keyframes cg-bar-in { from { clip-path: inset(0 100% 0 0); transform: translateY(8px); } to { clip-path: inset(0); transform: translateY(0); } }
-@keyframes cg-bar-out { from { clip-path: inset(0); transform: translateY(0); } to { clip-path: inset(0 0 0 100%); transform: translateY(8px); } }
+@keyframes cg-bar-out { from { clip-path: inset(0); transform: translateY(0); } to { clip-path: inset(0 100% 0 0); transform: translateY(8px); } }
 @keyframes cg-brand-in { from { clip-path: inset(100% 0 0); transform: translateY(12px); opacity: 0; } to { clip-path: inset(0); transform: translateY(0); opacity: 1; } }
 @keyframes cg-brand-out { from { clip-path: inset(0); transform: translateY(0); opacity: 1; } to { clip-path: inset(100% 0 0); transform: translateY(12px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
@@ -260,3 +260,93 @@
 
 
 .cnn-template .cg-subline-row.cg-detail-out { animation: cnn-text-out 160ms ease-in both; }
+
+/* Weather Morphing in CNN Logo Box */
+.cnn-template .cg-logo-box.standalone,
+.cg-logo-box.standalone {
+  position: relative;
+  overflow: hidden;
+}
+
+.cnn-template .cnn-logo-face,
+.cnn-logo-face {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 700ms cubic-bezier(.22,1,.36,1);
+}
+
+.cnn-template .cnn-weather-active .cnn-logo-face,
+.cnn-weather-active .cnn-logo-face {
+  transform: translateY(-22px);
+}
+
+.cnn-template .cnn-weather-strip,
+.cnn-weather-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.98));
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  overflow: hidden;
+  animation: cnn-weather-in 700ms cubic-bezier(.45,0,.25,1) both;
+}
+
+@keyframes cnn-weather-in {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.cnn-template .cnn-weather-strip .cg-weather-row,
+.cnn-weather-strip .cg-weather-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 10px;
+}
+
+.cnn-template .cnn-weather-strip .cg-weather-place,
+.cnn-weather-strip .cg-weather-place {
+  flex: 1;
+  min-width: 0;
+}
+
+.cnn-template .cnn-weather-strip .cg-weather-city,
+.cnn-weather-strip .cg-weather-city {
+  font: 700 16px/20px "CNN", Arial, sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.cnn-template .cnn-weather-strip .cg-weather-symbol,
+.cnn-weather-strip .cg-weather-symbol {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.cnn-template .cnn-weather-strip .cg-weather-temperature,
+.cnn-weather-strip .cg-weather-temperature {
+  font: 700 16px/20px "CNN", Arial, sans-serif;
+  white-space: nowrap;
+  color: #f87171;
+}
+
+.cnn-template .cnn-weather-strip.cg-weather-out,
+.cnn-weather-strip.cg-weather-out {
+  animation: cnn-weather-out 300ms ease-in both;
+}
+
+@keyframes cnn-weather-out {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+

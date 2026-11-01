@@ -12,37 +12,43 @@ export function Liputan7Settings({ master, onChange, disabled = false, onBusyCha
   const [uploadError, setUploadError] = useState("");
   const locations = getLiputan7WeatherLocations(master.weatherLocations);
   const valid = locations.every(location => weatherLocationSchema.safeParse(location).success) && new Set(locations.map(location => location.adm4)).size === locations.length;
-  const enabled = master.broadcastTemplate === "liputan7";
-  const weather = useWeatherForecast(enabled && Boolean(master.showProgramLogo && master.showWeather) && valid, locations);
-  if (!enabled) return null;
+  const isLiputan7 = master.broadcastTemplate === "liputan7";
+  const weather = useWeatherForecast(isLiputan7 && Boolean(master.showWeather) && valid, locations);
+  if (!isLiputan7) return null;
   const patch = (value: Partial<MasterOverlayState>) => onChange({ ...master, ...value });
   const busy = disabled || uploading;
+
   return <fieldset className="l7-settings" disabled={busy}>
-    <legend>Identitas Liputan7 & cuaca</legend>
-    <div className="l7-settings-logos"><img src={master.programLogoImage || "/branding/liputan7.svg"} alt="Logo Liputan7" /><img src={master.logoType === "image" && master.logoImage ? master.logoImage : "/branding/hoc-tv.svg"} alt="Logo HOC TV" /></div>
-    <div className="l7-settings-toggles">
-      <label><input type="checkbox" checked={Boolean(master.showProgramLogo)} onChange={event => patch({ showProgramLogo: event.target.checked })} />Logo program di kiri</label>
-      <label><input type="checkbox" checked={master.showLogo} onChange={event => patch({ showLogo: event.target.checked })} />Logo TV di kanan atas</label>
-      <label><input type="checkbox" disabled={!master.showProgramLogo} checked={Boolean(master.showWeather)} onChange={event => patch({ showWeather: event.target.checked })} />Cuaca di bawah logo program</label>
-    </div>
-    <label className="l7-upload-label">Ganti logo program<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={async event => {
-      const file = event.target.files?.[0];
-      event.target.value = "";
-      if (!file) return;
-      if (file.size > broadcastLogoUploadSpec.maxBytes) { setUploadError("Ukuran logo maksimal 2 MB."); return; }
-      setUploading(true); onBusyChange?.(true); setUploadError("");
-      try {
-        const response = await fetch("/api/uploads/logo", { method: "POST", headers: { "Content-Type": file.type || "image/png" }, body: file });
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Logo program gagal diunggah");
-        onChange({ ...latestMaster.current, programLogoImage: body.url });
-      } catch (error) { setUploadError(error instanceof Error ? error.message : "Logo program gagal diunggah"); }
-      finally { setUploading(false); onBusyChange?.(false); }
-    }} /></label>
-    {master.programLogoImage && <button type="button" onClick={() => patch({ programLogoImage: null })}>Pakai logo Liputan7 bawaan</button>}
-    {uploadError && <p role="alert">{uploadError}</p>}
+    <legend>{isLiputan7 ? "Identitas Liputan7 & Cuaca Global" : "Pengaturan Cuaca Siaran Global"}</legend>
+    {isLiputan7 && (
+      <>
+        <div className="l7-settings-logos">
+          <img src={master.programLogoImage || "/branding/liputan7.svg"} alt="Logo Liputan7" />
+        </div>
+        <div className="l7-settings-toggles">
+          <label><input type="checkbox" checked={Boolean(master.showProgramLogo)} onChange={event => patch({ showProgramLogo: event.target.checked })} />Logo program di kiri</label>
+          <label><input type="checkbox" checked={Boolean(master.showWeather)} onChange={event => patch({ showWeather: event.target.checked })} />Cuaca di bawah logo program</label>
+        </div>
+        <label className="l7-upload-label">Ganti logo program<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={async event => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          if (file.size > broadcastLogoUploadSpec.maxBytes) { setUploadError("Ukuran logo maksimal 2 MB."); return; }
+          setUploading(true); onBusyChange?.(true); setUploadError("");
+          try {
+            const response = await fetch("/api/uploads/logo", { method: "POST", headers: { "Content-Type": file.type || "image/png" }, body: file });
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.error || "Logo program gagal diunggah");
+            onChange({ ...latestMaster.current, programLogoImage: body.url });
+          } catch (error) { setUploadError(error instanceof Error ? error.message : "Logo program gagal diunggah"); }
+          finally { setUploading(false); onBusyChange?.(false); }
+        }} /></label>
+        {master.programLogoImage && <button type="button" onClick={() => patch({ programLogoImage: null })}>Pakai logo Liputan7 bawaan</button>}
+        {uploadError && <p role="alert">{uploadError}</p>}
+      </>
+    )}
     {master.showWeather && <>
-      <p>Logo tampil 10 detik, lalu cuaca seluruh kota berurutan. Tiap kota mendapat 3 detik untuk dibaca, dengan transisi lembut di antaranya. Setelah kota terakhir, logo kembali tampil 10 detik. Tiap kota diwakili wilayah kelurahan/desa yang tertera di bawah.</p>
+      <p>Cuaca global aktif pada Logo Box siaran. Kota-kota akan tampil bergantian dengan durasi 3 detik tiap kota, lalu jeda logo 10 detik.</p>
       <details><summary>Info data prakiraan</summary><p>Sumber: <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. Waktu berikut memakai zona waktu wilayah asli. Rentang suhu dihitung dari data prakiraan harian. Informasi sumber tidak ditampilkan di grafis siaran.</p></details>
       <button type="button" onClick={() => patch({ weatherLocations: defaultWeatherLocations.map(location => ({ ...location })) })}>Pakai 7 kota besar Indonesia</button>
       {locations.map((location, index) => <div className="l7-weather-location" key={index}>

@@ -2,10 +2,18 @@ import { useEffect, useState } from "react";
 import { defaultWeatherLocations, liputan7Motion, weatherForecastSchema } from "@newscg/shared";
 import type { WeatherForecast, WeatherLocation } from "@newscg/shared";
 
+let globalWeatherCache: { key: string; forecasts: WeatherForecast[] } = { key: "", forecasts: [] };
+
 /** Preview and output share the server cache; weather data never changes live commands. */
 export function useWeatherForecast(enabled: boolean, locations: WeatherLocation[] = defaultWeatherLocations) {
   const locationKey = locations.map(location => location.adm4).join(",");
-  const [result, setResult] = useState<{ key: string; forecasts: WeatherForecast[]; error: string }>({ key: "", forecasts: [], error: "" });
+  const [result, setResult] = useState<{ key: string; forecasts: WeatherForecast[]; error: string }>(() => {
+    if (globalWeatherCache.key === locationKey && globalWeatherCache.forecasts.length > 0) {
+      return { key: locationKey, forecasts: globalWeatherCache.forecasts, error: "" };
+    }
+    return { key: "", forecasts: [], error: "" };
+  });
+
   useEffect(() => {
     if (!enabled) return;
     let disposed = false;
@@ -24,6 +32,9 @@ export function useWeatherForecast(enabled: boolean, locations: WeatherLocation[
       const forecasts = settled.flatMap(item => item.status === "fulfilled" ? [item.value] : []);
       const error = settled.flatMap(item => item.status === "rejected" ? [item.reason instanceof Error ? item.reason.message : "Cuaca gagal dimuat"] : []).join("; ");
       if (error) console.warn("Cuaca otomatis (Open-Meteo):", error);
+      if (forecasts.length > 0) {
+        globalWeatherCache = { key: locationKey, forecasts };
+      }
       setResult({ key: locationKey, forecasts, error });
       const expiresIn = forecasts.length ? Math.min(...forecasts.map(forecast => Date.parse(forecast.expiresAt) - Date.now())) : liputan7Motion.weatherRefreshMs;
       timer = setTimeout(refresh, error ? 60000 : Math.max(1000, Math.min(liputan7Motion.weatherRefreshMs, expiresIn)));
@@ -31,5 +42,7 @@ export function useWeatherForecast(enabled: boolean, locations: WeatherLocation[
     void refresh();
     return () => { disposed = true; abort.abort(); clearTimeout(timer); };
   }, [enabled, locationKey]);
-  return enabled && result.key === locationKey ? result : { forecasts: [], error: "" };
+  return enabled && result.key === locationKey
+    ? result
+    : (enabled && globalWeatherCache.key === locationKey ? { forecasts: globalWeatherCache.forecasts, error: "" } : { forecasts: [], error: "" });
 }

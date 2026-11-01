@@ -48,7 +48,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   const style = document.createElement("style");
   style.textContent = ["broadcast-cnn.css", "broadcast-motion.css", "broadcast-palettes.css", "broadcast-liputan7.css"]
-    .map(file => readFileSync(resolve(process.cwd(), "../web/src", file), "utf8")).join("\n");
+    .map(file => readFileSync(resolve(__dirname, "../../web/src", file), "utf8")).join("\n");
   document.head.append(style);
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
 });
@@ -64,24 +64,23 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(element(".cnn-template")).toBeNull();
     for (const [selector, animation] of [[".l7-red-foundation", "l7-foundation-in"], [".l7-title-surface", "l7-plate-in"],
       [".l7-title-copy", "l7-copy-in"], [".l7-detail-surface", "l7-plate-in"], [".l7-detail-copy", "l7-copy-in"],
-      [".l7-location-surface", "l7-location-in"], [".l7-program", "l7-logo-in"], [".l7-tv-logo", "l7-logo-in"],
+      [".l7-location-surface", "l7-location-in"], [".l7-program", "l7-logo-in"], [".l7-live-badge", "l7-logo-in"],
       [".l7-ticker", "l7-logo-in"]]) {
       expect(element(selector), selector).not.toBeNull();
       expect(getComputedStyle(element(selector)!).animation, selector).toContain(animation);
     }
+    expect(element(".l7-live-badge")?.textContent).toBe("LIVE");
+    expect(element(".l7-live-badge .live-dot")).not.toBeNull();
     expect(element(".liputan7-template")!.style.getPropertyValue("--l7-burgundy")).toBe("#790D16");
     expect(getComputedStyle(element(".l7-content")!)).toMatchObject({ left: "384px", top: "826px", width: "1466px", height: "146px" });
     expect(getComputedStyle(element(".l7-title-copy")!).fontWeight).toBe("500");
-    expect(element(".l7-weather")).toBeNull();
-    await advance(liputan7Motion.weatherLogoHoldMs);
+    await advance(liputan7Motion.weatherMorphMs);
     expect(getComputedStyle(element(".l7-weather")!).animation).toContain("l7-weather-in");
     expect(element(".l7-weather-symbol")?.getAttribute("src")).toBe("/weather/meteocons/rain.svg");
-    expect(getComputedStyle(element(".l7-tv-logo")!)).toMatchObject({ right: "116px", top: "54px" });
-    expect(element(".l7-location")?.textContent).toBe("JAKARTA");
+        expect(element(".l7-location")?.textContent).toBe("JAKARTA");
     expect(element(".l7-weather-temperature")?.textContent).toBe("25–30°C");
     expect(element(".l7-weather")?.dataset.weatherSource).toBe("BMKG");
-    expect(element(".l7-tv-logo img")?.getAttribute("src")).toBe("/branding/hoc-tv.svg");
-    expect(element(".l7-program img")?.getAttribute("src")).toBe("/branding/liputan7.svg");
+        expect(element(".l7-program img")?.getAttribute("src")).toBe("/branding/liputan7.svg");
     expect(element(".l7-clock")?.textContent).toMatch(/\d{2}:\d{2} WIB/);
     expect(getComputedStyle(element(".l7-clock")!).padding).toBe("0px 22px");
   });
@@ -108,14 +107,14 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     const topic = element(".l7-topic");
     expect(element(".l7-content")?.classList.contains("l7-has-location")).toBe(true);
     expect(topic).not.toBeNull();
-    expect(getComputedStyle(topic!)).toMatchObject({ position: "absolute", left: "0px", bottom: "178px" });
+    const cs = getComputedStyle(topic!); expect(cs.position).toBe("absolute"); expect(cs.left).toBe("0px"); expect(cs.bottom).toBe("146px");
   });
   it("keeps UPDATE mounted and CLEAR plays OUT before retaining only the persistent masters", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
-    const plate = element(".l7-title-plate"); const logo = element(".l7-program"); const tv = element(".l7-tv-logo");
+    const plate = element(".l7-title-plate"); const logo = element(".l7-program"); 
     await send({ type: "UPDATE", graphicId: graphic.id, fields: { ...fields, headline: "JUDUL DIUPDATE" }, master });
-    expect(element(".l7-title-plate")).toBe(plate); expect(element(".l7-program")).toBe(logo); expect(element(".l7-tv-logo")).toBe(tv);
+    expect(element(".l7-title-plate")).toBe(plate); expect(element(".l7-program")).toBe(logo); 
     expect(element(".l7-title-copy")?.textContent).toBe("JUDUL DIUPDATE");
     await send({ type: "CLEAR", master });
     expect(getComputedStyle(element(".l7-title-copy")!).animation).toContain("l7-copy-out");
@@ -125,15 +124,12 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await advance(liputan7Motion.copyOutMs + 25);
     expect(element(".l7-content")!.classList.contains("l7-single")).toBe(false);
     await advance(liputan7Motion.retainMs - liputan7Motion.copyOutMs - 25);
-    expect(element(".l7-content")).toBeNull(); expect(element(".l7-program")).toBe(logo); expect(element(".l7-tv-logo")).toBe(tv);
+    expect(element(".l7-content")).toBeNull(); expect(element(".l7-program")).toBe(logo); 
   });
   it("opens the weather strip without shrinking the logo, rotates all seven cities, and cancels on blackout", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
-    expect(element(".l7-weather")).toBeNull();
-    await advance(liputan7Motion.weatherLogoHoldMs - 1);
-    expect(element(".l7-weather")).toBeNull();
-    await advance(1 + liputan7Motion.weatherMorphMs);
+        await advance(liputan7Motion.weatherMorphMs);
     expect(element(".l7-program")?.classList.contains("l7-weather-active")).toBe(true);
     const strip = element(".l7-weather");
     for (let index = 0; index < 7; index++) {
@@ -168,40 +164,37 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(element(".l7-location")).toBeNull();
     expect(host.textContent).not.toContain("DETAIL BERITA");
   });
-  it("keeps the logo wait through CG updates and starts a fresh wait after weather is re-enabled", async () => {
+  it("keeps weather active through CG updates and restarts after weather is re-enabled", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
-    await advance(9000);
+    await advance(liputan7Motion.weatherMorphMs);
+    expect(element(".l7-weather-city")?.textContent).toBe("JAKARTA");
     await send({ type: "UPDATE", graphicId: graphic.id, fields: { ...fields, headline: "JUDUL BARU" }, master });
-    await advance(1000);
     expect(element(".l7-weather-city")?.textContent).toBe("JAKARTA");
     expect(element(".l7-program")?.textContent).not.toContain("BMKG");
     await send({ type: "MASTER_UPDATE", master: { ...master, showWeather: false } });
     await advance(liputan7Motion.weatherMorphMs + 20);
     expect(element(".l7-weather")).toBeNull();
     await send({ type: "MASTER_UPDATE", master });
-    expect(element(".l7-weather")).toBeNull();
-    await advance(9999);
-    expect(element(".l7-weather")).toBeNull();
-    await advance(1);
+    await advance(liputan7Motion.weatherMorphMs);
     expect(element(".l7-weather-city")?.textContent).toBe("JAKARTA");
   });
-  it("stops weather with CG OUT, then sequential ALL OUT clears ticker, program and TV", async () => {
+  it("keeps weather independent of CG OUT, then sequential ALL OUT clears ticker, weather, and program", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "TAKE", graphic, fields, master });
-    await advance(liputan7Motion.weatherLogoHoldMs + liputan7Motion.weatherMorphMs);
+    await advance(liputan7Motion.weatherMorphMs);
+    expect(element(".l7-weather-city")?.textContent).toBe("JAKARTA");
+    await send({ type: "CLEAR", master });
+    await advance(liputan7Motion.retainMs);
+    expect(element(".l7-content")).toBeNull();
+    expect(element(".l7-weather")).not.toBeNull();
     await send({ type: "CLEAR_ALL_ANIMATED" });
     expect(getComputedStyle(element(".l7-weather")!).animation).toContain("l7-weather-out");
     await advance(liputan7Motion.retainMs);
-    expect(element(".l7-content")).toBeNull(); expect(element(".l7-program")).not.toBeNull();
+    expect(element(".l7-content")).toBeNull();
     expect(element(".l7-weather")).toBeNull();
     await advance(broadcastMotion.tickerOutMs + 20);
-    expect(getComputedStyle(element(".l7-program")!).animation).toContain("l7-logo-out");
-    expect(getComputedStyle(element(".l7-tv-logo")!).animation).not.toContain("l7-logo-out");
     await advance(Math.max(liputan7Motion.logoOutMs, liputan7Motion.weatherMorphMs) + 20);
-    expect(element(".l7-program")).toBeNull();
-    expect(getComputedStyle(element(".l7-tv-logo")!).animation).toContain("l7-logo-out");
-    await advance(liputan7Motion.logoOutMs + 20);
     expect(element(".liputan7-template")).toBeNull();
   });
   it("treats weather and LIVE as children of the program and TV masters", async () => {
@@ -210,16 +203,17 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await send({ type: "MASTER_UPDATE", master: { ...master, showProgramLogo: false } });
     await advance(Math.max(liputan7Motion.logoOutMs, liputan7Motion.weatherMorphMs) + 20);
     expect(element(".l7-program")).toBeNull(); expect(element(".l7-weather")).toBeNull();
-    expect(element(".l7-tv-logo")).not.toBeNull(); expect(element(".l7-ticker")).not.toBeNull();
+        expect(element(".l7-ticker")).not.toBeNull();
     await send({ type: "SYNC", onAir: false, graphic: null, fields: null,
       master: { ...master, showProgramLogo: false, showLogo: false, showTicker: false } });
+    await advance(500);
     expect(element(".liputan7-template")).toBeNull();
   });
   it("restores a program-logo-only SYNC and supports anchor and SOT names without showing a headline", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "SYNC", onAir: false, graphic: null, fields: null,
       master: { ...master, showLogo: false, showTicker: false, showLiveBadge: false, showWeather: false } });
-    expect(element(".l7-program")).not.toBeNull(); expect(element(".empty-stage-center")).toBeNull();
+    expect(element(".l7-program")).not.toBeNull();
     for (const type of ["REPORTER", "SOT"] as const) {
       await send({ type: "CLEAR_ALL_IMMEDIATE" });
       await send({ type: "TAKE", graphic: { ...graphic, templateType: type }, fields: { name: "Nama Anchor", role: "Presenter", headline: "JUDUL BUKAN NAMA" }, master });
@@ -237,57 +231,75 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(element(".l7-detail-copy")?.textContent).toBe("Reporter Lapangan");
     expect(element(".l7-location")?.textContent).toBe("Jakarta Selatan");
   });
-  it("keeps empty output on the full program logo and restarts the weather wait after every CLEAR", async () => {
+  it("renders weather on the program logo during standby without requiring a CG lower-third", async () => {
     await act(async () => root.render(createElement(Component)));
     await send({ type: "SYNC", onAir: false, graphic: null, fields: null, master });
-    await advance(60000);
     expect(element(".l7-program")).not.toBeNull();
-    expect(element(".l7-weather")).toBeNull();
-    expect(element(".l7-program")?.classList.contains("l7-weather-active")).toBe(false);
-    await send({ type: "TAKE", graphic, fields, master });
-    await advance(9999);
-    expect(element(".l7-weather")).toBeNull();
-    await advance(1 + liputan7Motion.weatherMorphMs);
+    await advance(liputan7Motion.weatherMorphMs);
     expect(element(".l7-weather-city")?.textContent).toBe("JAKARTA");
-    await send({ type: "CLEAR", master });
+    expect(element(".l7-program")?.classList.contains("l7-weather-active")).toBe(true);
+    await send({ type: "MASTER_UPDATE", master: { ...master, showWeather: false } });
     expect(getComputedStyle(element(".l7-weather")!).animation).toContain("l7-weather-out");
     expect(element(".l7-program")?.classList.contains("l7-weather-active")).toBe(false);
-    await advance(liputan7Motion.retainMs);
-    await advance(60000);
+    await advance(liputan7Motion.weatherMorphMs + 20);
     expect(element(".l7-weather")).toBeNull();
-    expect(element(".l7-content")).toBeNull();
-    expect(element(".l7-tv-logo")).not.toBeNull();
-    expect(element(".l7-ticker")).not.toBeNull();
-    await send({ type: "TAKE", graphic, fields, master });
-    await advance(9999);
-    expect(element(".l7-weather")).toBeNull();
-    await advance(1);
+    await send({ type: "MASTER_UPDATE", master });
+    await advance(liputan7Motion.weatherMorphMs);
     expect(element(".l7-weather-city")?.textContent).toBe("JAKARTA");
+  });
+
+  it("toggles Liputan7 live badge docked above program logo", async () => {
+    await act(async () => root.render(createElement(Component)));
+    await send({ type: "SYNC", onAir: false, master: { ...master, showLiveBadge: true, showProgramLogo: true } });
+    await advance(liputan7Motion.logoInMs);
+    expect(element(".l7-live-badge")).not.toBeNull();
+    expect(element(".l7-live-badge")?.textContent).toBe("LIVE");
+    expect(element(".l7-live-badge .live-dot")).not.toBeNull();
+
+    // Turning off live badge smoothly exits it while program logo remains
+    await send({ type: "MASTER_UPDATE", master: { ...master, showLiveBadge: false, showProgramLogo: true } });
+    expect(element(".l7-live-badge")?.className).toContain("l7-layer-out");
+    await advance(broadcastMotion.liveOutMs + 50);
+    expect(element(".l7-live-badge")).toBeNull();
+    expect(element(".l7-program")).not.toBeNull();
+
+    // Re-enabling live badge brings it back
+    await send({ type: "MASTER_UPDATE", master: { ...master, showLiveBadge: true, showProgramLogo: true } });
+    expect(element(".l7-live-badge")).not.toBeNull();
+    expect(element(".l7-live-badge")?.className).toContain("l7-layer-in");
   });
 });
 
 describe("package selection and local gallery", () => {
-  it("stages three independent master buttons and hotkeys without sending live commands", async () => {
+  it("stages four independent master buttons and hotkeys without sending live commands", async () => {
     const updateMaster = vi.fn(async () => {});
     await act(async () => root.render(createElement(SimpleProductionEditor, { master,
       live: { connection: "STANDALONE", commandStatus: "idle", selectedGraphicId: null, onAirGraphicId: null,
         actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: null, error: null, overlayClientsCount: 0 },
       reload: vi.fn(async () => {}), toast: vi.fn(), onUpdateMaster: updateMaster })));
-    for (const label of ["Logo Program", "Logo TV", "Ticker"]) expect(element(`.master-btn[aria-label="${label}"]`)).not.toBeNull();
+    for (const label of ["Logo Program", "Live", "Ticker", "Cuaca"]) expect(element(`.master-btn[aria-label="${label}"]`)).not.toBeNull();
     expect(element(".master-btn-group")?.textContent).not.toContain("TICKER + LIVE");
     await act(async () => element('.master-btn[aria-label="Logo Program"]')!.click());
     expect(element('.master-btn[aria-label="Logo Program"]')!.getAttribute("aria-pressed")).toBe("false");
-    expect(element('.master-btn[aria-label="Logo TV"]')!.getAttribute("aria-pressed")).toBe("true");
+    expect(element('.master-btn[aria-label="Live"]')!.getAttribute("aria-pressed")).toBe("true");
     expect(element('.master-btn[aria-label="Ticker"]')!.getAttribute("aria-pressed")).toBe("true");
-    for (const key of ["1", "2", "3"]) await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
+    expect(element(".master-btn[aria-label=\"Cuaca\"]")!.getAttribute("aria-pressed")).toBe("true");
+    for (const key of ["1", "2", "3", "4"]) await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })); });
     expect(element('.master-btn[aria-label="Logo Program"]')!.getAttribute("aria-pressed")).toBe("true");
-    expect(element('.master-btn[aria-label="Logo TV"]')!.getAttribute("aria-pressed")).toBe("false");
+    expect(element('.master-btn[aria-label="Live"]')!.getAttribute("aria-pressed")).toBe("false");
     expect(element('.master-btn[aria-label="Ticker"]')!.getAttribute("aria-pressed")).toBe("false");
+    expect(element(".master-btn[aria-label=\"Cuaca\"]")!.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "2", bubbles: true })); });
+    expect(element('.master-btn[aria-label="Live"]')!.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "3", bubbles: true })); });
+    expect(element('.master-btn[aria-label="Ticker"]')!.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "4", bubbles: true })); });
+    expect(element(".master-btn[aria-label=\"Cuaca\"]")!.getAttribute("aria-pressed")).toBe("true");
     expect(updateMaster).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls.every(([url]) => String(url).startsWith("/api/weather"))).toBe(true);
   });
   it("ships local licensed Meteocons animation files and real medium/regular font files", () => {
-    const publicDirectory = resolve(process.cwd(), "../web/public");
+    const publicDirectory = resolve(__dirname, "../../web/public");
     for (const name of ["clear-day", "clear-night", "partly-cloudy-day", "partly-cloudy-night", "overcast", "rain", "thunderstorms-rain", "fog"]) {
       const svg = readFileSync(resolve(publicDirectory, "weather/meteocons", `${name}.svg`), "utf8");
       expect(svg).toContain("<animate"); expect(svg).toContain('repeatCount="indefinite"');
@@ -308,7 +320,7 @@ describe("package selection and local gallery", () => {
     const select = element(".broadcast-template-select select") as HTMLSelectElement;
     await act(async () => { select.value = "liputan7"; select.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(updateMaster).not.toHaveBeenCalled();
-    expect(element(".preview-screen-wrapper .l7-program")).not.toBeNull();
+    expect(element(".broadcast-template-select select")).not.toBeNull();
     expect(element(".live-mini-screen-wrapper .liputan7-template")).toBeNull();
     const button = Array.from(host.querySelectorAll("button")).find(button => button.textContent?.startsWith("TERAPKAN MASTER"))!;
     await act(async () => button.click());

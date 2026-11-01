@@ -5,6 +5,7 @@ import { BroadcastTicker } from "./BroadcastTicker";
 import { BroadcastClock } from "./BroadcastGraphic";
 import { useLayerPresence } from "./useLayerPresence";
 import { AutoSquishText } from "./AutoSquishText";
+import { useBroadcastWeather, WeatherSymbol } from "./BroadcastWeather";
 
 const motionStyle = Object.fromEntries(
   Object.entries(broadcastMotion).map(([name, milliseconds]) => [`--cg-${name}`, `${milliseconds}ms`])
@@ -24,8 +25,9 @@ export function BccGraphic({
 }: BroadcastGraphicProps) {
   const graphicStyle = { ...motionStyle } as CSSProperties;
 
-  const logoLayer = useLayerPresence(master.showLogo, broadcastMotion.logoOutMs + 20);
-  const liveLayer = useLayerPresence(master.showLiveBadge, broadcastMotion.liveOutMs + 20);
+  const showProgramLogo = Boolean(master.showLogo || master.showProgramLogo);
+  const logoLayer = useLayerPresence(showProgramLogo, broadcastMotion.logoOutMs + 20);
+  const liveLayer = useLayerPresence(Boolean(!exitAll && master.showLiveBadge), broadcastMotion.liveOutMs + 20);
   const tickerLayer = useLayerPresence(master.showTicker, broadcastMotion.tickerOutMs + 20);
   const exitClass = isExiting ? "cg-exit" : "";
   const isBreaking = type === "BREAKING";
@@ -59,11 +61,13 @@ export function BccGraphic({
   useEffect(() => { if (effectiveFields.kicker) setLastKicker(effectiveFields.kicker); }, [effectiveFields.kicker]);
   const kickerText = effectiveFields.kicker || (isBreaking ? "BREAKING NEWS" : "");
 
-  const headlineText = (isReporter || contentMode === "presenter")
-    ? effectiveFields.name || effectiveFields.headline || "NAMA PEMBAWA BERITA"
+  // SOT standard: Title plate = Nama Narasumber, Detail plate = Jabatan (mengikuti standar Liputan7)
+  const isNameMode = isReporter || isSot || contentMode === "presenter" || contentMode === "sot";
+  const headlineText = isNameMode
+    ? effectiveFields.name || effectiveFields.headline || (isSot ? "NAMA NARASUMBER" : "NAMA PEMBAWA BERITA")
     : effectiveFields.headline || effectiveFields.text || "";
 
-  const sublineText = isReporter || isSot
+  const sublineText = isNameMode
     ? (effectiveFields.role || effectiveFields.subline || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
 
@@ -98,18 +102,13 @@ export function BccGraphic({
   const isDetailActive = hasSubline && !isSingleLayout && contentMode === "headline";
   const detailLayer = useLayerPresence(isDetailActive, broadcastMotion.detailOutMs + 20);
 
-  const isSotActive = contentMode === "sot" && effectiveFields.showSot !== "false";
+  const isSotActive = (contentMode === "sot" || isSot) && effectiveFields.showSot !== "false";
   const sotLayer = useLayerPresence(isSotActive, broadcastMotion.detailOutMs + 20);
-  const [lastSot, setLastSot] = useState({ name: effectiveFields.name || "", role: effectiveFields.role || "" });
-  useEffect(() => {
-    if (contentMode === "sot" && effectiveFields.showSot !== "false")
-      setLastSot({ name: effectiveFields.name || "", role: effectiveFields.role || "" });
-  }, [contentMode, effectiveFields.showSot, effectiveFields.name, effectiveFields.role]);
 
   const [lastSubline, setLastSubline] = useState(sublineText);
   useEffect(() => { if (sublineText) setLastSubline(sublineText); }, [sublineText]);
 
-  // Ketika sedang exiting (CLEAR), pertahankan struktur layout double/single sampai selesai exit agar tidak melompat
+  // Ketika sedang exiting (CLEAR), pertahankan struktur layout double/single sampai selesai exit
   const hasActiveDetailLayer = detailLayer.present || sotLayer.present || socialLayer.present;
   const isEffectiveSingleLayout = isExiting
     ? isSingleLayout
@@ -120,6 +119,13 @@ export function BccGraphic({
     (detailLayer.exiting && !sotLayer.present && !socialLayer.present) ||
     (sotLayer.exiting && !detailLayer.present && !socialLayer.present) ||
     (socialLayer.exiting && !detailLayer.present && !sotLayer.present)
+  );
+
+  // Weather (Konsep A - Morphing Logo Box)
+  const weatherEnabled = Boolean(!exitAll && showProgramLogo && master.showWeather);
+  const { weather, weatherLayer, displayedWeather, weatherVisible } = useBroadcastWeather(
+    weatherEnabled,
+    master.weatherLocations
   );
 
   const defaultBccTicker = "INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS";
@@ -145,17 +151,32 @@ export function BccGraphic({
         data-broadcast-template="bcc"
         className={`cg-lower-third bcc-template ${exitAll ? "cg-sequential-out" : ""} ${isBreaking ? "breaking" : ""} ${isReporter ? "reporter" : ""} ${isMini ? "mini" : ""} ${!tickerLayer.present ? "no-ticker" : ""}`}
       >
-        {/* Layer Master Permanen (Logo Box Kiri + Live Badge di Atasnya) */}
+        {/* Layer Konten (Logo Program di Kiri + Kicker Tab + Headline Plate + Subline Plate) */}
+        {/* Layer Master Permanen (Logo Box Kiri) */}
         {(logoLayer.present || liveLayer.present) && (
           <div className={`cg-standalone-master-wrap cg-persistent-master ${!tickerLayer.present ? "no-ticker" : ""}`}>
             {liveLayer.present && (
-              <div className={`cg-live-badge-top ${logoLayer.present ? "above-logo" : "solo"} ${liveLayer.exiting ? "cg-layer-out" : ""}`}>
+              <div className={`bcc-live-badge ${logoLayer.present ? "above-logo" : "solo"} ${liveLayer.exiting ? "cg-layer-out" : "cg-layer-in"}`}>
+                <span className="live-dot" />
                 <span>LIVE</span>
               </div>
             )}
             {logoLayer.present && (
-              <div className={`cg-logo-box-left ${logoLayer.exiting ? "cg-layer-out" : ""}`}>
-                <BccLogoRenderer master={master} />
+              <div className={`cg-logo-box-left ${weatherVisible ? "bcc-weather-active" : ""} ${logoLayer.exiting ? "cg-layer-out" : ""}`}>
+                <div className="bcc-logo-face">
+                  <BccLogoRenderer master={master} />
+                </div>
+                {weatherLayer.present && displayedWeather && (
+                  <div className={`bcc-weather-strip ${weatherLayer.exiting ? "cg-weather-out" : ""}`}>
+                    <div key={`${weather.cycle}-${displayedWeather.forecast.adm4}`} className="cg-weather-row">
+                      <div className="cg-weather-place">
+                        <AutoSquishText className="cg-weather-city" text={displayedWeather.label} minScale={1} />
+                      </div>
+                      <WeatherSymbol condition={displayedWeather.forecast.condition} isDaytime={displayedWeather.forecast.isDaytime} className="cg-weather-symbol" />
+                      <span className="cg-weather-temperature">{displayedWeather.forecast.temperature}°C</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -164,8 +185,8 @@ export function BccGraphic({
         {/* Layer Konten (Kicker Tab + Headline Plate + Subline Plate) */}
         {hasContent && (
           <div key={contentKey} className={`cg-content-layer ${kickerLayer.present ? "cg-has-topic" : ""} ${exitClass}`}>
-            {/* Ruang kosong penahan di sebelah kiri agar headline berdampingan dengan logo box */}
-            {logoLayer.present && (
+            {/* Ruang kosong penahan di sebelah kiri agar headline berdampingan dengan logo box / live badge */}
+            {(logoLayer.present || liveLayer.present) && (
               <div className="cg-logo-space" aria-hidden="true" />
             )}
 
@@ -198,18 +219,13 @@ export function BccGraphic({
               {!isEffectiveSingleLayout && (
                 <div className={`cg-subline-plate ${isDetailPlateExiting ? "cg-detail-out" : ""}`}>
                   {sotLayer.present ? (
-                    <div className={`cg-sot-name-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
-                      <div className="cg-copy-motion" style={{ width: "max-content", maxWidth: "60%" }}>
-                        <AutoSquishText text={sotLayer.exiting ? lastSot.name : effectiveFields.name || lastSot.name} minScale={0.35} />
+                    <div className={`cg-subline-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
+                      <div className="cg-copy-motion" style={{ width: "100%" }}>
+                        <AutoSquishText
+                          text={sublineText || lastSubline}
+                          minScale={0.45}
+                        />
                       </div>
-                      {(sotLayer.exiting ? lastSot.role : effectiveFields.role) && (
-                        <>
-                          <span className="cg-sot-divider" aria-hidden="true" />
-                          <div className="cg-copy-motion" style={{ flex: 1 }}>
-                            <AutoSquishText text={sotLayer.exiting ? lastSot.role : effectiveFields.role || lastSot.role} minScale={0.45} className="cg-sot-role-text" />
-                          </div>
-                        </>
-                      )}
                     </div>
                   ) : detailLayer.present ? (
                     <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
@@ -240,7 +256,6 @@ export function BccGraphic({
             </div>
           </div>
         )}
-
 
         {/* 3. Baris Ticker Bawah */}
         {tickerLayer.present && (

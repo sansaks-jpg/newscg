@@ -12,7 +12,10 @@ const shortcuts: Record<string, LiveShortcut> = {
   c: "clear",
   "0": "clear-all",
   "1": "logo",
-  "2": "full",
+  "2": "live",
+  "3": "ticker",
+  "4": "weather",
+  "5": "all-live",
   h: "headline",
   p: "news-anchor",
   o: "reporter",
@@ -38,7 +41,6 @@ export function liveShortcut(
   }
 ): LiveShortcut | null {
   if (context.disabled || context.editing || context.repeat || context.modified) return null;
-  if (key === "3") return (context.broadcastTemplate === "liputan7" || context.broadcastTemplate === "bcc") ? "ticker" : null;
   if (context.interactive && (key === " " || key === "Enter")) return null;
   return shortcuts[key] || shortcuts[key.toLowerCase()] || null;
 }

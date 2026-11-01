@@ -4,14 +4,21 @@ import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bccPalette, broadcastMotion, defaultMasterOverlayState } from "@newscg/shared";
-import type { GraphicItem, OverlayEvent } from "@newscg/shared";
+import { bccPalette, broadcastMotion, defaultMasterOverlayState, liputan7Motion } from "@newscg/shared";
+import type { GraphicItem, OverlayEvent, WeatherForecast } from "@newscg/shared";
 import OverlayWindow from "../../web/src/OverlayWindow";
 import BccPreview from "../../web/src/BccPreview";
 
 let root: Root;
 let host: HTMLDivElement;
 const streams: { onmessage: ((event: MessageEvent) => void) | null; close: () => void }[] = [];
+const forecast: WeatherForecast = {
+  adm4: "31.71.03.1001", village: "Kemayoran", city: "Jakarta Pusat", timezone: "Asia/Jakarta",
+  condition: "rain", description: "Hujan Ringan", temperature: 29, minimum: 25, maximum: 30, source: "BMKG",
+  validAt: "2026-10-15T09:00:00Z", expiresAt: "2026-10-15T12:00:00Z", forecastDate: "2026-10-15",
+  fetchedAt: "2026-10-15T10:00:00Z", sourceUrl: "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=31.71.03.1001", isDaytime: true
+};
+const fetchMock = vi.fn();
 const fields = {
   headline: "KEMACETAN STASIUN CITAYAM",
   subline: "Tanti | Pengunjung",
@@ -53,6 +60,11 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: Promise.resolve() } });
   sessionStorage.clear();
+  fetchMock.mockReset().mockImplementation(async (url: string) => {
+    const adm4 = new URL(url, "http://localhost").searchParams.get("adm4") || forecast.adm4;
+    return { ok: true, json: async () => ({ ...forecast, adm4 }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
 
   const webSrc = resolve(__dirname, "../../web/src");
   const style = document.createElement("style");
@@ -90,11 +102,13 @@ describe("BCC News Template ('output' and 'preview')", () => {
     const logoImg = logoBox?.querySelector("img");
     expect(logoImg?.getAttribute("src")).toBe("/branding/bcc.png");
 
-    // Live badge is positioned on top of logo box
-    const liveBadge = element(".cg-live-badge-top");
+    // Live badge docked on top of left logo box
+    const liveBadge = element(".bcc-live-badge");
     expect(liveBadge).not.toBeNull();
     expect(liveBadge?.textContent).toContain("LIVE");
+    expect(liveBadge?.querySelector(".live-dot")).not.toBeNull();
 
+    
     // Orange kicker tab
     const kickerTab = element(".cg-kicker-tab");
     expect(kickerTab).not.toBeNull();
@@ -185,47 +199,30 @@ describe("BCC News Template ('output' and 'preview')", () => {
     expect(element(".cg-headline-plate")?.className).toContain("single-layout");
   });
 
-  it("preserves persistent logo box and LIVE badge across standby, headline entry (TAKE), and CLEAR without closing animation or unmounting", async () => {
+  it("preserves persistent logo box across standby, headline entry (TAKE), and CLEAR without closing animation or unmounting (without lingering live badge)", async () => {
     await act(async () => { root.render(createElement(OverlayWindow)); });
-    // Standby: Master layers active (logo + live + ticker), no headline on air yet
+    // Standby: Master active, no headline on air yet -> logo box persistent, no live badge
     await send({ type: "SYNC", onAir: false, master });
     await advance(broadcastMotion.panelInMs);
-
-    // 1. Initial master state: Logo and LIVE badge are mounted
     const logoNode = element(".cg-logo-box-left");
-    const liveNode = element(".cg-live-badge-top");
     expect(logoNode).not.toBeNull();
-    expect(liveNode).not.toBeNull();
-    expect(liveNode?.textContent).toContain("LIVE");
-    expect(element(".cg-headline-plate")).toBeNull();
+    expect(element(".bcc-live-badge")).not.toBeNull();
+    expect(element(".bcc-live-badge")?.textContent).toBe("LIVE");
+    expect(element(".bcc-live-badge .live-dot")).not.toBeNull();
 
-    // 2. Headline enters (TAKE): Logo and LIVE badge MUST stay persistent and NOT unmount/re-animate
+    // 2. TAKE: Headline enters, persistent logo remains stationary
     await send({ type: "TAKE", graphic, fields, master });
     await advance(broadcastMotion.panelInMs);
-
-    // Headline is now present
     expect(element(".cg-headline-plate")?.textContent).toContain("KEMACETAN STASIUN CITAYAM");
-    // Spacer in content layer exists to align next to logo
     expect(element(".cg-logo-space")).not.toBeNull();
-    // LIVE badge is strictly present and unchanged
-    expect(element(".cg-live-badge-top")).toBe(liveNode);
-    expect(element(".cg-live-badge-top")?.textContent).toContain("LIVE");
-    // Logo node was NOT recreated or closed
     expect(element(".cg-logo-box-left")).toBe(logoNode);
 
-    // 3. Clear headline (CLEAR): Only the headline content layer exits, logo & LIVE badge stay stationary
+    // 3. CLEAR: Headline exits, logo remains persistent
     await send({ type: "CLEAR", master });
     expect(element(".cg-content-layer")?.className).toContain("cg-exit");
-    // Logo box does NOT receive exit animation
-    expect(element(".cg-logo-box-left")?.className).not.toContain("cg-layer-out");
-    expect(element(".cg-logo-box-left")).toBe(logoNode);
-    expect(element(".cg-live-badge-top")).toBe(liveNode);
-
-    // 4. Past retain time: Headline completely gone, Logo & LIVE badge still intact
     await advance(broadcastMotion.retainMs + 100);
     expect(element(".cg-headline-plate")).toBeNull();
     expect(element(".cg-logo-box-left")).toBe(logoNode);
-    expect(element(".cg-live-badge-top")).toBe(liveNode);
   });
 
   it("renders single headline mode with full height when subline is empty", async () => {
@@ -255,9 +252,8 @@ describe("BCC News Template ('output' and 'preview')", () => {
     await send({ type: "SYNC", onAir: true, graphic: sotGraphic, fields: sotFields, master });
     await advance(broadcastMotion.panelInMs);
 
-    expect(element(".cg-sot-name-row")?.textContent).toContain("Tanti");
-    expect(element(".cg-sot-divider")).not.toBeNull();
-    expect(element(".cg-sot-role-text")?.textContent).toContain("Pengunjung");
+    expect(element(".cg-headline-plate")?.textContent).toContain("Tanti");
+    expect(element(".cg-subline-plate")?.textContent).toContain("Pengunjung");
   });
 
   it("renders the interactive BccPreview gallery correctly", async () => {
@@ -268,4 +264,51 @@ describe("BCC News Template ('output' and 'preview')", () => {
     expect(element(".bcc-template.cg-lower-third")).not.toBeNull();
     expect(element(".cg-headline-plate")?.textContent).toContain("KEMACETAN STASIUN CITAYAM");
   });
+
+  it("morphs weather strip in the BCC logo box immediately without requiring a CG lower-third or waiting 10 seconds", async () => {
+    const bccMasterWithWeather = { ...master, showProgramLogo: true, showWeather: true };
+    await act(async () => { root.render(createElement(OverlayWindow)); });
+    await send({ type: "SYNC", onAir: false, master: bccMasterWithWeather });
+    await advance(broadcastMotion.panelInMs);
+
+    // Initial 10s: Logo is stationary, no weather strip
+    expect(element(".cg-logo-box-left")).not.toBeNull();
+    // Weather opens immediately with morph
+    await advance(liputan7Motion.weatherMorphMs);
+    expect(element(".cg-logo-box-left")?.classList.contains("bcc-weather-active")).toBe(true);
+    const weatherStrip = element(".bcc-weather-strip");
+    expect(weatherStrip).not.toBeNull();
+    expect(element(".cg-weather-city")?.textContent).toBe("JAKARTA");
+    expect(element(".cg-weather-temperature")?.textContent).toBe("29°C");
+
+    // Turning off weather via master update smoothly exits the weather strip
+    await send({ type: "MASTER_UPDATE", master: { ...bccMasterWithWeather, showWeather: false } });
+    expect(element(".bcc-weather-strip")?.classList.contains("cg-weather-out")).toBe(true);
+    await advance(750);
+    expect(element(".bcc-weather-strip")).toBeNull();
+    expect(element(".cg-logo-box-left")?.classList.contains("bcc-weather-active")).toBe(false);
+  });
+
+  it("renders and toggles BCC live badge independently from logo box", async () => {
+    await act(async () => { root.render(createElement(OverlayWindow)); });
+    await send({ type: "SYNC", onAir: false, master: { ...master, showLiveBadge: true, showLogo: true } });
+    await advance(broadcastMotion.panelInMs);
+    expect(element(".bcc-live-badge")).not.toBeNull();
+    expect(element(".bcc-live-badge .live-dot")).not.toBeNull();
+    expect(element(".bcc-live-badge")?.textContent).toBe("LIVE");
+    expect(element(".bcc-live-badge")?.classList.contains("above-logo")).toBe(true);
+
+    // Turning off logo retains live badge in solo mode
+    await send({ type: "MASTER_UPDATE", master: { ...master, showLiveBadge: true, showLogo: false } });
+    await advance(broadcastMotion.logoOutMs + 50);
+    expect(element(".cg-logo-box-left")).toBeNull();
+    expect(element(".bcc-live-badge")).not.toBeNull();
+    expect(element(".bcc-live-badge")?.classList.contains("solo")).toBe(true);
+
+    // Turning off live badge removes it
+    await send({ type: "MASTER_UPDATE", master: { ...master, showLiveBadge: false, showLogo: false } });
+    await advance(broadcastMotion.liveOutMs + 50);
+    expect(element(".bcc-live-badge")).toBeNull();
+  });
 });
+

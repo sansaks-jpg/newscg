@@ -56,9 +56,12 @@ describe("operator live workflow", () => {
 
     expect(liveShortcut("1", {})).toBe("logo");
 
-    expect(liveShortcut("2", {})).toBe("full");
+    expect(liveShortcut("2", {})).toBe("live");
 
-    expect(liveShortcut("3", {})).toBeNull();
+    expect(liveShortcut("3", {})).toBe("ticker");
+
+    expect(liveShortcut("4", {})).toBe("weather");
+    expect(liveShortcut("5", {})).toBe("all-live");
 
     expect(liveShortcut("3", { broadcastTemplate: "liputan7" })).toBe("ticker");
 

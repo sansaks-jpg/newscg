@@ -109,10 +109,10 @@
 }
 
 /* Persistent broadcast layers also retain their own complete IN/OUT motion. */
-[data-broadcast-motion] .cnn-template .cg-logo-box.standalone.cg-layer-in {
+[data-broadcast-motion] .cnn-template .cg-logo-box.cg-layer-in {
   animation: news-logo-in var(--cg-logoInMs, 500ms) cubic-bezier(.22,.75,.18,1) 0ms 1 both !important;
 }
-[data-broadcast-motion] .cnn-template .cg-logo-box.standalone.cg-layer-out {
+[data-broadcast-motion] .cnn-template .cg-logo-box.cg-layer-out {
   animation: news-logo-out var(--cg-logoOutMs, 400ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-standalone-live-badge.cg-layer-in {
@@ -132,12 +132,14 @@
   animation: news-ticker-item-in var(--cg-tickerItemInMs, 300ms) cubic-bezier(.22,.75,.18,1) var(--cg-tickerItemInDelayMs, 140ms) 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-ticker-bar.cg-ticker-out {
-  animation: news-ticker-out var(--cg-tickerOutMs, 420ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+  animation: cg-bar-out var(--cg-tickerOutMs, 480ms) cubic-bezier(.65,0,.8,.2) 0ms 1 both !important;
 }
 [data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-badge,
-[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-content,
-[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-clock {
+[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-content {
   animation: news-ticker-item-out var(--cg-tickerItemOutMs, 180ms) cubic-bezier(.55,0,.8,.35) 0ms 1 both !important;
+}
+[data-broadcast-motion] .cnn-template .cg-ticker-out > .cg-ticker-clock {
+  animation: none !important;
 }
 
 /* Placeholders and standby ghosts are not on-air elements. */

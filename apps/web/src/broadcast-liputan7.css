@@ -21,15 +21,19 @@
 .l7-single .l7-title-copy { font-size: 108px; }
 .l7-single .l7-detail-plate { display: none; }
 .l7-endcap { position: absolute; right: 0; top: 0; height: 146px; width: 20px; border-right: 4px solid var(--l7-sand); background: var(--l7-burgundy); }
-.l7-location { position: absolute; left: 384px; top: 794px; min-width: 220px; max-width: 610px; height: 32px; padding: 4px 18px; color: var(--l7-ivory); font-size: 20px; line-height: 24px; text-transform: uppercase; overflow: hidden; }
+.l7-location { position: absolute; left: 70px; top: 76px; min-width: 220px; max-width: 610px; height: 32px; padding: 4px 18px; color: var(--l7-ivory); font-size: 20px; line-height: 24px; text-transform: uppercase; overflow: hidden; }
 .l7-location-surface { position: absolute; inset: 0; border-left: 7px solid var(--l7-sand); background: var(--l7-burgundy); animation: l7-location-in var(--l7-locationInMs) ease-out var(--l7-locationDelayMs) both; }
 .l7-location-copy { position: relative; max-width: 570px; animation: l7-location-copy-in var(--l7-locationCopyInMs) ease-out var(--l7-locationCopyDelayMs) both; }
-.l7-location-only { left: 192px; }
+.l7-location-only { left: 70px; top: 76px; }
 /* Topic tab uses the template's own burgundy/ivory tab language, like the location tab. */
 .l7-topic { position: absolute; left: 0; bottom: 146px; max-width: 480px; height: 32px; display: flex; align-items: center; padding: 0 18px; background: var(--l7-burgundy); border-left: 7px solid var(--l7-sand); color: var(--l7-ivory); font-size: 20px; line-height: 1; letter-spacing: .4px; text-transform: uppercase; overflow: hidden; animation: l7-location-in var(--l7-locationInMs) ease-out var(--l7-locationDelayMs) both; }
 /* Keep both tabs readable when a location tag already fills the band above the headline. */
-.l7-content.l7-has-location .l7-topic { bottom: 178px; }
-.l7-program { position: absolute; left: 96px; top: 826px; width: 288px; height: 146px; overflow: hidden; background: var(--l7-burgundy); z-index: 3; }
+/* topic stays at bottom: 146px above panel */
+.l7-program { position: absolute; left: 96px; top: 826px; width: 288px; height: 146px; overflow: visible; background: var(--l7-burgundy); z-index: 3; }
+.l7-program.l7-logo-hidden { background: transparent; pointer-events: none; }
+.l7-live-badge { position: absolute; bottom: 100%; left: 0; width: 100%; height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(#f21212,#c00); color: #fff; font-family: Arial, "Barlow News", Helvetica, sans-serif; font-size: 26px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; z-index: 4; }
+.l7-live-badge.solo { bottom: 0; }
+.l7-live-badge .live-dot { width: 8px; height: 8px; background: #fff; border-radius: 50%; display: inline-block; animation: pulse-dot 1s infinite; }
 .l7-program-face { position: relative; height: 146px; width: 288px; z-index: 2; background: var(--l7-burgundy); transition: height var(--l7-weatherMorphMs) cubic-bezier(.22,1,.36,1); }
 .l7-program-wordmark { width: 100%; height: 100%; overflow: hidden; }
 .l7-program-wordmark img { display: block; width: 288px; height: 146px; object-fit: contain; transform: translateY(0); transition: transform var(--l7-weatherMorphMs) cubic-bezier(.45,0,.25,1); }
@@ -88,6 +92,7 @@
 @keyframes l7-city-leave { from { transform: translate(0,0); opacity: 1; } to { transform: translate(calc(-1 * var(--l7-city-x)), calc(-1 * var(--l7-city-y))); opacity: 0; } }
 @keyframes l7-program-refresh { 0%, 85%, 100% { opacity: 1; transform: translateY(0); } 91% { opacity: .8; transform: translateY(-1px); } }
 @keyframes l7-tv-refresh { 0%, 85%, 100% { opacity: 1; } 92% { opacity: .82; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.85); } }
 
 /* Operator controls; these never appear in the transparent output. */
 .broadcast-template-select { display: grid; gap: 5px; min-width: 220px; font-size: 12px; }

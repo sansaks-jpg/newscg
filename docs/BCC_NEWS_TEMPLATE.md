@@ -40,10 +40,11 @@ Based on BCC News broadcast visual references:
   - Running Text: White (`#FFFFFF`) with orange bullet delimiters ("■") filling the space to the right of the clock.
   - Default Content: Pre-populated with `"INFORMASI TERKINI • SIARAN LANGSUNG • DATA TERVERIFIKASI BCC NEWS"` when no custom text is provided.
 - **Independent Master Controls in Production**:
-  - Three dedicated master toggle buttons in Production:
+  - Four dedicated master toggle buttons in Production:
     - **[1] LOGO**: Toggles logo box in Preview.
     - **[2] LIVE**: Toggles LIVE badge in Preview.
     - **[3] TICKER**: Toggles ticker bar in Preview.
+    - **[4] CUACA**: Toggles weather morph in Preview.
     - **[M] APPLY MASTER**: Commits master staging configuration to Program.
 
 ---

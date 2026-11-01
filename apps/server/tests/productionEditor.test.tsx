@@ -470,6 +470,35 @@ describe("template-specific quick editing", () => {
       showLiveBadge: true,
     }));
     expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("MASTER IN"));
+
+    // Staging a master change with hotkey 2 (Live), then pressing 0 clears staged state immediately
+    master = { ...master, showLogo: true, showTicker: true, showLiveBadge: true };
+    await act(async () => root.render(createElement(SimpleProductionEditor, { live, master, reload, toast, onUpdateMaster: updateMaster, rundown })));
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "2", bubbles: true })); });
+    expect(host.querySelector('.master-btn[aria-label="Live"]')?.querySelector(".staged-pill")).not.toBeNull();
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true })); });
+    expect(updateMaster).toHaveBeenLastCalledWith(expect.objectContaining({
+      showLogo: false,
+      showTicker: false,
+      showLiveBadge: false,
+    }));
+    master = { ...master, showLogo: false, showTicker: false, showLiveBadge: false };
+    await act(async () => root.render(createElement(SimpleProductionEditor, { live, master, reload, toast, onUpdateMaster: updateMaster, rundown })));
+    expect(host.querySelector('.master-btn[aria-label="Live"]')?.querySelector(".staged-pill")).toBeNull();
+  });
+
+  it("key 5 immediately activates all master layers (1234) directly to live without pressing M", async () => {
+    master = { ...master, showLogo: false, showTicker: false, showLiveBadge: false, showWeather: false };
+    await mount();
+
+    await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "5", bubbles: true })); });
+    expect(updateMaster).toHaveBeenLastCalledWith(expect.objectContaining({
+      showLogo: true,
+      showLiveBadge: true,
+      showTicker: true,
+      showWeather: true,
+    }));
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("ALL MASTER LIVE"));
   });
 
   it("retains Preview composition (headline + lokasi + detail) after UPDATE instead of flip-flopping", async () => {

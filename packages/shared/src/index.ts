@@ -233,55 +233,34 @@ export type Liputan7WeatherFrame = { phase: Liputan7WeatherPhase; index: number;
 /** Ten seconds of logo, a readable run of every city, then ten seconds of logo again. */
 
 export function getLiputan7WeatherFrame(elapsedMs: number, count: number): Liputan7WeatherFrame {
-
   const total = Math.max(0, Math.trunc(count));
-
-  const steps: { phase: Liputan7WeatherPhase; index: number; duration: number }[] = [
-
-    { phase: "logo", index: 0, duration: liputan7Motion.weatherLogoHoldMs }
-
-  ];
+  const steps: { phase: Liputan7WeatherPhase; index: number; duration: number }[] = [];
 
   if (total) {
-
     steps.push({ phase: "opening", index: 0, duration: liputan7Motion.weatherMorphMs });
-
     for (let index = 0; index < total; index++) {
-
       steps.push({ phase: "hold", index, duration: liputan7Motion.weatherHoldMs });
-
       if (index < total - 1) steps.push(
-
         { phase: "out", index, duration: liputan7Motion.weatherCityOutMs },
-
         { phase: "in", index: index + 1, duration: liputan7Motion.weatherCityInMs });
-
     }
-
     steps.push({ phase: "closing", index: total - 1, duration: liputan7Motion.weatherMorphMs });
-
+    steps.push({ phase: "logo", index: 0, duration: liputan7Motion.weatherLogoHoldMs });
+  } else {
+    steps.push({ phase: "logo", index: 0, duration: liputan7Motion.weatherLogoHoldMs });
   }
 
   const duration = steps.reduce((sum, step) => sum + step.duration, 0);
-
   const elapsed = Math.max(0, elapsedMs);
-
   const cycle = Math.floor(elapsed / duration);
-
   let position = elapsed % duration;
 
   for (const step of steps) {
-
     if (position < step.duration) return { phase: step.phase, index: step.index, cycle,
-
       motion: (["rise", "slide", "fade"] as const)[(step.index + cycle) % 3]!, nextChangeInMs: step.duration - position };
-
     position -= step.duration;
-
   }
-
-  return { phase: "logo", index: 0, cycle, motion: "rise", nextChangeInMs: liputan7Motion.weatherLogoHoldMs };
-
+  return { phase: "opening", index: 0, cycle, motion: "rise", nextChangeInMs: liputan7Motion.weatherMorphMs };
 }
 
 
@@ -765,14 +744,9 @@ export function masterControlPatch(master: MasterOverlayState) {
   return masterOverlayPatchSchema.parse(Object.fromEntries(Object.entries(master).filter(([key]) => key in masterOverlayPatchSchema.shape)));
 }
 
-
-
 export function hasVisibleMasterLayers(master: MasterOverlayState): boolean {
-
-  if (master.broadcastTemplate === "liputan7") return Boolean(master.showProgramLogo || master.showLogo || master.showTicker);
-
-  return master.showLogo || master.showTicker || master.showLiveBadge;
-
+  if (master.broadcastTemplate === "liputan7") return Boolean(master.showProgramLogo || master.showTicker || master.showWeather || master.showLiveBadge);
+  return Boolean(master.showLogo || master.showTicker || master.showLiveBadge || master.showWeather);
 }
 
 
@@ -794,6 +768,7 @@ export function selectBroadcastTemplate(master: MasterOverlayState, broadcastTem
     broadcastTemplate,
 
     ...(broadcastTemplate === "liputan7" ? { showProgramLogo: true, showWeather: true } : {}),
+
 
     ...(broadcastTemplate === "bcc" ? {
 
@@ -1495,9 +1470,15 @@ export type LiveShortcut =
 
   | "logo"
 
+  | "live"
+
   | "full"
 
   | "ticker"
+
+  | "weather"
+
+  | "all-live"
 
   | "headline"
 

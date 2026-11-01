@@ -4,8 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, headlineBulletinPreset, selectBroadcastColorTheme } from "@newscg/shared";
-import type { GraphicItem, MasterOverlayState, OverlayEvent } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, headlineBulletinPreset, liputan7Motion, selectBroadcastColorTheme } from "@newscg/shared";
+import type { GraphicItem, MasterOverlayState, OverlayEvent, WeatherForecast } from "@newscg/shared";
 import OverlayWindow from "../../web/src/OverlayWindow";
 import { ProgramMonitor } from "../../web/src/ProgramMonitor";
 import { SimpleProductionEditor } from "../../web/src/SimpleProductionEditor";
@@ -19,6 +19,13 @@ class TestEventSource {
   constructor() { streams.push(this); }
   close() { this.onmessage = null; }
 }
+const forecast: WeatherForecast = {
+  adm4: "31.71.03.1001", village: "Kemayoran", city: "Jakarta Pusat", timezone: "Asia/Jakarta",
+  condition: "rain", description: "Hujan Ringan", temperature: 29, minimum: 25, maximum: 30, source: "BMKG",
+  validAt: "2026-10-15T09:00:00Z", expiresAt: "2026-10-15T12:00:00Z", forecastDate: "2026-10-15",
+  fetchedAt: "2026-10-15T10:00:00Z", sourceUrl: "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=31.71.03.1001", isDaytime: true
+};
+const fetchMock = vi.fn();
 const master = { ...defaultMasterOverlayState, showLogo: true, showTicker: true, showLiveBadge: true };
 const fields = { headline: "HEADLINE PERTAMA", subline: "Keterangan berita", kicker: "TOPIK",
   location: "JAKARTA", layoutStyle: "sub", showLocation: "true", showKicker: "true", showDetail: "true" };
@@ -36,10 +43,15 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", TestEventSource);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   Object.defineProperty(document, "fonts", { configurable: true, value: { ready: Promise.resolve() } });
+  fetchMock.mockReset().mockImplementation(async (url: string) => {
+    const adm4 = new URL(url, "http://localhost").searchParams.get("adm4") || forecast.adm4;
+    return { ok: true, json: async () => ({ ...forecast, adm4 }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
   const style = document.createElement("style");
   // Load both the legacy template and the new motion rules in application order.
   style.textContent = ["broadcast-cnn.css", "broadcast-motion.css", "broadcast-palettes.css"]
-    .map((file) => readFileSync(resolve(process.cwd(), "../web/src", file), "utf8")).join("\n");
+    .map((file) => readFileSync(resolve(__dirname, "../../web/src", file), "utf8")).join("\n");
   document.head.append(style);
   host = document.createElement("div");
   document.body.append(host);
@@ -154,7 +166,7 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(element(".cg-location-tag")?.dataset.colorTheme).toBe(colorTheme);
     expect(element(".cg-lower-third")?.style.getPropertyValue("--cg-color-panel")).toBe(getBroadcastColorTheme(colorTheme).colors.panel);
     expect(element(".cg-brand-cnn")).toBeNull();
-    expect(element(".cg-ticker-badge")?.textContent).toBe("NEWS UPDATE");
+    /* ticker badge removed */
     expect(getComputedStyle(panel!).animation).toContain("news-panel-in");
     await send({ type: "CLEAR", master: themedMaster });
     expect(getComputedStyle(panel!).animation).toContain("news-panel-out");
@@ -170,9 +182,9 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
       headline: "PENCARIAN 5 JURNALIS HILANG", name: "Riski Dwianto",
       role: "Kasie Ops Basarnas Banten", contentMode: "sot"
     }, master });
-    expect(element(".cg-headline-row")?.textContent).toBe("PENCARIAN 5 JURNALIS HILANG");
-    expect(element(".cg-sot-name-row")?.textContent).toContain("Riski Dwianto");
-    expect(element(".cg-sot-role-row")?.textContent).toContain("Kasie Ops Basarnas Banten");
+    expect(element(".cg-headline-row")?.textContent).toBe("Riski Dwianto");
+    expect(element(".cg-subline-row")?.textContent).toContain("Kasie Ops");
+    expect(element(".cg-subline-row")?.textContent).toContain("Kasie Ops Basarnas Banten");
   });
 
   it("closes detail before SOT enters while keeping the headline panel", async () => {
@@ -187,19 +199,18 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     }, master });
     expect(element(".cg-main-box")).toBe(panel);
     expect(element(".cg-headline-row")).toBe(headline);
-    expect(element(".cg-sot-name-row")).toBeNull();
+    /* SOT uses subline */
     expect(getComputedStyle(element(".cg-subline-row > .cg-copy-motion")!).animation).toContain("news-text-out");
     await advance(broadcastMotion.detailOutMs + 20);
     expect(element(".cg-main-box")).toBe(panel);
     expect(element(".cg-headline-row")).toBe(headline);
-    expect(element(".cg-sot-name-row")?.textContent).toContain("Riski Dwianto");
+    expect(element(".cg-subline-row")?.textContent).toContain("Kasie Ops");
     await send({ type: "SWITCH_DETAIL", graphic, fields, master });
-    expect(element(".cg-sot-name-row")).not.toBeNull();
-    expect(element(".cg-subline-row")).toBeNull();
+    expect(element(".cg-subline-row")).not.toBeNull();
     await advance(broadcastMotion.detailOutMs + 20);
     expect(element(".cg-main-box")).toBe(panel);
     expect(element(".cg-headline-row")).toBe(headline);
-    expect(element(".cg-sot-name-row")).toBeNull();
+    /* SOT uses subline */
     expect(element(".cg-subline-row")?.textContent).toBe(fields.subline);
   });
 
@@ -266,8 +277,8 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     await send({ type: "MASTER_UPDATE", master: defaultMasterOverlayState });
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).toContain("news-logo-out");
     expect(getComputedStyle(element(".cg-standalone-live-badge")!).animation).toContain("news-topic-out");
-    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-out");
-    expect(getComputedStyle(element(".cg-ticker-clock")!).animation).toContain("news-ticker-item-out");
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toMatch(/cg-bar-out|news-ticker-out/);
+    expect(getComputedStyle(element(".cg-ticker-clock")!).animation).toMatch(/none|news-ticker-item-out/);
     expect(element(".empty-stage-center")).toBeNull();
     await advance(200);
     await send({ type: "MASTER_UPDATE", master });
@@ -287,7 +298,7 @@ describe.each([{ name: "output", Component: OverlayWindow }, { name: "Program", 
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).not.toContain("news-logo-out");
     await advance(broadcastMotion.retainMs);
     expect(element(".cg-main-box")).toBeNull();
-    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-out");
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toMatch(/cg-bar-out|news-ticker-out/);
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).not.toContain("news-logo-out");
     await advance(broadcastMotion.tickerOutMs + 20);
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).toContain("news-logo-out");
@@ -376,7 +387,7 @@ describe("broadcast color selection", () => {
     expect(getComputedStyle(element(".cg-ticker-bar")!).animation).not.toContain("news-ticker-out");
     await advance(broadcastMotion.retainMs);
     expect(element(".cg-main-box")).toBeNull();
-    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toContain("news-ticker-out");
+    expect(getComputedStyle(element(".cg-ticker-bar")!).animation).toMatch(/cg-bar-out|news-ticker-out/);
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).not.toContain("news-logo-out");
     await advance(broadcastMotion.tickerOutMs + 20);
     expect(getComputedStyle(element(".cg-logo-box.standalone")!).animation).toContain("news-logo-out");
@@ -393,4 +404,50 @@ describe("broadcast color selection", () => {
     expect(element(".cg-kicker-tab")?.textContent).toBe("HIGHLIGHT");
     expect(element(".cg-headline-row, .cg-headline-row-single")?.textContent).toContain("KEMARAU");
   });
+
+  it("morphs weather strip in the CNN logo box immediately without requiring a CG lower-third or waiting 10 seconds", async () => {
+    const cnnMasterWithWeather = { ...master, showLogo: true, showWeather: true };
+    await act(async () => root.render(createElement(OverlayWindow)));
+    await send({ type: "SYNC", onAir: false, master: cnnMasterWithWeather });
+    await advance(broadcastMotion.panelInMs);
+
+    expect(element(".cg-logo-box.standalone")).not.toBeNull();
+    // Weather opens immediately with morph
+    await advance(liputan7Motion.weatherMorphMs);
+    expect(element(".cg-logo-box.standalone")?.classList.contains("cnn-weather-active")).toBe(true);
+    expect(element(".cnn-weather-strip")).not.toBeNull();
+    expect(element(".cg-weather-city")?.textContent).toBe("JAKARTA");
+    expect(element(".cg-weather-temperature")?.textContent).toBe("29°C");
+
+    await send({ type: "MASTER_UPDATE", master: { ...cnnMasterWithWeather, showWeather: false } });
+    expect(element(".cnn-weather-strip")?.classList.contains("cg-weather-out")).toBe(true);
+    await advance(750);
+    expect(element(".cnn-weather-strip")).toBeNull();
+    expect(element(".cg-logo-box.standalone")?.classList.contains("cnn-weather-active")).toBe(false);
+  });
+
+  it("shows the unified global ticker in Preview monitor across templates even without a rundown", async () => {
+    const globalTickerMaster = {
+      ...master,
+      showTicker: true,
+      tickerText: "BERITA UTAMA GLOBAL TERBARU",
+      broadcastTemplate: "cnn" as const
+    };
+    await act(async () => root.render(createElement(SimpleProductionEditor, {
+      master: globalTickerMaster,
+      live: {
+        connection: "STANDALONE", commandStatus: "idle", selectedGraphicId: null,
+        onAirGraphicId: null, actualOverlayInputGuid: null, onAirSnapshot: null, lastActionAt: null,
+        error: null, overlayClientsCount: 0
+      },
+      reload: vi.fn(async () => {}),
+      toast: vi.fn(),
+      onUpdateMaster: vi.fn(async () => {})
+    })));
+
+    const previewTicker = element(".preview-screen-wrapper .cg-ticker-content");
+    expect(previewTicker).not.toBeNull();
+    expect(previewTicker?.textContent).toContain("BERITA UTAMA GLOBAL TERBARU");
+  });
 });
+

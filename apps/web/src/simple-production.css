@@ -386,6 +386,8 @@
   color: #fff;
 }
 
+.master-btn.btn-all-live { background: #1e1b4b; border-color: #3730a3; color: #c7d2fe; }
+.master-btn.btn-all-live:hover { background: #312e81; border-color: #6366f1; color: #ffffff; }
 .master-btn.active {
   background: #064e3b;
   border-color: #059669;

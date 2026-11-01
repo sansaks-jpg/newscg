@@ -11,7 +11,7 @@ Selectable via **Broadcast template → Liputan7 · HOC TV** in Production or Se
 - Topic / HIGHLIGHT tab docks on the **top-left** of the headline plate (x=384), adhering to CNN top-tab conventions. Palette: burgundy `#790D16`, ivory `#F5EFE1` text, 7 px sand accent line `#E5D3AF` on the left, height 32 px, 20 px bold uppercase. If a location tab is also active, the topic tab stacks 32 px above it.
 - Headline and names use Barlow Semi Condensed 500; details, locations, clock, and ticker use standard Arial. WOFF2 fonts are bundled locally with zero CDN or external font dependencies during broadcast.
 - Locator appears in a tab above the headline. Subline details appear on a blue accent strip. Dynamic text leverages `AutoSquishText` within clipping viewports to avoid text overflowing broadcast margins.
-- Three independent master toggles in Production: **Program Logo (1)**, **TV Logo (2)**, and **Ticker (3)**. Weather accompanies the program logo, LIVE accompanies the TV logo, and clock accompanies the ticker.
+- Four independent master toggles in Production: **Program Logo (1)**, **LIVE (2)**, **Ticker (3)**, and **Cuaca (4)**. Weather morphs in the program logo box, LIVE docks directly above the program logo, and clock accompanies the ticker.
 
 ## Motion & Transitions
 
