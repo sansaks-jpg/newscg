@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   MapPin,
   MonitorPlay,
+  Play,
   Plus,
   Search,
   SlidersHorizontal,
@@ -35,7 +36,9 @@ const duration = (seconds: number) =>
     .padStart(2, "0")}:${(Math.abs(seconds) % 60).toString().padStart(2, "0")}`;
 
 const graphicLabel = (g: GraphicItem) =>
-  g.templateType === "SOT"
+  g.templateType === "CREDITS" || Boolean(g.draftFields?.creditList)
+    ? `Credit Title · ${g.draftFields?.totalDuration || "30"}s`
+    : g.templateType === "SOT"
     ? `SOT · ${g.draftFields.name || "Narasumber"}`
     : g.templateType === "REPORTER"
     ? `CG · ${g.draftFields.name || "Nama"}`
@@ -543,7 +546,12 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
                           className={`cg-chip cg-${g.templateType.toLowerCase()}`}
                           title={graphicLabel(g)}
                         >
-                          {g.templateType === "SOT" || g.templateType === "REPORTER" ? (
+                          {g.templateType === "CREDITS" || Boolean(g.draftFields.creditList) ? (
+                            <>
+                              <Play size={10} />
+                              <span>CREDITS ({g.draftFields.totalDuration || "30"}s)</span>
+                            </>
+                          ) : g.templateType === "SOT" || g.templateType === "REPORTER" ? (
                             <>
                               <UserRound size={10} />
                               <span>{g.draftFields.name || (g.templateType === "SOT" ? "SOT" : "Nama")}</span>

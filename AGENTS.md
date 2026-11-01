@@ -271,4 +271,5 @@ In addition to backend REST endpoints and SSE streams, NewsCG provides native **
   7. `take_field_reporter`: Air default field reporter lower-third (`POST /api/live/reporter`).
   8. `create_rundown`: Create a complete news rundown with stories and CG cues (`POST /api/rundowns`).
   9. `get_broadcast_status`: Read live on-air state, master overlay, and rundown summaries.
+  10. `add_credit_title`: Add auto-rotating credit title with fade animation and closing slide.
 

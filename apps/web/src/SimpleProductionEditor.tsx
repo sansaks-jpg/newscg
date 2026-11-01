@@ -1099,6 +1099,19 @@ export function SimpleProductionEditor({
           {items.map((it, idx) => {
             const isSelected = it.id === selectedItem?.id;
             const onAir = isItemOnAir(it);
+            const ctGraphic = it.graphics.find((g) => g.templateType === "CREDITS" || Boolean(g.draftFields?.creditList));
+            let ctDurationSec: number | null = null;
+            if (ctGraphic?.draftFields?.creditList) {
+              const entries = parseCreditEntries(ctGraphic.draftFields.creditList);
+              if (entries.length > 0) {
+                const calc = calculateCreditDurations({
+                  entryCount: entries.length,
+                  hasClosing: Boolean((ctGraphic.draftFields.closingText || `PRODUKSI ${new Date().getFullYear()}`).trim()),
+                  totalDurationSec: ctGraphic.draftFields.totalDuration
+                });
+                ctDurationSec = Math.round(calc.totalDurationSec);
+              }
+            }
 
             return (
               <div
@@ -1119,6 +1132,22 @@ export function SimpleProductionEditor({
                     {isSelected && <span className="badge-selected">PREVIEW</span>}
                     {!onAir && idx === nextStoryIndex && <span className="badge-selected">BERIKUTNYA</span>}
                       <span className="badge-metadata">{it.format}</span>
+                      {ctDurationSec !== null && (
+                        <span
+                          className="badge-metadata badge-ct-dur"
+                          style={{
+                            background: "#0284c7",
+                            color: "#ffffff",
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                            borderRadius: "3px",
+                            letterSpacing: "0.5px"
+                          }}
+                          title={`Total Durasi Credit Title: ${ctDurationSec} detik`}
+                        >
+                          ⏱️ CT {ctDurationSec}s
+                        </span>
+                      )}
                       {!it.cgRequired && <span className="badge-metadata">TANPA CG</span>}
                   </div>
                 </div>
@@ -1141,7 +1170,7 @@ export function SimpleProductionEditor({
                           selectCue(it.id, g.id);
                         }}
                       >
-                        #{gIdx + 1} {g.draftFields.creditList ? "CREDITS" : g.draftFields.headlinePresentation === "bulletin" ? "HIGHLIGHT" : g.templateType}
+                        #{gIdx + 1} {g.draftFields.creditList ? `CREDITS (${ctDurationSec || 30}s)` : g.draftFields.headlinePresentation === "bulletin" ? "HIGHLIGHT" : g.templateType}
                       </button>
                     ))}
                   </div>
@@ -1349,7 +1378,17 @@ export function SimpleProductionEditor({
               <span className="cue-name">
                 {reporterPreview ? "REPORTER LAPANGAN · DEFAULT" : anchorPreview ? "NEWS ANCHOR · DEFAULT" : selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "TIDAK ADA BERITA TERPILIH"}
               </span>
-              <span className="cue-type">{previewCue?.draftFields?.creditList ? "CREDITS" : previewCue?.templateType || "OFF"}</span>
+              <span className="cue-type">
+                {previewCue?.draftFields?.creditList ? `CREDITS (${(() => {
+                  const ent = parseCreditEntries(previewCue.draftFields.creditList);
+                  const dur = calculateCreditDurations({
+                    entryCount: ent.length,
+                    hasClosing: Boolean((previewCue.draftFields.closingText || `PRODUKSI ${new Date().getFullYear()}`).trim()),
+                    totalDurationSec: previewCue.draftFields.totalDuration
+                  });
+                  return `${Math.round(dur.totalDurationSec)}s`;
+                })()})` : previewCue?.templateType || "OFF"}
+              </span>
             </div>
 
             <BroadcastPreviewBox
@@ -1405,7 +1444,7 @@ export function SimpleProductionEditor({
           </button>
         </div>
         <div className="live-change-summary" role="status">
-          <span>{busy ? "Memproses…" : reporterPreview ? `Reporter Lapangan: ${reporterPreview.draftFields.name} · Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"} (O: kembali)` : anchorPreview ? `News Anchor: ${anchorPreview.draftFields.name} · Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"} (P: kembali)` : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue siap di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item memerlukan CG tetapi belum ada cue." : "Item tanpa lower third.") : "Pilih cue atau tekan P/O untuk default."}</span>
+          <span>{busy ? "Memproses…" : reporterPreview ? `Reporter Lapangan: ${reporterPreview.draftFields.name} · Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"} (O: kembali)` : anchorPreview ? `News Anchor: ${anchorPreview.draftFields.name} · Spasi untuk ${canUpdate ? "UPDATE" : "TAKE"} (P: kembali)` : previewCue?.draftFields?.creditList ? `Credit Title siap (${(() => { const ent = parseCreditEntries(previewCue.draftFields.creditList); const dur = calculateCreditDurations({ entryCount: ent.length, hasClosing: true, totalDurationSec: previewCue.draftFields.totalDuration }); return Math.round(dur.totalDurationSec); })()} detik) · Tekan Spasi untuk memutar kerabat kerja live.` : selectedCue ? (canUpdate ? "Tekan Spasi untuk memperbarui Program." : "Cue siap di Preview. Tekan Spasi untuk menayangkan.") : selectedItem ? (selectedItem.cgRequired ? "Item memerlukan CG tetapi belum ada cue." : "Item tanpa lower third.") : "Pilih cue atau tekan P/O untuk default."}</span>
           {isMasterChanged && <span className="summary-alert">Perubahan master belum diterapkan (M).</span>}
           {isSelectedOnAir && pendingChanges.length > 0 && <span className="summary-pending">Belum diterapkan: {pendingChanges.join(", ")}.</span>}
           <span className="summary-client-pill">{live.overlayClientsCount} output terhubung</span>

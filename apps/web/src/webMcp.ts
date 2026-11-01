@@ -280,6 +280,40 @@ export function initWebMcp(options: WebMcpOptions): WebMcpContext {
           }))
         };
       }
+    },
+    {
+      name: "add_credit_title",
+      description: "Menambahkan grafis penutup Credit Title kerabat kerja (rotasi fade antar nama dan slide penutup tahun) ke dalam berita rundown.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          itemId: { type: "string", description: "ID berita tujuan di rundown" },
+          creditList: { type: "string", description: "Daftar kerabat kerja format Jabatan: Nama per baris" },
+          closingText: { type: "string", description: "Teks penutup (default: PRODUKSI 2026)" },
+          totalDuration: { type: "string", description: "Total durasi siaran dalam detik (default: 30)" }
+        },
+        required: ["itemId", "creditList"]
+      },
+      execute: async (args: { itemId: string; creditList: string; closingText?: string; totalDuration?: string }) => {
+        const payload = {
+          templateType: "HEADLINE",
+          sortOrder: 0,
+          draftFields: {
+            creditList: args.creditList,
+            closingText: args.closingText || "PRODUKSI " + new Date().getFullYear(),
+            totalDuration: args.totalDuration || "30",
+            headline: "KERABAT KERJA SIARAN",
+            subline: "Credit Title",
+            kicker: "CREDIT TITLE",
+            showKicker: "false",
+            showLocation: "false",
+            showDetail: "false"
+          }
+        };
+        const res = await mutate("/api/items/" + args.itemId + "/graphics", "POST", payload);
+        await getOptions().onReload();
+        return { status: "success", message: "Credit title berhasil ditambahkan", graphic: res };
+      }
     }
   ];
 

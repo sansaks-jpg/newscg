@@ -210,10 +210,36 @@ export const agentApiDiscovery = {
     materialEditsChangeOutput: false },
   safety: { materialApprovalRequired: false, materialEditsChangeProgram: false, liveEffectsRequireExplicitInstruction: true, observationStream: "/api/live/stream?role=monitor", serverConfirmationProvesRenderedFrame: false, mutationRetry: "Creation/import is not yet idempotent. On timeout, perform readback before retrying. Live commands require a unique Idempotency-Key per action and payload; identical retries reuse the same key, while changing action/payload with the same key returns 409 Conflict. Cached for 60 seconds after completion or until process restart." },
   templates: templateTypes.map(templateType => ({ templateType, fieldsSchema: `#/components/schemas/${templateType}Fields`, fieldLimits: graphicFieldLimits[templateType] })),
-  graphicPresets: [{ id: "headline-bulletin", label: "News Highlight", templateType: "HEADLINE", draftFields: headlineBulletinPreset,
-    requiredFields: ["headline"], createPath: "/api/items/{id}/graphics", editPath: "/api/graphics/{id}",
-    galleryPaths: ["/templates/liputan7", "/templates/cnn", "/templates/bcc"],
-    description: "One headline per cue with HIGHLIGHT in the topic tab above the headline (kicker). Arrange multiple cues via sortOrder; advancement is operator-controlled. In Liputan7, the topic tab uses template visuals (burgundy–ivory, sand line) on the top-left of the panel; right/left arrows in Production switch highlight headlines during HIGHLIGHT preview, whereas on regular cues right arrow triggers TAKE/UPDATE and left arrow triggers OUT." }],
+  graphicPresets: [
+    {
+      id: "headline-bulletin",
+      label: "News Highlight",
+      templateType: "HEADLINE",
+      draftFields: headlineBulletinPreset,
+      requiredFields: ["headline"],
+      createPath: "/api/items/{id}/graphics",
+      editPath: "/api/graphics/{id}",
+      galleryPaths: ["/templates/liputan7", "/templates/cnn", "/templates/bcc"],
+      description: "One headline per cue with HIGHLIGHT in the topic tab above the headline (kicker). Arrange multiple cues via sortOrder; advancement is operator-controlled. In Liputan7, the topic tab uses template visuals (burgundy–ivory, sand line) on the top-left of the panel; right/left arrows in Production switch highlight headlines during HIGHLIGHT preview, whereas on regular cues right arrow triggers TAKE/UPDATE and left arrow triggers OUT."
+    },
+    {
+      id: "credit-title",
+      label: "Credit Title / End Credits",
+      templateType: "CREDITS",
+      draftFields: {
+        creditList: "Produser: Sandi Ardiansyah\nPengarah Acara: Budi Santoso",
+        closingText: "PRODUKSI " + new Date().getFullYear(),
+        totalDuration: "30",
+        headline: "SANDI ARDIANSYAH",
+        subline: "Produser"
+      },
+      requiredFields: ["creditList"],
+      createPath: "/api/items/{id}/graphics",
+      editPath: "/api/graphics/{id}",
+      galleryPaths: ["/templates/liputan7", "/templates/cnn", "/templates/bcc"],
+      description: "End-of-broadcast credits on a single plate. Rotates through crew list with fade transitions, followed by a closing production year slide (e.g. PRODUKSI 2026), and automatically triggers an off-air CLEAR on completion. When totalDuration is specified (e.g. 30s), entry and closing durations are automatically computed to fit the target window comfortably."
+    }
+  ],
   colorThemes: broadcastColorThemeIds.map(id => ({ id, label: broadcastColorThemes[id].label })),
   broadcastTemplates: broadcastTemplateIds.map(id => ({ id, ...broadcastTemplates[id] })),
   weather: { source: "Open-Meteo", path: "/api/weather?adm4={kode_wilayah}", documentation: "https://open-meteo.com/", automaticallyAppliesToProgram: false },
