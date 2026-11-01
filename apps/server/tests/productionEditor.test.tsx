@@ -487,18 +487,18 @@ describe("template-specific quick editing", () => {
     expect(host.querySelector('.master-btn[aria-label="Live"]')?.querySelector(".staged-pill")).toBeNull();
   });
 
-  it("key 5 immediately activates all master layers (1234) directly to live without pressing M", async () => {
+  it("key 5 immediately activates master branding (Logo, Ticker, Cuaca) without forcing LIVE on-air", async () => {
     master = { ...master, showLogo: false, showTicker: false, showLiveBadge: false, showWeather: false };
     await mount();
 
     await act(async () => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "5", bubbles: true })); });
     expect(updateMaster).toHaveBeenLastCalledWith(expect.objectContaining({
       showLogo: true,
-      showLiveBadge: true,
+      showLiveBadge: false,
       showTicker: true,
       showWeather: true,
     }));
-    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("ALL MASTER LIVE"));
+    expect(toast).toHaveBeenLastCalledWith(expect.stringContaining("ALL MASTER"));
   });
 
   it("retains Preview composition (headline + lokasi + detail) after UPDATE instead of flip-flopping", async () => {

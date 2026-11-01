@@ -604,7 +604,7 @@ export function SimpleProductionEditor({
       const nextMaster: Partial<MasterOverlayState> = {
         ...basePatch,
         showLogo: true,
-        showLiveBadge: true,
+        showLiveBadge: master.showLiveBadge,
         showTicker: true,
         showProgramLogo: stagedMaster.broadcastTemplate === "liputan7",
         showWeather: true
@@ -616,14 +616,16 @@ export function SimpleProductionEditor({
       setStagedMaster((previous) => ({ ...previous, ...nextMaster }));
       await onUpdateMaster(nextMaster);
       void reload().catch(() => {});
-      toast("ALL MASTER LIVE — Seluruh layer master (1, 2, 3, 4) aktif ke Program");
+      toast(master.showLiveBadge
+        ? "ALL MASTER — Logo, Ticker, dan Cuaca aktif ke Program (LIVE aktif)"
+        : "ALL MASTER — Logo, Ticker, dan Cuaca aktif ke Program (LIVE tidak aktif)");
     } catch (error: any) {
-      toast(error.message || "Gagal mengaktifkan master live");
+      toast(error.message || "Gagal mengaktifkan master");
     } finally {
       commandLock.current = false;
       setBusy(false);
     }
-  }, [stagedMaster, rundown?.ticker?.text, onUpdateMaster, reload, toast]);
+  }, [stagedMaster, master.showLiveBadge, rundown?.ticker?.text, onUpdateMaster, reload, toast]);
 
   // OUT preserves the selected cue and any unsent draft.
   const executeClear = useCallback(async () => {
@@ -1217,14 +1219,14 @@ export function SimpleProductionEditor({
 
             <button
               type="button"
-              aria-label="All Live"
-              className={`master-btn btn-all-live ${((master.showLogo || master.showProgramLogo) && master.showLiveBadge && master.showTicker && master.showWeather) ? "active" : ""}`}
+              aria-label="All Master"
+              className={`master-btn btn-all-live ${((master.showLogo || master.showProgramLogo) && master.showTicker && master.showWeather) ? "active" : ""}`}
               disabled={busy}
               onClick={() => void executeAllMasterLive()}
-              title="Tayangkan seluruh master layer (Logo, Live, Ticker, Cuaca) langsung ke Program ON AIR (5)"
+              title="Tayangkan master branding (Logo, Ticker, Cuaca) langsung ke Program ON AIR (5) — Status LIVE terpisah"
             >
               <span className="btn-kbd">5</span>
-              <span>ALL LIVE</span>
+              <span>ALL MASTER</span>
             </button>
           </div>
         </div>

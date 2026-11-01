@@ -147,7 +147,7 @@ npm run build
   - `2`: toggle Master Live badge.
   - `3`: toggle Master Ticker.
   - `4`: toggle Master Cuaca / Weather.
-  - `5`: all master live (langsung menayangkan seluruh layer master 1, 2, 3, 4 ke Program on-air tanpa perlu menekan M).
+  - `5`: all master branding (langsung menayangkan layer master Logo, Ticker, dan Cuaca ke Program on-air tanpa perlu menekan M; status badge LIVE 2 murni terpisah).
   - `0`: toggle **Master Out / Master In** (mutes or restores all active master layers on Program).
   - Note: Blackout `ALL OUT` (animasi/seketika) is triggered via explicit UI button or live API command (`POST /api/live/clear-all`), distinct from key `0` which controls master layers.
 - Field reporter defaults are stored in `reporter_defaults` settings (`name`, default `role: "Reporter Lapangan"`, `location`) and triggered via hotkey `O` in Production. `O` only stages Preview; TAKE/UPDATE requires explicit live commands. The `GET/PATCH /api/settings/reporter-defaults` and `POST /api/live/reporter` endpoints follow shared schemas, queues, and idempotency keys. Do not create rundown cues just because the operator uses `O`; see [docs/REPORTER_LAPANGAN_DEFAULT.md](docs/REPORTER_LAPANGAN_DEFAULT.md).
