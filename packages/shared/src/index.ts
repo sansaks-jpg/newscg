@@ -1168,24 +1168,47 @@ export const liveTickerInputSchema = z.strictObject({ rundownId: z.string().trim
 
 
 
+export const newsAnchorDefaultsSchema = z.object({
+  name: z.string().trim().max(graphicFieldLimits.REPORTER.name).default(""),
+  role: z.string().trim().max(graphicFieldLimits.REPORTER.role).default("News Anchor")
+});
+
+export const newsAnchorDefaultsPatchSchema = z.object({
+  name: newsAnchorDefaultsSchema.shape.name.removeDefault(),
+  role: newsAnchorDefaultsSchema.shape.role.removeDefault()
+}).partial().strict()
+  .refine(data => Object.keys(data).length > 0, "Isi minimal satu field default news anchor").meta({ minProperties: 1 });
+
+export type NewsAnchorDefaults = z.infer<typeof newsAnchorDefaultsSchema>;
+export const defaultNewsAnchorDefaults: NewsAnchorDefaults = { name: "", role: "News Anchor" };
+
+export const reporterDefaultsSchema = z.object({
+  name: z.string().trim().max(graphicFieldLimits.REPORTER.name).default(""),
+  role: z.string().trim().max(graphicFieldLimits.REPORTER.role).default("Reporter Lapangan"),
+  location: z.string().trim().max(graphicFieldLimits.REPORTER.location).default("")
+});
+
+export const reporterDefaultsPatchSchema = z.object({
+  name: reporterDefaultsSchema.shape.name.removeDefault(),
+  role: reporterDefaultsSchema.shape.role.removeDefault(),
+  location: reporterDefaultsSchema.shape.location.removeDefault()
+}).partial().strict()
+  .refine(data => Object.keys(data).length > 0, "Isi minimal satu field default reporter lapangan").meta({ minProperties: 1 });
+
+export type ReporterDefaults = z.infer<typeof reporterDefaultsSchema>;
+export const defaultReporterDefaults: ReporterDefaults = { name: "", role: "Reporter Lapangan", location: "" };
+
 const rundownBaseInputSchema = z.object({
-
   programName: z.string().trim().min(1).max(80),
-
   title: z.string().trim().min(1).max(100),
-
   broadcastSchedule: broadcastScheduleSchema.nullable().default(null),
-
   ticker: rundownTickerSchema.default(emptyRundownTicker),
-
+  newsAnchor: newsAnchorDefaultsSchema.nullable().default(null),
+  reporter: reporterDefaultsSchema.nullable().default(null),
   items: z.array(rundownItemInputSchema.extend({
-
     id: z.string().optional(),
-
     graphics: z.array(graphicInputSchema.extend({ id: z.string().optional() })).default([])
-
   })).default([])
-
 });
 
 export const rundownInputSchema = rundownBaseInputSchema.superRefine((value, ctx) => {
@@ -1207,13 +1230,12 @@ export const storyInputSchema = rundownItemInputSchema.extend({
 
 
 export const rundownPatchSchema = z.object({
-
   programName: z.string().trim().min(1).max(80).optional(),
-
   title: z.string().trim().min(1).max(100).optional(),
-
-  broadcastSchedule: broadcastScheduleSchema.nullable().optional(), ticker: rundownTickerSchema.optional()
-
+  broadcastSchedule: broadcastScheduleSchema.nullable().optional(),
+  ticker: rundownTickerSchema.optional(),
+  newsAnchor: newsAnchorDefaultsPatchSchema.nullable().optional(),
+  reporter: reporterDefaultsPatchSchema.nullable().optional()
 }).refine((data) => Object.keys(data).length > 0, "Minimal satu field harus diisi").meta({ minProperties: 1 });
 
 
@@ -1274,7 +1296,17 @@ export type RundownItem = {
 
 };
 
-export type Rundown = { id: string; programName: string; title: string; updatedAt: string; items: RundownItem[]; broadcastSchedule?: BroadcastSchedule | null; ticker?: RundownTicker };
+export type Rundown = {
+  id: string;
+  programName: string;
+  title: string;
+  updatedAt: string;
+  items: RundownItem[];
+  broadcastSchedule?: BroadcastSchedule | null;
+  ticker?: RundownTicker;
+  newsAnchor?: NewsAnchorDefaults | null;
+  reporter?: ReporterDefaults | null;
+};
 
 export type OverlayState = { overlayNumber: number; inputGuid: string | null };
 
@@ -1374,80 +1406,23 @@ export const defaultHeadlineDefaults: HeadlineDefaults = {
 
 
 
-export const newsAnchorDefaultsSchema = z.object({
-
-  name: z.string().trim().max(graphicFieldLimits.REPORTER.name).default(""),
-
-  role: z.string().trim().max(graphicFieldLimits.REPORTER.role).default("News Anchor")
-
-});
-
-export const newsAnchorDefaultsPatchSchema = z.object({ name: newsAnchorDefaultsSchema.shape.name.removeDefault(),
-
-  role: newsAnchorDefaultsSchema.shape.role.removeDefault() }).partial().strict()
-
-  .refine(data => Object.keys(data).length > 0, "Isi minimal satu field default news anchor").meta({ minProperties: 1 });
-
-export type NewsAnchorDefaults = z.infer<typeof newsAnchorDefaultsSchema>;
-
-export const defaultNewsAnchorDefaults: NewsAnchorDefaults = { name: "", role: "News Anchor" };
-
 export const newsAnchorGraphicId = "newscg:default-news-anchor";
 
 export function createNewsAnchorGraphic(defaults: NewsAnchorDefaults): GraphicItem {
-
   return { id: newsAnchorGraphicId, itemId: "newscg:defaults", templateType: "REPORTER", sortOrder: 0, lastPushedFields: null,
-
     draftFields: z.record(z.string(), z.string()).parse(fieldSchemas.REPORTER.parse({ ...defaults, contentMode: "presenter", location: "",
-
       showLocation: "false", showKicker: "false", showDetail: defaults.role ? "true" : "false",
-
       layoutStyle: defaults.role ? "sub" : "single" })) };
-
 }
-
-
-
-export const reporterDefaultsSchema = z.object({
-
-  name: z.string().trim().max(graphicFieldLimits.REPORTER.name).default(""),
-
-  role: z.string().trim().max(graphicFieldLimits.REPORTER.role).default("Reporter Lapangan"),
-
-  location: z.string().trim().max(graphicFieldLimits.REPORTER.location).default("")
-
-});
-
-export const reporterDefaultsPatchSchema = z.object({
-
-  name: reporterDefaultsSchema.shape.name.removeDefault(),
-
-  role: reporterDefaultsSchema.shape.role.removeDefault(),
-
-  location: reporterDefaultsSchema.shape.location.removeDefault()
-
-}).partial().strict()
-
-  .refine(data => Object.keys(data).length > 0, "Isi minimal satu field default reporter lapangan").meta({ minProperties: 1 });
-
-export type ReporterDefaults = z.infer<typeof reporterDefaultsSchema>;
-
-export const defaultReporterDefaults: ReporterDefaults = { name: "", role: "Reporter Lapangan", location: "" };
 
 export const fieldReporterGraphicId = "newscg:default-field-reporter";
 
 export function createFieldReporterGraphic(defaults: ReporterDefaults): GraphicItem {
-
   return { id: fieldReporterGraphicId, itemId: "newscg:defaults", templateType: "REPORTER", sortOrder: 0, lastPushedFields: null,
-
     draftFields: z.record(z.string(), z.string()).parse(fieldSchemas.REPORTER.parse({ name: defaults.name,
-
       role: defaults.role || "Reporter Lapangan", location: defaults.location, contentMode: "presenter",
-
       showLocation: defaults.location ? "true" : "false", showKicker: "false",
-
       showDetail: defaults.role ? "true" : "false", layoutStyle: defaults.role ? "sub" : "single" })) };
-
 }
 
 
@@ -1511,17 +1486,15 @@ export const apiIdSchema = z.string().trim().min(1);
 const idempotencyBodyShape = { idempotencyKey: z.string().trim().min(1).max(200).optional() };
 
 export const liveNewsAnchorInputSchema = z.object({ ...idempotencyBodyShape,
-
+  rundownId: z.string().trim().optional(),
   action: z.enum(["take", "update"]).default("take"), defaults: newsAnchorDefaultsSchema.optional()
-
 });
 
 export type LiveNewsAnchorInput = z.infer<typeof liveNewsAnchorInputSchema>;
 
 export const liveReporterInputSchema = z.object({ ...idempotencyBodyShape,
-
+  rundownId: z.string().trim().optional(),
   action: z.enum(["take", "update"]).default("take"), defaults: reporterDefaultsSchema.optional()
-
 });
 
 export type LiveReporterInput = z.infer<typeof liveReporterInputSchema>;

@@ -268,5 +268,33 @@ describe("operator to output through real HTTP, SQLite and SSE", () => {
       playback.dispose();
       abort.abort();
     }
-  }, 10000);
+  });
+
+  it("persists news anchor and field reporter per rundown independently without mutating other rundowns or global defaults", async () => {
+    const rd1 = await request("/api/rundowns", "POST", {
+      programName: "BULETIN PAGI", title: "Edisi Pagi",
+      newsAnchor: { name: "Anchor Pagi", role: "Presenter Pagi" },
+      reporter: { name: "Reporter Pagi", role: "Liputan Pagi", location: "Monas" }
+    });
+    const rd2 = await request("/api/rundowns", "POST", {
+      programName: "BULETIN MALAM", title: "Edisi Malam",
+      newsAnchor: { name: "Anchor Malam", role: "Presenter Malam" },
+      reporter: { name: "Reporter Malam", role: "Liputan Malam", location: "Bundaran HI" }
+    });
+
+    expect(rd1.newsAnchor.name).toBe("Anchor Pagi");
+    expect(rd2.newsAnchor.name).toBe("Anchor Malam");
+    expect(rd1.reporter.name).toBe("Reporter Pagi");
+    expect(rd2.reporter.name).toBe("Reporter Malam");
+
+    const patchedRd1 = await request(`/api/rundowns/${rd1.id}`, "PATCH", {
+      newsAnchor: { name: "Anchor Pagi Pengganti" }
+    });
+    expect(patchedRd1.newsAnchor.name).toBe("Anchor Pagi Pengganti");
+    expect(patchedRd1.newsAnchor.role).toBe("Presenter Pagi");
+
+    const freshRd2 = await request(`/api/rundowns/${rd2.id}`);
+    expect(freshRd2.newsAnchor.name).toBe("Anchor Malam");
+    expect(freshRd2.reporter.location).toBe("Bundaran HI");
+  });
 });

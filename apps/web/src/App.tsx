@@ -1394,8 +1394,8 @@ function SettingsView({
         </div>
 
         <div className="settings-card news-anchor-defaults-card">
-          <h3><FileJson size={17} /> Pengaturan Default News Anchor</h3>
-          <p>Dipakai semua template. Di Produksi, P menyiapkan anchor di Preview; Spasi/Enter menayangkan. P lagi kembali ke cue berita.</p>
+          <h3><FileJson size={17} /> Pengaturan Default News Anchor (Template Global)</h3>
+          <p>Template bawaan global untuk rundown baru. Setiap rundown juga memiliki News Anchor tersendiri yang dapat diatur di Newsroom atau langsung di Produksi.</p>
           {anchorState.loading && <p role="status">Memuat default news anchor…</p>}
           {anchorState.error && <div role="alert" className="modal-error-banner">{anchorState.error}
             <button type="button" onClick={() => setAnchorState(current => ({ ...current, attempt: current.attempt + 1 }))}>Muat ulang news anchor</button>
@@ -1418,8 +1418,8 @@ function SettingsView({
         </div>
 
         <div className="settings-card reporter-defaults-card">
-          <h3><FileJson size={17} /> Pengaturan Default Reporter Lapangan</h3>
-          <p>Dipakai semua template. Di Produksi, <b>O</b> menyiapkan reporter lapangan di Preview; Spasi/→ menayangkan. O lagi kembali ke cue berita.</p>
+          <h3><FileJson size={17} /> Pengaturan Default Reporter Lapangan (Template Global)</h3>
+          <p>Template bawaan global untuk rundown baru. Setiap rundown juga memiliki Reporter Lapangan tersendiri yang dapat diatur di Newsroom atau langsung di Produksi.</p>
           {reporterState.loading && <p role="status">Memuat default reporter lapangan…</p>}
           {reporterState.error && <div role="alert" className="modal-error-banner">{reporterState.error}
             <button type="button" onClick={() => setReporterState(current => ({ ...current, attempt: current.attempt + 1 }))}>Muat ulang reporter</button>

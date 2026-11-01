@@ -63,6 +63,8 @@ db.transaction(() => {
   const columns = db.prepare("PRAGMA table_info(rundowns)").all() as Array<{ name: string }>;
   if (!columns.some(column => column.name === "broadcast_schedule")) db.exec("ALTER TABLE rundowns ADD COLUMN broadcast_schedule TEXT");
   if (!columns.some(column => column.name === "ticker")) db.exec("ALTER TABLE rundowns ADD COLUMN ticker TEXT");
+  if (!columns.some(column => column.name === "news_anchor")) db.exec("ALTER TABLE rundowns ADD COLUMN news_anchor TEXT");
+  if (!columns.some(column => column.name === "reporter")) db.exec("ALTER TABLE rundowns ADD COLUMN reporter TEXT");
   // Legacy shared ticker remains in raw settings for recovery, but is never assigned to a rundown.
   db.prepare("INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (3, datetime('now'))").run();
 })();
@@ -76,8 +78,22 @@ export function getRundown(id: string): Rundown | null {
 }
 function readRundownRow(row: any): Rundown {
   const items = (db.prepare("SELECT * FROM rundown_items WHERE rundown_id = ? ORDER BY sort_order, rowid").all(row.id) as any[]).map(readItemRow);
-  return { id: row.id, programName: row.program_name, title: row.title, updatedAt: row.updated_at, items,
-    broadcastSchedule: json(row.broadcast_schedule), ticker: rundownTickerSchema.parse(json(row.ticker) ?? { ...emptyRundownTicker, sources: [] }) };
+  const rawAnchor = json<NewsAnchorDefaults>(row.news_anchor);
+  const rawReporter = json<ReporterDefaults>(row.reporter);
+  const newsAnchor = rawAnchor ? newsAnchorDefaultsSchema.parse(rawAnchor) : getNewsAnchorDefaults();
+  const reporter = rawReporter ? reporterDefaultsSchema.parse(rawReporter) : getReporterDefaults();
+
+  return {
+    id: row.id,
+    programName: row.program_name,
+    title: row.title,
+    updatedAt: row.updated_at,
+    items,
+    broadcastSchedule: json(row.broadcast_schedule),
+    ticker: rundownTickerSchema.parse(json(row.ticker) ?? { ...emptyRundownTicker, sources: [] }),
+    newsAnchor,
+    reporter
+  };
 }
 function readItemRow(row: any): RundownItem {
   const graphics = (db.prepare("SELECT * FROM graphic_items WHERE item_id = ? ORDER BY sort_order, rowid").all(row.id) as any[]).map(readGraphicRow);
@@ -96,11 +112,15 @@ export function getGraphic(id: string): GraphicItem | null {
   return row ? readGraphicRow(row) : null;
 }
 
-export const createRundown = db.transaction((input: { id?: string; programName: string; title: string; items?: any[]; broadcastSchedule?: Rundown["broadcastSchedule"]; ticker?: Rundown["ticker"] }, options?: { regenerateIds?: boolean }) => {
+export const createRundown = db.transaction((input: { id?: string; programName: string; title: string; items?: any[]; broadcastSchedule?: Rundown["broadcastSchedule"]; ticker?: Rundown["ticker"]; newsAnchor?: Rundown["newsAnchor"]; reporter?: Rundown["reporter"] }, options?: { regenerateIds?: boolean }) => {
   const broadcast = rundownBroadcastSchema.parse({ broadcastSchedule: input.broadcastSchedule ?? null, ticker: input.ticker ?? emptyRundownTicker });
   const id = (options?.regenerateIds || !input.id) ? `RD-${randomUUID().slice(0, 8).toUpperCase()}` : input.id;
   const now = new Date().toISOString();
-  db.prepare("INSERT INTO rundowns(id, program_name, title, created_at, updated_at, broadcast_schedule, ticker) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, input.programName, input.title, now, now, JSON.stringify(broadcast.broadcastSchedule), JSON.stringify(broadcast.ticker));
+  const newsAnchor = input.newsAnchor ? newsAnchorDefaultsSchema.parse(input.newsAnchor) : getNewsAnchorDefaults();
+  const reporter = input.reporter ? reporterDefaultsSchema.parse(input.reporter) : getReporterDefaults();
+  db.prepare("INSERT INTO rundowns(id, program_name, title, created_at, updated_at, broadcast_schedule, ticker, news_anchor, reporter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    id, input.programName, input.title, now, now, JSON.stringify(broadcast.broadcastSchedule), JSON.stringify(broadcast.ticker), JSON.stringify(newsAnchor), JSON.stringify(reporter)
+  );
   for (const item of input.items || []) {
     const itemId = (options?.regenerateIds || !item.id) ? randomUUID() : item.id;
     db.prepare("INSERT INTO rundown_items(id,rundown_id,slug,title,format,estimated_duration_seconds,sort_order,cg_required) VALUES (?,?,?,?,?,?,?,?)").run(itemId, id, item.slug, item.title, item.format, item.estimatedDurationSeconds, item.sortOrder, Number(item.cgRequired ?? item.format !== "LAINNYA"));
@@ -124,7 +144,23 @@ export const reorderRundownItems = db.transaction((rundownId: string, itemIds: s
 export function updateRundown(id: string, patch: any) {
   const current = getRundown(id); if (!current) return null;
   const broadcast = rundownBroadcastSchema.parse({ broadcastSchedule: patch.broadcastSchedule !== undefined ? patch.broadcastSchedule : current.broadcastSchedule ?? null, ticker: patch.ticker ?? current.ticker ?? emptyRundownTicker });
-  db.prepare("UPDATE rundowns SET program_name = ?, title = ?, updated_at = ?, broadcast_schedule = ?, ticker = ? WHERE id = ?").run(patch.programName ?? current.programName, patch.title ?? current.title, new Date().toISOString(), JSON.stringify(broadcast.broadcastSchedule), JSON.stringify(broadcast.ticker), id);
+  const newsAnchor = patch.newsAnchor !== undefined
+    ? (patch.newsAnchor ? newsAnchorDefaultsSchema.parse({ ...(current.newsAnchor || getNewsAnchorDefaults()), ...patch.newsAnchor }) : null)
+    : (current.newsAnchor ?? getNewsAnchorDefaults());
+  const reporter = patch.reporter !== undefined
+    ? (patch.reporter ? reporterDefaultsSchema.parse({ ...(current.reporter || getReporterDefaults()), ...patch.reporter }) : null)
+    : (current.reporter ?? getReporterDefaults());
+
+  db.prepare("UPDATE rundowns SET program_name = ?, title = ?, updated_at = ?, broadcast_schedule = ?, ticker = ?, news_anchor = ?, reporter = ? WHERE id = ?").run(
+    patch.programName ?? current.programName,
+    patch.title ?? current.title,
+    new Date().toISOString(),
+    JSON.stringify(broadcast.broadcastSchedule),
+    JSON.stringify(broadcast.ticker),
+    JSON.stringify(newsAnchor),
+    JSON.stringify(reporter),
+    id
+  );
   return getRundown(id);
 }
 export function deleteRundown(id: string) { return db.prepare("DELETE FROM rundowns WHERE id = ?").run(id).changes > 0; }

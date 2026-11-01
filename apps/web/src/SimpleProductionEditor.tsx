@@ -17,6 +17,7 @@ import {
   Radio,
   RefreshCw,
   Trash2,
+  UserRound,
   X
 } from "lucide-react";
 import { api, mutate } from "./api";
@@ -181,6 +182,23 @@ export function SimpleProductionEditor({
     setQuickEditOpen(false);
     requestAnimationFrame(() => quickEditButtonRef.current?.focus());
   };
+
+  const [personnelOpen, setPersonnelOpen] = useState(false);
+  const [personnelAnchorName, setPersonnelAnchorName] = useState(rundown?.newsAnchor?.name || "");
+  const [personnelAnchorRole, setPersonnelAnchorRole] = useState(rundown?.newsAnchor?.role || "News Anchor");
+  const [personnelReporterName, setPersonnelReporterName] = useState(rundown?.reporter?.name || "");
+  const [personnelReporterRole, setPersonnelReporterRole] = useState(rundown?.reporter?.role || "Reporter Lapangan");
+  const [personnelReporterLoc, setPersonnelReporterLoc] = useState(rundown?.reporter?.location || "");
+
+  useEffect(() => {
+    if (rundown) {
+      setPersonnelAnchorName(rundown.newsAnchor?.name || "");
+      setPersonnelAnchorRole(rundown.newsAnchor?.role || "News Anchor");
+      setPersonnelReporterName(rundown.reporter?.name || "");
+      setPersonnelReporterRole(rundown.reporter?.role || "Reporter Lapangan");
+      setPersonnelReporterLoc(rundown.reporter?.location || "");
+    }
+  }, [rundown?.id, rundown?.newsAnchor, rundown?.reporter]);
 
   // Staged master overlay untuk keselamatan siaran (Hotkey 1 & 2 di-stage di preview; tekan M untuk kirim ke ON AIR)
   const [stagedMaster, setStagedMaster] = useState<MasterOverlayState>(master);
@@ -706,15 +724,17 @@ export function SimpleProductionEditor({
     commandLock.current = true;
     setBusy(true);
     try {
-      const defaults = newsAnchorDefaultsSchema.parse(await api<NewsAnchorDefaults>("/api/settings/news-anchor-defaults"));
-      if (!defaults.name) throw new Error("Isi Nama Anchor di Pengaturan Default News Anchor terlebih dahulu.");
+      const defaults = (rundown?.newsAnchor?.name?.trim())
+        ? rundown.newsAnchor
+        : newsAnchorDefaultsSchema.parse(await api<NewsAnchorDefaults>("/api/settings/news-anchor-defaults"));
+      if (!defaults.name) throw new Error("Isi Nama Anchor di Pengaturan Rundown atau Pengaturan Default terlebih dahulu.");
       setReporterPreview(null);
       setAnchorPreview(createNewsAnchorGraphic(defaults));
-      toast("Preview: News Anchor (Spasi untuk TAKE atau UPDATE; P untuk kembali ke cue)");
+      toast(`Preview: News Anchor (${defaults.name}) (Spasi untuk TAKE atau UPDATE; P untuk kembali ke cue)`);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Default news anchor gagal dimuat");
     } finally { commandLock.current = false; setBusy(false); }
-  }, [anchorPreview, toast]);
+  }, [anchorPreview, rundown?.newsAnchor, toast]);
 
   const actionReporter = useCallback(async () => {
     if (commandLock.current) return;
@@ -722,15 +742,17 @@ export function SimpleProductionEditor({
     commandLock.current = true;
     setBusy(true);
     try {
-      const defaults = reporterDefaultsSchema.parse(await api<ReporterDefaults>("/api/settings/reporter-defaults"));
-      if (!defaults.name) throw new Error("Isi Nama Reporter Lapangan di Pengaturan Default terlebih dahulu.");
+      const defaults = (rundown?.reporter?.name?.trim())
+        ? rundown.reporter
+        : reporterDefaultsSchema.parse(await api<ReporterDefaults>("/api/settings/reporter-defaults"));
+      if (!defaults.name) throw new Error("Isi Nama Reporter Lapangan di Pengaturan Rundown atau Pengaturan Default terlebih dahulu.");
       setAnchorPreview(null);
       setReporterPreview(createFieldReporterGraphic(defaults));
-      toast("Preview: Reporter Lapangan (Spasi untuk TAKE atau UPDATE; O untuk kembali ke cue)");
+      toast(`Preview: Reporter Lapangan (${defaults.name}) (Spasi untuk TAKE atau UPDATE; O untuk kembali ke cue)`);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Default reporter lapangan gagal dimuat");
     } finally { commandLock.current = false; setBusy(false); }
-  }, [reporterPreview, toast]);
+  }, [reporterPreview, rundown?.reporter, toast]);
 
   const actionHeadline = useCallback(() => {
     setAnchorPreview(null);
@@ -846,7 +868,7 @@ export function SimpleProductionEditor({
 
       const action = liveShortcut(event.key, {
         broadcastTemplate: stagedMaster.broadcastTemplate,
-        disabled: !shortcutsEnabled || busy || quickEditOpen,
+        disabled: !shortcutsEnabled || busy || quickEditOpen || personnelOpen,
         editing: isEditing,
         interactive: isInteractive,
         repeat: event.repeat,
@@ -985,6 +1007,7 @@ export function SimpleProductionEditor({
     shortcutsEnabled,
     busy,
     quickEditOpen,
+    personnelOpen,
     navigateStory,
     toggleMasterLogo,
     toggleMasterLive,
@@ -1139,6 +1162,16 @@ export function SimpleProductionEditor({
           <div className="header-actions-group">
             <button ref={quickEditButtonRef} type="button" className="shortcut-toggle-btn" disabled={busy || Boolean(anchorPreview || reporterPreview) || !selectedCue} onClick={() => setQuickEditOpen(true)} title="Edit teks cue terpilih tanpa meninggalkan kontrol siaran">
               <FileText size={13} /> Edit teks
+            </button>
+            <button
+              type="button"
+              className={`shortcut-toggle-btn ${personnelOpen ? "active" : ""}`}
+              disabled={busy || !rundown}
+              onClick={() => setPersonnelOpen(prev => !prev)}
+              title="Atur Personel Rundown: News Anchor (P) & Reporter (O)"
+            >
+              <UserRound size={13} />
+              <span>Personel: {rundown?.newsAnchor?.name ? rundown.newsAnchor.name.split(" ")[0] : "Anchor"} / {rundown?.reporter?.name ? rundown.reporter.name.split(" ")[0] : "Reporter"}</span>
             </button>
             <button
               type="button"
@@ -1443,6 +1476,79 @@ export function SimpleProductionEditor({
 
 
 
+
+        {/* Drawer Personel Rundown */}
+        {personnelOpen && rundown && (
+          <div className="mini-editor-card quick-edit-drawer" role="dialog" aria-label="Atur personel rundown" onKeyDown={(event) => {
+            if (event.key === "Escape") { event.stopPropagation(); setPersonnelOpen(false); }
+          }}>
+            <div className="mini-editor-header">
+              <div className="mini-editor-title">
+                <UserRound size={13} />
+                <span>PERSONEL SIARAN RUNDOWN · {rundown.programName}</span>
+              </div>
+              <button type="button" className="quick-edit-close" onClick={() => setPersonnelOpen(false)} aria-label="Tutup"><X size={16} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "10px 0" }}>
+              <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "6px", padding: "10px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "bold", color: "#93c5fd" }}>🎤 News Anchor Rundown (Hotkey P)</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "6px" }}>
+                  <label style={{ margin: 0 }}>
+                    <span style={{ fontSize: "10px", color: "#94a3b8" }}>Nama Anchor</span>
+                    <input style={{ width: "100%", padding: "4px 8px", fontSize: "12px" }} value={personnelAnchorName} onChange={(e) => setPersonnelAnchorName(e.target.value)} placeholder="Nama pembawa berita" />
+                  </label>
+                  <label style={{ margin: 0 }}>
+                    <span style={{ fontSize: "10px", color: "#94a3b8" }}>Jabatan</span>
+                    <input style={{ width: "100%", padding: "4px 8px", fontSize: "12px" }} value={personnelAnchorRole} onChange={(e) => setPersonnelAnchorRole(e.target.value)} placeholder="News Anchor" />
+                  </label>
+                </div>
+              </div>
+              <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: "6px", padding: "10px" }}>
+                <span style={{ fontSize: "11px", fontWeight: "bold", color: "#86efac" }}>📹 Reporter Lapangan Rundown (Hotkey O)</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginTop: "6px" }}>
+                  <label style={{ margin: 0 }}>
+                    <span style={{ fontSize: "10px", color: "#94a3b8" }}>Nama Reporter</span>
+                    <input style={{ width: "100%", padding: "4px 8px", fontSize: "12px" }} value={personnelReporterName} onChange={(e) => setPersonnelReporterName(e.target.value)} placeholder="Nama reporter" />
+                  </label>
+                  <label style={{ margin: 0 }}>
+                    <span style={{ fontSize: "10px", color: "#94a3b8" }}>Jabatan</span>
+                    <input style={{ width: "100%", padding: "4px 8px", fontSize: "12px" }} value={personnelReporterRole} onChange={(e) => setPersonnelReporterRole(e.target.value)} placeholder="Reporter Lapangan" />
+                  </label>
+                  <label style={{ margin: 0 }}>
+                    <span style={{ fontSize: "10px", color: "#94a3b8" }}>Lokasi Liputan</span>
+                    <input style={{ width: "100%", padding: "4px 8px", fontSize: "12px" }} value={personnelReporterLoc} onChange={(e) => setPersonnelReporterLoc(e.target.value)} placeholder="Contoh: Jakarta" />
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px" }}>
+                <button type="button" className="btn-modal-cancel" onClick={() => setPersonnelOpen(false)}>Batal</button>
+                <button
+                  type="button"
+                  style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: "4px", padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: 600 }}
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      await mutate(`/api/rundowns/${rundown.id}`, "PATCH", {
+                        newsAnchor: { name: personnelAnchorName, role: personnelAnchorRole },
+                        reporter: { name: personnelReporterName, role: personnelReporterRole, location: personnelReporterLoc }
+                      });
+                      await reload();
+                      setPersonnelOpen(false);
+                      toast("Personel siaran untuk rundown ini berhasil disimpan");
+                    } catch (err: any) {
+                      toast(err.message || "Gagal menyimpan personel");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Simpan untuk Rundown Ini
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mini Editor Berita Ringkas */}
         {quickEditOpen && <div className="mini-editor-card quick-edit-drawer" role="dialog" aria-label="Edit cepat teks cue" onKeyDown={(event) => {

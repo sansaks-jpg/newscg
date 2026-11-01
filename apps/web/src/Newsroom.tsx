@@ -321,11 +321,21 @@ export function Preparation({ rundown, rundowns, onRundown, reload, toast, onSet
           <div className="prep-title-group">
             <h1>{rundown?.programName || "Manajemen Rundown"}</h1>
             <span className="prep-edition-badge">{rundown?.title || "Edisi Siaran"}</span>
+            {rundown?.newsAnchor?.name && (
+              <span className="badge-metadata" style={{ fontSize: 11, background: "#1e293b", color: "#93c5fd", border: "1px solid #334155", padding: "2px 6px", borderRadius: 4 }}>
+                🎤 {rundown.newsAnchor.name}
+              </span>
+            )}
+            {rundown?.reporter?.name && (
+              <span className="badge-metadata" style={{ fontSize: 11, background: "#1e293b", color: "#86efac", border: "1px solid #334155", padding: "2px 6px", borderRadius: 4 }}>
+                📹 {rundown.reporter.name}
+              </span>
+            )}
             {rundown && (
               <button
                 className="prep-rename-btn"
                 onClick={() => setRenameTarget(rundown)}
-                title="Ubah nama program & edisi"
+                title="Ubah nama program, edisi, anchor, dan reporter"
               >
                 <Edit3 size={12} />
                 <span>Ubah Edisi</span>
@@ -677,6 +687,11 @@ function RenameRundownModal({
 }) {
   const [name, setName] = useState(rundown.programName);
   const [title, setTitle] = useState(rundown.title);
+  const [anchorName, setAnchorName] = useState(rundown.newsAnchor?.name || "");
+  const [anchorRole, setAnchorRole] = useState(rundown.newsAnchor?.role || "News Anchor");
+  const [reporterName, setReporterName] = useState(rundown.reporter?.name || "");
+  const [reporterRole, setReporterRole] = useState(rundown.reporter?.role || "Reporter Lapangan");
+  const [reporterLocation, setReporterLocation] = useState(rundown.reporter?.location || "");
   const [targetId] = useState(rundown.id);
   const [saving, setSaving] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
@@ -709,7 +724,7 @@ function RenameRundownModal({
         className="modal-box rename-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Ubah identitas rundown"
+        aria-label="Ubah identitas dan personel rundown"
         onKeyDown={onDialogKeyDown}
         onSubmit={async (e) => {
           e.preventDefault();
@@ -717,7 +732,9 @@ function RenameRundownModal({
           try {
             await mutate(`/api/rundowns/${targetId}`, "PATCH", {
               programName: name,
-              title
+              title,
+              newsAnchor: { name: anchorName, role: anchorRole },
+              reporter: { name: reporterName, role: reporterRole, location: reporterLocation }
             });
             await onSaved();
           } catch (err) {
@@ -728,7 +745,7 @@ function RenameRundownModal({
         }}
       >
         <div className="modal-header">
-          <h3>Ubah Identitas Rundown</h3>
+          <h3>Ubah Identitas & Personel Rundown</h3>
           <button type="button" className="btn-close-modal" disabled={saving} onClick={onClose} aria-label="Tutup dialog ubah rundown">
             <X size={14} />
           </button>
@@ -752,6 +769,54 @@ function RenameRundownModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: Edisi Petang · 19 September 2026"
+            />
+          </label>
+
+          <div style={{ gridColumn: "1 / -1", marginTop: 8, borderTop: "1px solid #334155", paddingTop: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#93c5fd" }}>🎤 News Anchor Rundown (Hotkey P)</span>
+          </div>
+          <label>
+            <span>Nama Anchor</span>
+            <input
+              value={anchorName}
+              onChange={(e) => setAnchorName(e.target.value)}
+              placeholder="Nama pembawa berita untuk rundown ini"
+            />
+          </label>
+          <label>
+            <span>Jabatan Anchor</span>
+            <input
+              value={anchorRole}
+              onChange={(e) => setAnchorRole(e.target.value)}
+              placeholder="News Anchor"
+            />
+          </label>
+
+          <div style={{ gridColumn: "1 / -1", marginTop: 8, borderTop: "1px solid #334155", paddingTop: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#86efac" }}>📹 Reporter Lapangan Rundown (Hotkey O)</span>
+          </div>
+          <label>
+            <span>Nama Reporter</span>
+            <input
+              value={reporterName}
+              onChange={(e) => setReporterName(e.target.value)}
+              placeholder="Nama reporter untuk rundown ini"
+            />
+          </label>
+          <label>
+            <span>Jabatan Reporter</span>
+            <input
+              value={reporterRole}
+              onChange={(e) => setReporterRole(e.target.value)}
+              placeholder="Reporter Lapangan"
+            />
+          </label>
+          <label style={{ gridColumn: "1 / -1" }}>
+            <span>Lokasi Liputan</span>
+            <input
+              value={reporterLocation}
+              onChange={(e) => setReporterLocation(e.target.value)}
+              placeholder="Contoh: Jakarta Pusat / Gedung DPR"
             />
           </label>
         </div>

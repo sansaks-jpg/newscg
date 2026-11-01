@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { GraphicItem, LiveNewsAnchorInput, LiveReporterInput, LiveState, LiveVariantAction, MasterOverlayState, OverlayEvent } from "@newscg/shared";
 import { createFieldReporterGraphic, createNewsAnchorGraphic, fieldReporterGraphicId, newsAnchorDefaultsSchema, newsAnchorGraphicId, normalizeHeadlineTopicFields, reporterDefaultsSchema } from "@newscg/shared";
 import { getNewsAnchorDefaults, getReporterDefaults } from "./db.js";
-import { getGraphic, getItem, getMasterOverlay, getOnAir, logAction, markGraphicPushed, rundownTickerSnapshot, saveProgramWithTicker, saveMasterAndClearOnAir, saveMasterOverlay, saveOnAir } from "./db.js";
+import { getGraphic, getItem, getMasterOverlay, getOnAir, getRundown, logAction, markGraphicPushed, rundownTickerSnapshot, saveProgramWithTicker, saveMasterAndClearOnAir, saveMasterOverlay, saveOnAir } from "./db.js";
 
 let selectedGraphicId: string | null = null;
 let live: LiveState = {
@@ -193,10 +193,10 @@ export function take(graphicId: string, idempotencyKey: string, options?: { pres
 
 /** Default anchor is a Program snapshot, never a cue inserted into a rundown. */
 export function takeNewsAnchor(input: LiveNewsAnchorInput, idempotencyKey: string) {
-  return enqueue(idempotencyKey, `NEWS_ANCHOR:${JSON.stringify([input.action, input.defaults ?? null])}`, async () => {
+  return enqueue(idempotencyKey, `NEWS_ANCHOR:${JSON.stringify([input.action, input.defaults ?? null, input.rundownId ?? null])}`, async () => {
     const requestId = randomUUID();
     try {
-      const defaults = input.defaults || getNewsAnchorDefaults();
+      const defaults = input.defaults || (input.rundownId ? getRundown(input.rundownId)?.newsAnchor : null) || getNewsAnchorDefaults();
       if (!defaults.name.trim()) throw new Error("Isi Nama Anchor di Pengaturan Default News Anchor sebelum menayangkan.");
       const graphic = createNewsAnchorGraphic(defaults);
       const current = getOnAir();
@@ -223,10 +223,10 @@ export function takeNewsAnchor(input: LiveNewsAnchorInput, idempotencyKey: strin
 }
 
 export function takeFieldReporter(input: LiveReporterInput, idempotencyKey: string) {
-  return enqueue(idempotencyKey, `FIELD_REPORTER:${JSON.stringify([input.action, input.defaults ?? null])}`, async () => {
+  return enqueue(idempotencyKey, `FIELD_REPORTER:${JSON.stringify([input.action, input.defaults ?? null, input.rundownId ?? null])}`, async () => {
     const requestId = randomUUID();
     try {
-      const defaults = input.defaults || getReporterDefaults();
+      const defaults = input.defaults || (input.rundownId ? getRundown(input.rundownId)?.reporter : null) || getReporterDefaults();
       if (!defaults.name.trim()) throw new Error("Isi Nama Reporter Lapangan di Pengaturan Default Reporter Lapangan sebelum menayangkan.");
       const graphic = createFieldReporterGraphic(defaults);
       const current = getOnAir();
