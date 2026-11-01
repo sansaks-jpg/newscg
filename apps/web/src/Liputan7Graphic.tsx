@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { broadcastMotion, defaultMasterOverlayState, getLiputan7WeatherLocations, liputan7HeadlineFit, liputan7Motion, liputan7Palette, weatherIconAssets } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, formatEydDetail, getLiputan7WeatherLocations, liputan7HeadlineFit, liputan7Motion, liputan7Palette, weatherIconAssets } from "@newscg/shared";
 import type { BroadcastGraphicProps, WeatherCondition, WeatherDisplay } from "@newscg/shared";
 import { AutoSquishText } from "./AutoSquishText";
 import { BroadcastTicker } from "./BroadcastTicker";
@@ -24,7 +24,8 @@ export function Liputan7Graphic({ type, fields, master = defaultMasterOverlaySta
   const data = fields || {};
   const nameMode = type === "REPORTER" || (type === "SOT" && data.showSot !== "false") || data.contentMode === "presenter" || data.contentMode === "sot";
   const title = nameMode ? data.name || data.headline || "" : data.headline || data.text || "";
-  const detail = nameMode ? data.role || data.socialHandle || data.subline || "" : data.subline || "";
+  const rawDetail = nameMode ? data.role || data.socialHandle || data.subline || "" : data.subline || "";
+  const detail = formatEydDetail(rawDetail);
   const hasContent = type && type !== "LOCATION" && Boolean(title);
   const showDetail = Boolean(detail && (nameMode || (data.layoutStyle !== "single" && data.showDetail !== "false")));
   const detailLayer = useLayerPresence(showDetail && !isExiting, isExiting ? liputan7Motion.retainMs : liputan7Motion.copyOutMs + 20, contentKey);
@@ -71,7 +72,7 @@ export function Liputan7Graphic({ type, fields, master = defaultMasterOverlaySta
       <div className="l7-detail-plate">
         <div className="l7-detail-surface" />
         {detailLayer.present ? <div className={`l7-detail-viewport ${detailLayer.exiting ? "l7-detail-out" : ""}`}><div className="l7-detail-copy"><AutoSquishText text={detail || lastDetail} minScale={1} /></div></div>
-          : ghostPreview && ghostFields?.subline ? <AutoSquishText className="l7-ghost" text={ghostFields.subline} minScale={1} /> : null}
+          : ghostPreview && ghostFields?.subline ? <AutoSquishText className="l7-ghost" text={formatEydDetail(ghostFields.subline)} minScale={1} /> : null}
       </div>
       </div>
       {data.kicker && data.showKicker !== "false" && !nameMode && <div className="l7-topic"><AutoSquishText text={data.kicker} minScale={1} /></div>}

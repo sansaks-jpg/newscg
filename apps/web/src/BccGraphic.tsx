@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import type { BroadcastGraphicProps, MasterOverlayState } from "@newscg/shared";
-import { broadcastMotion, defaultMasterOverlayState, normalizeHeadlineTopicFields } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, formatEydDetail, normalizeHeadlineTopicFields } from "@newscg/shared";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { BroadcastClock } from "./BroadcastGraphic";
 import { useLayerPresence } from "./useLayerPresence";
@@ -67,9 +67,10 @@ export function BccGraphic({
     ? effectiveFields.name || effectiveFields.headline || (isSot ? "NAMA NARASUMBER" : "NAMA PEMBAWA BERITA")
     : effectiveFields.headline || effectiveFields.text || "";
 
-  const sublineText = isNameMode
+  const rawSubline = isNameMode
     ? (effectiveFields.role || effectiveFields.subline || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
+  const sublineText = formatEydDetail(rawSubline);
 
   // Mode layout: jika subline tidak diisi, menjadi judul tunggal (single-layout full height)
   const hasSubline = Boolean(sublineText && sublineText.trim().length > 0);
@@ -90,10 +91,11 @@ export function BccGraphic({
 
   const ghostSublineText =
     ghostPreview && !hasSubline && contentMode === "headline" && Boolean(ghostFields?.subline?.trim())
-      ? ghostFields!.subline!.trim()
+      ? formatEydDetail(ghostFields!.subline!.trim())
       : null;
 
-  const socialText = effectiveFields.socialHandle || sublineText;
+  const rawSocial = effectiveFields.socialHandle || rawSubline;
+  const socialText = rawSocial.startsWith("@") ? rawSocial : formatEydDetail(rawSocial);
   const isSocialActive = contentMode === "presenter" && Boolean(socialText);
   const socialLayer = useLayerPresence(isSocialActive, broadcastMotion.detailOutMs + 20);
   const [lastSocialText, setLastSocialText] = useState(socialText);

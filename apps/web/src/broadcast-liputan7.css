@@ -11,7 +11,7 @@
 .l7-title-plate { position: absolute; left: 0; top: 0; right: 20px; height: 92px; overflow: hidden; transition: height 300ms cubic-bezier(.4,0,.2,1); }
 .l7-title-surface { position: absolute; inset: 0; background: var(--l7-ivory); animation: l7-plate-in var(--l7-plateInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-plateDelayMs) both; }
 .l7-title-viewport { position: absolute; inset: 7px 16px; overflow: hidden; display: flex; align-items: center; }
-.l7-title-copy { width: 100%; height: 100%; min-width: 0; font-size: 76px; line-height: 1; font-weight: 500; letter-spacing: .2px; animation: l7-copy-in var(--l7-copyInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-copyDelayMs) both; }
+.l7-title-copy { width: 100%; height: 100%; min-width: 0; font-size: 76px; line-height: 1; font-weight: 500; letter-spacing: .2px; text-transform: uppercase; animation: l7-copy-in var(--l7-copyInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-copyDelayMs) both; }
 .l7-anchor .l7-title-copy { letter-spacing: .3px; }
 .l7-detail-plate { position: absolute; left: 0; top: 92px; right: 20px; height: 54px; padding: 0 16px; overflow: hidden; }
 .l7-detail-surface { position: absolute; inset: 0; background: var(--l7-blue); animation: l7-plate-in var(--l7-detailInMs) cubic-bezier(.333333,1,.666667,1) var(--l7-detailDelayMs) both; }
@@ -48,7 +48,7 @@
 .l7-city-slide { --l7-city-x: 12px; --l7-city-y: 0px; }
 .l7-city-fade { --l7-city-x: 0px; --l7-city-y: 0px; }
 .l7-weather-place { flex: 1; min-width: 0; }
-.l7-weather-city { font: 400 19px/24px Arial, Helvetica, sans-serif; letter-spacing: 0; }
+.l7-weather-city { font: 400 19px/24px Arial, Helvetica, sans-serif; letter-spacing: 0; text-transform: uppercase; }
 .l7-weather-symbol { flex: 0 0 44px; width: 44px; height: 44px; object-fit: contain; }
 .l7-weather-temperature { flex: none; white-space: nowrap; font: 400 20px/1 Arial, Helvetica, sans-serif; font-variant-numeric: tabular-nums; }
 .l7-tv-logo { position: absolute; right: 116px; top: 54px; width: 190px; height: 121px; }
@@ -62,7 +62,7 @@
 .l7-ticker .cg-ticker-track { display: flex; width: max-content; white-space: nowrap; will-change: transform; }
 .l7-ticker .cg-ticker-segment, .l7-ticker .cg-ticker-copy { display: inline-flex; align-items: center; white-space: nowrap; flex-shrink: 0; }
 .l7-ticker .cg-ticker-bullet { padding: 0 20px; color: var(--l7-burgundy); }
-.l7-ticker .cg-ticker-text { color: var(--l7-burgundy); font: 400 30px/1 Arial, Helvetica, sans-serif; letter-spacing: 0; }
+.l7-ticker .cg-ticker-text { color: var(--l7-burgundy); font: 400 30px/1 Arial, Helvetica, sans-serif; letter-spacing: 0; text-transform: uppercase; }
 .l7-ghost { opacity: .35; }
 .l7-layer-in { animation: l7-logo-in var(--l7-logoInMs) cubic-bezier(.22,1,.36,1) both; }
 .l7-layer-out { animation: l7-logo-out var(--l7-logoOutMs) ease-in both; }

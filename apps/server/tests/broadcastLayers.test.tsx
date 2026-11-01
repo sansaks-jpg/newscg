@@ -27,7 +27,7 @@ const forecast: WeatherForecast = {
 };
 const fetchMock = vi.fn();
 const master = { ...defaultMasterOverlayState, showLogo: true, showTicker: true, showLiveBadge: true };
-const fields = { headline: "HEADLINE PERTAMA", subline: "Keterangan berita", kicker: "TOPIK",
+const fields = { headline: "HEADLINE PERTAMA", subline: "Keterangan Berita", kicker: "TOPIK",
   location: "JAKARTA", layoutStyle: "sub", showLocation: "true", showKicker: "true", showDetail: "true" };
 const graphic = { id: "headline-1", templateType: "HEADLINE", draftFields: fields } as GraphicItem;
 const element = (selector: string) => host.querySelector(selector) as HTMLElement | null;

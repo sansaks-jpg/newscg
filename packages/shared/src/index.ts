@@ -361,6 +361,103 @@ export function normalizeHeadlineTopicFields(
 
 
 
+/**
+ * Kata tugas (preposisi, konjungsi, partikel) menurut EYD (Ejaan Bahasa Indonesia yang Disempurnakan)
+ * serta preposisi/konjungsi bahasa Inggris yang umum pada jabatan/keterangan siaran.
+ * Kata-kata ini ditulis dengan huruf kecil KECUALI jika terletak pada posisi awal frasa/kalimat.
+ */
+export const eydLowercaseWords: ReadonlySet<string> = new Set([
+  // Preposisi & Konjungsi Bahasa Indonesia
+  "dan", "atau", "serta", "tetapi", "tapi", "melainkan", "padahal", "sedangkan",
+  "yang", "di", "ke", "dari", "pada", "dalam", "untuk", "tentang", "dengan",
+  "oleh", "sebagai", "terhadap", "bagi", "atas", "antara", "hingga", "sampai",
+  "demi", "tanpa", "maupun", "guna", "buat", "sejak", "bersama", "menurut",
+  "lewat", "via", "karena", "sebab", "agar", "supaya", "jika", "bila", "kalau",
+  "walau", "meski", "walaupun", "meskipun", "kendati", "sehingga", "maka",
+  "lalu", "kemudian", "sambil", "seraya", "setelah", "sebelum", "sesudah",
+  "sewaktu", "ketika", "saat", "yakni", "yaitu", "pun", "per",
+  // English prepositions / conjunctions
+  "of", "the", "and", "in", "on", "for", "to", "with", "at", "by", "from", "as", "an", "a"
+]);
+
+/**
+ * Singkatan/akronim inisial resmi yang harus tetap huruf besar semua (UPPERCASE).
+ */
+export const eydUppercaseAcronyms: ReadonlySet<string> = new Set([
+  "RI", "DKI", "TNI", "POLRI", "KPK", "DPR", "MPR", "DPD", "IKN", "BUMN", "BUMD",
+  "BMKG", "BNPB", "BPBD", "KPU", "BAWASLU", "MK", "MA", "KY", "PBB", "WHO", "NATO",
+  "ASEAN", "CEO", "CFO", "CTO", "COO", "CMO", "CIO", "VP", "SVP", "AVP", "EVP",
+  "HRD", "PR", "SDM", "IT", "APBD", "APBN", "PNS", "ASN", "PPPK", "WIB", "WITA", "WIT",
+  "IDR", "USD", "BBC", "CNN", "SOT", "PKG", "LIVE", "MUI", "USA", "UK", "EU", "IMF",
+  "BPK", "OJK", "LPS", "BI", "PLN", "KAI", "BPS", "BIN", "BNN"
+]);
+
+/**
+ * Memformat teks baris detail / subline / role siaran agar huruf depannya kapital sesuai kaidah EYD,
+ * kata depan/hubung tetap huruf kecil jika bukan di awal kalimat, dan singkatan resmi tetap uppercase.
+ */
+export function formatEydDetail(text: string | null | undefined): string {
+  if (!text) return "";
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+
+  return trimmed
+    .split(/(\s*\|\s*|\s*\/\s*|\s*:\s*)/)
+    .map((segment) => {
+      if (/^\s*[|/:]\s*$/.test(segment)) return segment;
+
+      const tokens = segment.split(/(\s+)/);
+      let wordIndex = 0;
+
+      return tokens
+        .map((token) => {
+          if (/^\s+$/.test(token) || !token) return token;
+
+          const hyphenParts = token.split("-");
+          const formattedToken = hyphenParts
+            .map((part) => {
+              if (!part) return part;
+              const match = part.match(/^([^a-zA-Z0-9]*)([a-zA-Z0-9.]+)([^a-zA-Z0-9]*)$/);
+              if (!match) return part;
+
+              const prefix = match[1] ?? "";
+              const core = match[2];
+              const suffix = match[3] ?? "";
+              if (!core) return part;
+
+              const upperCore = core.toUpperCase();
+              const lowerCore = core.toLowerCase();
+
+              if (eydUppercaseAcronyms.has(upperCore) || /^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)$/i.test(core)) {
+                return `${prefix}${upperCore}${suffix}`;
+              }
+
+              if (core.includes(".") && core.length <= 6) {
+                return `${prefix}${core}${suffix}`;
+              }
+
+              if (eydLowercaseWords.has(lowerCore)) {
+                if (wordIndex === 0) {
+                  return `${prefix}${lowerCore.charAt(0).toUpperCase()}${lowerCore.slice(1)}${suffix}`;
+                }
+                return `${prefix}${lowerCore}${suffix}`;
+              }
+
+              const capitalized = lowerCore.charAt(0).toUpperCase() + lowerCore.slice(1);
+              return `${prefix}${capitalized}${suffix}`;
+            })
+            .join("-");
+
+          wordIndex++;
+          return formattedToken;
+        })
+        .join("");
+    })
+    .join("");
+}
+
+
+
 export const broadcastColorThemeIds = ["cnn", "studio-navy", "studio-graphite", "studio-copper"] as const;
 
 export type BroadcastColorThemeId = (typeof broadcastColorThemeIds)[number];

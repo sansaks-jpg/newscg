@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { BroadcastGraphicProps, BroadcastGhostFields, MasterOverlayState, TimezoneMode } from "@newscg/shared";
-import { broadcastMotion, defaultMasterOverlayState, getBroadcastColorTheme, hasVisibleMasterLayers, normalizeHeadlineTopicFields } from "@newscg/shared";
+import { broadcastMotion, defaultMasterOverlayState, formatEydDetail, getBroadcastColorTheme, hasVisibleMasterLayers, normalizeHeadlineTopicFields } from "@newscg/shared";
 import { MonitorPlay } from "lucide-react";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { useLayerPresence } from "./useLayerPresence";
@@ -81,9 +81,10 @@ function CnnGraphic({
     ? effectiveFields.name || effectiveFields.headline || (isSot ? "NAMA NARASUMBER" : "NAMA PEMBAWA BERITA")
     : effectiveFields.headline || effectiveFields.text || "";
 
-  const sublineText = isNameMode
+  const rawSubline = isNameMode
     ? (effectiveFields.role || effectiveFields.subline || effectiveFields.socialHandle || "")
     : effectiveFields.subline || "";
+  const sublineText = formatEydDetail(rawSubline);
 
   // Mode layout: jika subline tidak diisi, otomatis menjadi judul tunggal bersih (single-line full)
   const hasSubline = Boolean(sublineText && sublineText.trim().length > 0);
@@ -104,10 +105,11 @@ function CnnGraphic({
 
   const ghostSublineText =
     ghostPreview && !hasSubline && contentMode === "headline" && Boolean(ghostFields?.subline?.trim())
-      ? ghostFields!.subline!.trim()
+      ? formatEydDetail(ghostFields!.subline!.trim())
       : null;
 
-  const socialText = effectiveFields.socialHandle || sublineText;
+  const rawSocial = effectiveFields.socialHandle || rawSubline;
+  const socialText = rawSocial.startsWith("@") ? rawSocial : formatEydDetail(rawSocial);
   const socialLayer = useLayerPresence(contentMode === "presenter" && Boolean(socialText) && !isExiting, broadcastMotion.detailOutMs + 20);
   const [lastSocialText, setLastSocialText] = useState(socialText);
   useEffect(() => { if (socialText) setLastSocialText(socialText); }, [socialText]);

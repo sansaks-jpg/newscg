@@ -268,6 +268,7 @@
   padding: 8px 30px;
   font: italic 700 32px/1.2 Arial, Helvetica, sans-serif;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
   background: var(--bcc-orange);
   color: #ffffff;
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
@@ -347,6 +348,7 @@
   white-space: nowrap;
   font: 400 34px/1.1 "Arial Narrow", Arial, sans-serif;
   color: #ffffff;
+  text-transform: uppercase;
 }
 
 .bcc-template .cg-ticker-bullet {

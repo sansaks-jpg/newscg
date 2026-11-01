@@ -53,7 +53,8 @@ export function AutoSquishText({ text, className, minScale = 0.72, fillHeight, m
         const context = getSharedCanvasContext();
         if (context) {
           context.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`;
-          const ink = context.measureText(text);
+          const measuredText = css.textTransform === "uppercase" ? text.toUpperCase() : text;
+          const ink = context.measureText(measuredText);
           const inkHeight = ink.actualBoundingBoxAscent + ink.actualBoundingBoxDescent;
           if (inkHeight > 0) {
             scaleY = Math.max(1, Math.min(maxVerticalScale, container.clientHeight * fillHeight / inkHeight));
