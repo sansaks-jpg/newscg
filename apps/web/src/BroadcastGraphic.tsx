@@ -32,7 +32,8 @@ function CnnGraphic({
   exitAll = false,
   ghostPreview = false,
   ghostFields = null,
-  onAutoClear
+  onAutoClear,
+  isLive = false
 }: BroadcastGraphicProps) {
   const cnn = true;
   const colorTheme = getBroadcastColorTheme(master.colorTheme);
@@ -49,7 +50,7 @@ function CnnGraphic({
   const isBreaking = type === "BREAKING";
   const isReporter = type === "REPORTER";
   const isSot = type === "SOT";
-  const isCredits = type === "CREDITS";
+  const isCredits = type === "CREDITS" || Boolean(fields?.creditList);
   const isLocationOnly = type === "LOCATION";
 
   const effectiveFields = normalizeHeadlineTopicFields(type, fields || {});
@@ -179,6 +180,7 @@ function CnnGraphic({
                     fields={effectiveFields}
                     isExiting={isExiting}
                     isMini={isMini}
+                    isLive={isLive}
                     onAutoClear={onAutoClear}
                     className="cnn-credits"
                   />
@@ -391,7 +393,8 @@ export function BroadcastPreviewBox({
   animationKey = 0,
   studioReference = false,
   ghostPreview = false,
-  ghostFields = null
+  ghostFields = null,
+  isLive = false
 }: {
   graphic: any;
   fields: Record<string, string> | null;
@@ -405,6 +408,7 @@ export function BroadcastPreviewBox({
   studioReference?: boolean;
   ghostPreview?: boolean;
   ghostFields?: GhostFields | null;
+  isLive?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.2);
@@ -481,6 +485,7 @@ export function BroadcastPreviewBox({
             contentKey={`cnn-${animationKey}`}
             ghostPreview={ghostPreview}
             ghostFields={ghostFields}
+            isLive={isLive}
           />}
         </div>
 

@@ -21,9 +21,9 @@ function WeatherSymbol({ condition, isDaytime }: { condition: WeatherCondition; 
 }
 
 export function Liputan7Graphic({ type, fields, master = defaultMasterOverlayState, contentKey = 0,
-  isExiting = false, exitAll = false, ghostPreview = false, ghostFields, onAutoClear }: BroadcastGraphicProps) {
+  isExiting = false, exitAll = false, ghostPreview = false, ghostFields, onAutoClear, isLive = false }: BroadcastGraphicProps) {
   const data = fields || {};
-  const isCredits = type === "CREDITS";
+  const isCredits = type === "CREDITS" || Boolean(data.creditList);
   const nameMode = type === "REPORTER" || (type === "SOT" && data.showSot !== "false") || data.contentMode === "presenter" || data.contentMode === "sot";
   const title = nameMode ? data.name || data.headline || "" : data.headline || data.text || "";
   const rawDetail = nameMode ? data.role || data.socialHandle || data.subline || "" : data.subline || "";
@@ -74,6 +74,7 @@ export function Liputan7Graphic({ type, fields, master = defaultMasterOverlaySta
               <CreditTitlePlate
                 fields={data}
                 isExiting={isExiting}
+                isLive={isLive}
                 onAutoClear={onAutoClear}
                 className="l7-credits"
               />

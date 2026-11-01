@@ -333,7 +333,7 @@ export function SimpleProductionEditor({
         layoutStyle: compToSave.showDetail ? "sub" : "single"
       };
 
-      if (targetCue.templateType === "CREDITS") {
+      if (targetCue.templateType === "CREDITS" || Boolean(targetCue.draftFields?.creditList)) {
         patchFields.creditList = draftToSave.creditList || "";
         patchFields.closingText = draftToSave.closingText || "";
         patchFields.totalDuration = draftToSave.totalDuration || "";
@@ -1141,7 +1141,7 @@ export function SimpleProductionEditor({
                           selectCue(it.id, g.id);
                         }}
                       >
-                        #{gIdx + 1} {g.draftFields.headlinePresentation === "bulletin" ? "HIGHLIGHT" : g.templateType}
+                        #{gIdx + 1} {g.draftFields.creditList ? "CREDITS" : g.draftFields.headlinePresentation === "bulletin" ? "HIGHLIGHT" : g.templateType}
                       </button>
                     ))}
                   </div>
@@ -1349,7 +1349,7 @@ export function SimpleProductionEditor({
               <span className="cue-name">
                 {reporterPreview ? "REPORTER LAPANGAN · DEFAULT" : anchorPreview ? "NEWS ANCHOR · DEFAULT" : selectedItem ? `#${items.indexOf(selectedItem) + 1} ${selectedItem.title}` : "TIDAK ADA BERITA TERPILIH"}
               </span>
-              <span className="cue-type">{previewCue?.templateType || "OFF"}</span>
+              <span className="cue-type">{previewCue?.draftFields?.creditList ? "CREDITS" : previewCue?.templateType || "OFF"}</span>
             </div>
 
             <BroadcastPreviewBox
@@ -1592,7 +1592,7 @@ export function SimpleProductionEditor({
             </div>
           </div>
 
-          {selectedCue?.templateType === "CREDITS" ? (
+          {selectedCue?.templateType === "CREDITS" || Boolean(selectedCue?.draftFields?.creditList) ? (
             <div className="mini-editor-grid">
               <div className="mini-input-group span-2">
                 <label htmlFor="quick-edit-credits">Daftar Kerabat Kerja (Format: Jabatan: Nama atau Jabatan | Nama)</label>

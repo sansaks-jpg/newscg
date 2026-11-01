@@ -814,7 +814,7 @@ export type BroadcastGraphicProps = {
 
   exitAll?: boolean; ghostPreview?: boolean; ghostFields?: BroadcastGhostFields | null;
 
-  onAutoClear?: () => void;
+  onAutoClear?: () => void; isLive?: boolean;
 
 };
 

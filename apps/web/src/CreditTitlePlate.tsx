@@ -6,6 +6,7 @@ export interface CreditTitlePlateProps {
   fields: Record<string, string>;
   isExiting?: boolean;
   isMini?: boolean;
+  isLive?: boolean;
   onAutoClear?: () => void;
   className?: string;
   style?: CSSProperties;
@@ -15,6 +16,7 @@ export function CreditTitlePlate({
   fields,
   isExiting = false,
   isMini = false,
+  isLive = false,
   onAutoClear,
   className = "",
   style
@@ -57,9 +59,18 @@ export function CreditTitlePlate({
     onAutoClearRef.current = onAutoClear;
   }, [onAutoClear]);
 
+  // Hanya putar siklus pergantian nama otomatis jika sedang LIVE / tayang ON AIR
+  const shouldAutoPlay = Boolean(isLive || onAutoClear);
+
+  // Reset step jika daftar kredit berubah atau status live aktif
+  useEffect(() => {
+    setStep(0);
+    setFading(false);
+  }, [rawList, shouldAutoPlay]);
+
   // Siklus penayangan otomatis dan transisi fade antar nama
   useEffect(() => {
-    if (isExiting) return;
+    if (!shouldAutoPlay || isExiting) return;
 
     const isLastStep = step >= totalSteps - 1;
     const currentDurationMs = (isLastStep && hasClosing)
@@ -68,6 +79,8 @@ export function CreditTitlePlate({
 
     const fadeDurationMs = 400;
     const holdDurationMs = Math.max(1000, currentDurationMs - fadeDurationMs);
+
+    let fadeTimer: any = null;
 
     // Timer tahan tayang sebelum fade out
     const holdTimer = setTimeout(() => {
@@ -78,7 +91,7 @@ export function CreditTitlePlate({
         // Mulai transisi fade out
         setFading(true);
         // Setelah fade out selesai, ganti step dan fade in kembali
-        setTimeout(() => {
+        fadeTimer = setTimeout(() => {
           setStep((prev) => (prev + 1 < totalSteps ? prev + 1 : prev));
           setFading(false);
         }, fadeDurationMs);
@@ -87,8 +100,9 @@ export function CreditTitlePlate({
 
     return () => {
       clearTimeout(holdTimer);
+      if (fadeTimer) clearTimeout(fadeTimer);
     };
-  }, [step, totalSteps, isExiting, hasClosing, durations.itemDurationMs, durations.closingDurationMs]);
+  }, [shouldAutoPlay, step, totalSteps, isExiting, hasClosing, durations.itemDurationMs, durations.closingDurationMs]);
 
   const isClosingStep = hasClosing && step === entries.length;
   const currentItem = useMemo(() => {

@@ -81,6 +81,7 @@ export default function OverlayWindow() {
           exitAll={state.exitAll}
           contentKey={state.animationKey}
           onAutoClear={handleAutoClear}
+          isLive={true}
         />}
       </div>
     </div>

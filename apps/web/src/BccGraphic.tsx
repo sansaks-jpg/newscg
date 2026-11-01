@@ -23,7 +23,8 @@ export function BccGraphic({
   exitAll = false,
   ghostPreview = false,
   ghostFields = null,
-  onAutoClear
+  onAutoClear,
+  isLive = false
 }: BroadcastGraphicProps) {
   const graphicStyle = { ...motionStyle } as CSSProperties;
 
@@ -35,7 +36,7 @@ export function BccGraphic({
   const isBreaking = type === "BREAKING";
   const isReporter = type === "REPORTER";
   const isSot = type === "SOT";
-  const isCredits = type === "CREDITS";
+  const isCredits = type === "CREDITS" || Boolean(fields?.creditList);
   const isLocationOnly = type === "LOCATION";
 
   const effectiveFields = normalizeHeadlineTopicFields(type, fields || {});
@@ -217,6 +218,7 @@ export function BccGraphic({
                     fields={effectiveFields}
                     isExiting={isExiting}
                     isMini={isMini}
+                    isLive={isLive}
                     onAutoClear={onAutoClear}
                     className="bcc-credits"
                   />

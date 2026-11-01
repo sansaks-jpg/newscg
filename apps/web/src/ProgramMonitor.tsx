@@ -5,5 +5,5 @@ export function ProgramMonitor() {
   const state = useOverlayPlayback({ role: "monitor" });
   return <BroadcastPreviewBox graphic={state.graphic} fields={state.fields} master={state.master}
     isExiting={state.exiting} exitAll={state.exitAll} blackout={state.blackout}
-    animationKey={state.animationKey} emptyText="OUTPUT KOSONG" />;
+    animationKey={state.animationKey} emptyText="OUTPUT KOSONG" isLive={true} />;
 }
