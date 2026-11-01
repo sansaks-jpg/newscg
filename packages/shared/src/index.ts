@@ -403,7 +403,7 @@ export const eydUppercaseAcronyms: ReadonlySet<string> = new Set([
   "ASEAN", "CEO", "CFO", "CTO", "COO", "CMO", "CIO", "VP", "SVP", "AVP", "EVP",
   "HRD", "PR", "SDM", "IT", "APBD", "APBN", "PNS", "ASN", "PPPK", "WIB", "WITA", "WIT",
   "IDR", "USD", "BBC", "CNN", "SOT", "PKG", "LIVE", "MUI", "USA", "UK", "EU", "IMF",
-  "BPK", "OJK", "LPS", "BI", "PLN", "KAI", "BPS", "BIN", "BNN"
+  "BPK", "OJK", "LPS", "BI", "PLN", "KAI", "BPS", "BIN", "BNN", "CG", "VT"
 ]);
 
 /**
@@ -498,26 +498,36 @@ export function parseCreditEntries(rawText: string | null | undefined): CreditEn
   let pendingRole: string | null = null;
 
   for (const line of lines) {
-    const delimiterMatch = line.match(/^([^:|]+?)\s*[:|]\s*(.+)$/) || line.match(/^([^-]+?)\s+-\s+(.+)$/);
+    // Abaikan baris judul/kategori tanpa pengisi seperti "TIM LAPANGAN:" atau "KERABAT KERJA:"
+    if (/^[A-Za-z0-9\s_\-•*#]+:$/.test(line) && !line.includes("|")) {
+      continue;
+    }
+
+    const cleanLine = line.replace(/^[\s*\-•\d.]+\s+(?=[a-zA-Z])/, "").trim();
+
+    const delimiterMatch = cleanLine.match(/^([^:|]+?)\s*[:|]\s*(.+)$/) || cleanLine.match(/^([^-]+?)\s+-\s+(.+)$/);
     if (delimiterMatch) {
-      const rawRole = delimiterMatch[1] ?? "";
-      const rawName = delimiterMatch[2] ?? "";
+      const rawRole = (delimiterMatch[1] ?? "").replace(/^[\s*\-•]+\s*/, "").trim();
+      const rawName = (delimiterMatch[2] ?? "").replace(/^[\s*\-•]+\s*/, "").trim();
       if (rawRole && rawName) {
         entries.push({
           role: formatEydDetail(rawRole),
-          name: rawName.trim().toUpperCase()
+          name: rawName.toUpperCase()
         });
         pendingRole = null;
         continue;
       }
     }
 
+    const unbulleted = cleanLine.replace(/^[\s*\-•]+\s*/, "").trim();
+    if (!unbulleted) continue;
+
     if (pendingRole === null) {
-      pendingRole = line;
+      pendingRole = unbulleted;
     } else {
       entries.push({
         role: formatEydDetail(pendingRole),
-        name: line.trim().toUpperCase()
+        name: unbulleted.toUpperCase()
       });
       pendingRole = null;
     }

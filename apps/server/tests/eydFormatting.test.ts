@@ -95,6 +95,23 @@ describe("parseCreditEntries", () => {
       { role: "Kameramen Lapangan", name: "RAKA PRATAMA" }
     ]);
   });
+
+  it("handles bulleted lines, section headers, and broadcast acronyms CG and VT", () => {
+    const raw = `
+      - Produser : Nurhaneisya Wiko
+      - Operator CG : Sandi Ardiansya
+      - Operator VT : Salsabila Dwi Rahma
+      TIM LAPANGAN:
+      - Produser Lapangan : Kendamarino
+    `;
+    const entries = parseCreditEntries(raw);
+    expect(entries).toEqual([
+      { role: "Produser", name: "NURHANEISYA WIKO" },
+      { role: "Operator CG", name: "SANDI ARDIANSYA" },
+      { role: "Operator VT", name: "SALSABILA DWI RAHMA" },
+      { role: "Produser Lapangan", name: "KENDAMARINO" }
+    ]);
+  });
 });
 
 describe("calculateCreditDurations", () => {
