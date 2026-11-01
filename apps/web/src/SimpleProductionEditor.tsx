@@ -559,7 +559,13 @@ export function SimpleProductionEditor({
         showDetail: composition.showDetail ? "true" : "false",
         layoutStyle: composition.showDetail ? "sub" : "single"
       };
-      if (previewCue.templateType === "REPORTER" || previewCue.templateType === "SOT") {
+      if (previewCue.templateType === "CREDITS" || Boolean(previewCue.draftFields?.creditList)) {
+        fieldsToSend.creditList = miniDraft.creditList || previewCue.draftFields?.creditList || "";
+        fieldsToSend.closingText = miniDraft.closingText || previewCue.draftFields?.closingText || "PRODUKSI 2026";
+        fieldsToSend.totalDuration = miniDraft.totalDuration || previewCue.draftFields?.totalDuration || "30";
+        fieldsToSend.headline = miniDraft.headline.trim();
+        fieldsToSend.subline = miniDraft.subline.trim();
+      } else if (previewCue.templateType === "REPORTER" || previewCue.templateType === "SOT") {
         fieldsToSend.name = miniDraft.headline.trim();
         fieldsToSend.role = miniDraft.subline.trim();
       } else if (previewCue.templateType === "LOCATION") {
