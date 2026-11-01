@@ -2,7 +2,7 @@ import { z } from "zod";
 
 
 
-export const templateTypes = ["HEADLINE", "REPORTER", "SOT", "LOCATION", "BREAKING"] as const;
+export const templateTypes = ["HEADLINE", "REPORTER", "SOT", "LOCATION", "BREAKING", "CREDITS"] as const;
 
 export type TemplateType = (typeof templateTypes)[number];
 
@@ -321,6 +321,20 @@ export const headlineBulletinPreset = {
 
 
 
+export const creditsBroadcastPreset = {
+
+  creditList: "Produser: Sandi Ardiansyah\nPengarah Acara: Budi Santoso",
+
+  closingText: `PRODUKSI ${new Date().getFullYear()}`,
+
+  totalDuration: "30",
+
+  visualTemplate: "cnn"
+
+} as const;
+
+
+
 // Compatibility with the first side-label preset; all new editing uses kicker.
 
 // changedFields differentiates explicit PATCH intent from legacy stored values.
@@ -454,6 +468,146 @@ export function formatEydDetail(text: string | null | undefined): string {
         .join("");
     })
     .join("");
+}
+
+
+
+export type CreditEntry = {
+  role: string;
+  name: string;
+};
+
+/**
+ * Mengurai string multi-line daftar kerabat kerja menjadi pasangan role & name.
+ * Mendukung format:
+ * 1. "Jabatan: Nama"
+ * 2. "Jabatan | Nama"
+ * 3. "Jabatan - Nama"
+ * 4. Baris bergantian (baris 1 Jabatan, baris 2 Nama)
+ */
+export function parseCreditEntries(rawText: string | null | undefined): CreditEntry[] {
+  if (!rawText) return [];
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length === 0) return [];
+
+  const entries: CreditEntry[] = [];
+  let pendingRole: string | null = null;
+
+  for (const line of lines) {
+    const delimiterMatch = line.match(/^([^:|]+?)\s*[:|]\s*(.+)$/) || line.match(/^([^-]+?)\s+-\s+(.+)$/);
+    if (delimiterMatch) {
+      const rawRole = delimiterMatch[1] ?? "";
+      const rawName = delimiterMatch[2] ?? "";
+      if (rawRole && rawName) {
+        entries.push({
+          role: formatEydDetail(rawRole),
+          name: rawName.trim().toUpperCase()
+        });
+        pendingRole = null;
+        continue;
+      }
+    }
+
+    if (pendingRole === null) {
+      pendingRole = line;
+    } else {
+      entries.push({
+        role: formatEydDetail(pendingRole),
+        name: line.trim().toUpperCase()
+      });
+      pendingRole = null;
+    }
+  }
+
+  if (pendingRole !== null) {
+    entries.push({
+      role: "",
+      name: pendingRole.trim().toUpperCase()
+    });
+  }
+
+  return entries;
+}
+
+export type CreditDurationConfig = {
+  itemDurationSec: number;
+  itemDurationMs: number;
+  closingDurationSec: number;
+  closingDurationMs: number;
+  totalDurationSec: number;
+  totalDurationMs: number;
+};
+
+/**
+ * Menghitung durasi tayang per item dan penutup copyright.
+ * Jika totalDurationSec diberikan (misal 30 detik), sistem akan membagi waktu secara proporsional
+ * agar pas dan enak dilihat, dengan copyright penutup berdurasi 5-7 detik.
+ */
+export function calculateCreditDurations(options: {
+  entryCount: number;
+  hasClosing?: boolean;
+  totalDurationSec?: number | string | null;
+  customItemDurationSec?: number | string | null;
+  customClosingDurationSec?: number | string | null;
+}): CreditDurationConfig {
+  const { entryCount, hasClosing = true } = options;
+  const rawTotal = options.totalDurationSec ? parseFloat(String(options.totalDurationSec)) : NaN;
+  const rawItem = options.customItemDurationSec ? parseFloat(String(options.customItemDurationSec)) : NaN;
+  const rawClosing = options.customClosingDurationSec ? parseFloat(String(options.customClosingDurationSec)) : NaN;
+
+  if (!Number.isNaN(rawTotal) && rawTotal > 0) {
+    if (!hasClosing || entryCount === 0) {
+      const dur = entryCount > 0 ? rawTotal / entryCount : rawTotal;
+      const rounded = Math.round(dur * 10) / 10;
+      return {
+        itemDurationSec: rounded,
+        itemDurationMs: Math.round(dur * 1000),
+        closingDurationSec: 0,
+        closingDurationMs: 0,
+        totalDurationSec: rawTotal,
+        totalDurationMs: Math.round(rawTotal * 1000)
+      };
+    }
+
+    let closingSec = Math.max(5.0, Math.min(7.0, rawTotal * 0.22));
+    let remainingForItems = rawTotal - closingSec;
+
+    if (entryCount > 0 && remainingForItems / entryCount < 2.0) {
+      closingSec = Math.max(4.0, Math.min(5.5, rawTotal * 0.18));
+      remainingForItems = rawTotal - closingSec;
+    }
+
+    const itemSec = entryCount > 0 ? remainingForItems / entryCount : 3.5;
+    const roundedItem = Math.round(itemSec * 10) / 10;
+    const roundedClosing = Math.round(closingSec * 10) / 10;
+    const calcTotal = Math.round((roundedItem * entryCount + roundedClosing) * 10) / 10;
+
+    return {
+      itemDurationSec: roundedItem,
+      itemDurationMs: Math.round(roundedItem * 1000),
+      closingDurationSec: roundedClosing,
+      closingDurationMs: Math.round(roundedClosing * 1000),
+      totalDurationSec: calcTotal,
+      totalDurationMs: Math.round(calcTotal * 1000)
+    };
+  }
+
+  const itemSec = !Number.isNaN(rawItem) && rawItem > 0 ? rawItem : 3.5;
+  const closingSec = hasClosing ? (!Number.isNaN(rawClosing) && rawClosing > 0 ? rawClosing : 6.0) : 0;
+  const totalSec = Math.round((itemSec * entryCount + closingSec) * 10) / 10;
+
+  return {
+    itemDurationSec: itemSec,
+    itemDurationMs: Math.round(itemSec * 1000),
+    closingDurationSec: closingSec,
+    closingDurationMs: Math.round(closingSec * 1000),
+    totalDurationSec: totalSec,
+    totalDurationMs: Math.round(totalSec * 1000)
+  };
 }
 
 
@@ -649,6 +803,8 @@ export type BroadcastGraphicProps = {
   isExiting?: boolean; isMini?: boolean; visualTemplate?: string; contentKey?: string | number;
 
   exitAll?: boolean; ghostPreview?: boolean; ghostFields?: BroadcastGhostFields | null;
+
+  onAutoClear?: () => void;
 
 };
 
@@ -897,7 +1053,17 @@ export const graphicFieldLimits = {
 
   SOT: { headline: 120, name: 80, role: 100, location: 60, ticker: 160, brand: 40 },
 
-  LOCATION: { location: 50 }
+  LOCATION: { location: 50 },
+
+  CREDITS: {
+    creditList: 10000,
+    closingText: 200,
+    totalDuration: 10,
+    itemDuration: 10,
+    closingDuration: 10,
+    headline: 120,
+    subline: 160
+  }
 
 } as const;
 
@@ -1032,6 +1198,26 @@ export const fieldSchemas: Record<TemplateType, z.ZodObject<any>> = {
     showLocation: visibilityFlagSchema.optional().default("false"),
 
     showDetail: visibilityFlagSchema.optional().default("false")
+
+  }).passthrough(),
+
+  CREDITS: z.object({
+
+    creditList: z.string().trim().min(1).max(graphicFieldLimits.CREDITS.creditList),
+
+    closingText: z.string().trim().max(graphicFieldLimits.CREDITS.closingText).optional().default(""),
+
+    totalDuration: z.string().trim().max(graphicFieldLimits.CREDITS.totalDuration).optional().default(""),
+
+    itemDuration: z.string().trim().max(graphicFieldLimits.CREDITS.itemDuration).optional().default(""),
+
+    closingDuration: z.string().trim().max(graphicFieldLimits.CREDITS.closingDuration).optional().default(""),
+
+    headline: z.string().trim().max(graphicFieldLimits.CREDITS.headline).optional().default(""),
+
+    subline: z.string().trim().max(graphicFieldLimits.CREDITS.subline).optional().default(""),
+
+    visualTemplate: z.preprocess((value) => value === "classic" ? "cnn" : value, z.literal("cnn").default("cnn"))
 
   }).passthrough()
 

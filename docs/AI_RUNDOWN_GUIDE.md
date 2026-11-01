@@ -81,6 +81,22 @@ Construct the rundown payload complying with `rundownInputSchema` from `@newscg/
 
 For new rundowns, never supply stale IDs, `lastPushedFields`, ON AIR snapshots, or master properties. The server generates fresh IDs. Validate payloads against `@newscg/shared` schemas before sending.
 
+### End Credits (`CREDITS`)
+
+Broadcast closing credits can be included as a rundown cue with `templateType: "CREDITS"`. It renders inside the template's standard single-plate headline CG with automated fade playlist rotation, fit-to-duration proportional timing, closing production year slide (e.g. `PRODUKSI 2026`), and automatic off-air `CLEAR` upon completion:
+
+```json
+{
+  "templateType": "CREDITS",
+  "sortOrder": 90,
+  "draftFields": {
+    "creditList": "Produser: Sandi Ardiansyah\nPengarah Acara: Budi Santoso\nKamerawan Utama: Eko Prasetyo",
+    "closingText": "PRODUKSI 2026",
+    "totalDuration": "30"
+  }
+}
+```
+
 ## 3. Save via API and Perform Readback
 
 1. Inquire/verify target backend URL (`http://localhost:3001` by default).

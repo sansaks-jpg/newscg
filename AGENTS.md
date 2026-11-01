@@ -129,6 +129,7 @@ npm run build
 - New materials are stored as editable drafts without approval state gates (Draft/Ready/Needs Review). Importing a rundown does not grant permission to modify master settings or trigger ON AIR commands.
 - For direct HTTP interactions, begin at `GET /api/agent` and consult [docs/AI_AGENT_API.md](docs/AI_AGENT_API.md). Use published schemas and read back results after every mutation.
 - Graphic types and opening headlines are documented in [docs/CG_GUIDE.md](docs/CG_GUIDE.md) and available at `GET /api/agent/cg-guide.md`. The `headline-bulletin` preset is listed in discovery `graphicPresets`; it uses the `HEADLINE` template. Edit headlines via PATCH graphic, edition metadata via PATCH rundown, and story titles via PATCH item. Keep these three entities separate, read back each, and never apply to Program without live instructions.
+- The `CREDITS` template renders end credits on a single plate (non-tiered regular CG): the top line displays the role (Title Case EYD, regular font) and the bottom line displays the person's name (UPPERCASE, bold). Multiple entries rotate automatically with smooth fade transitions, followed by a closing production year slide (default `PRODUKSI 2026` or current year), and automatically trigger an off-air `CLEAR` command upon completion. When `totalDuration` is specified (e.g. 30 seconds), entry and closing durations are automatically computed to fit the target window comfortably. Available on all templates (`cnn`, `liputan7`, `bcc`).
 - The HIGHLIGHT label uses the topic tab above the headline via `kicker` and `showKicker`, along with the T toggle. Do not reintroduce side panels. `headlineLabel` is deprecated and kept only for backward compatibility; new materials must use topic fields. On Liputan7, the topic tab uses template visuals (burgundy–ivory with sand line, left-aligned above panel). Interactive HIGHLIGHT examples are available in `/templates/liputan7` and `/templates/cnn`.
 - Operator shortcuts: in Production:
   - `Space` / `Enter`: execute primary live action (`TAKE` or `UPDATE`).
@@ -167,7 +168,7 @@ This document is accessible to external AI agents via HTTP:
 - **`GET /api/agent/openapi.json`** — Complete OpenAPI 3.1 specification.
 - **`GET /api/agent/guide.md`** — Comprehensive REST API guide for material manipulation.
 - **`GET /api/agent/rundown-guide.md`** — Guide for converting rundown files (PDF/Excel/Word/Chat) into NewsCG schema.
-- **`GET /api/agent/cg-guide.md`** — Guide on CG types (HEADLINE, SOT, REPORTER, BREAKING) and visual variants.
+- **`GET /api/agent/cg-guide.md`** — Guide on CG types (HEADLINE, SOT, REPORTER, BREAKING, CREDITS) and visual variants.
 
 ### Adding Rundowns via API
 

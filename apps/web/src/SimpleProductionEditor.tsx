@@ -25,7 +25,7 @@ import { createNewsAnchorGraphic, newsAnchorDefaultsSchema, newsAnchorGraphicId 
 import { createFieldReporterGraphic, fieldReporterGraphicId, reporterDefaultsSchema, type ReporterDefaults } from "@newscg/shared";
 import { BroadcastPreviewBox } from "./BroadcastGraphic";
 import { ProgramMonitor } from "./ProgramMonitor";
-import { broadcastTemplates, getBroadcastColorTheme, getGraphicFieldLimit, hasVisibleMasterLayers, masterControlPatch, normalizeHeadlineTopicFields, selectBroadcastColorTheme, selectBroadcastTemplate } from "@newscg/shared";
+import { broadcastTemplates, calculateCreditDurations, getBroadcastColorTheme, getGraphicFieldLimit, hasVisibleMasterLayers, masterControlPatch, normalizeHeadlineTopicFields, parseCreditEntries, selectBroadcastColorTheme, selectBroadcastTemplate } from "@newscg/shared";
 import { BroadcastColorThemePicker, BroadcastTemplatePicker } from "./VisualTemplatePicker";
 import { Liputan7Settings } from "./Liputan7Settings";
 import { liveShortcut, primaryGraphicAction } from "./productionFlow";
@@ -49,6 +49,9 @@ type MiniDraft = {
   location: string;
   kicker: string;
   subline: string;
+  creditList?: string;
+  closingText?: string;
+  totalDuration?: string;
 };
 
 type PreviewComposition = {
@@ -282,7 +285,10 @@ export function SimpleProductionEditor({
       headline,
       location,
       kicker: f.kicker || "",
-      subline
+      subline,
+      creditList: f.creditList || "",
+      closingText: f.closingText || "",
+      totalDuration: f.totalDuration || ""
     });
 
     setComposition(restoreCompositionRef.current || {
@@ -327,7 +333,14 @@ export function SimpleProductionEditor({
         layoutStyle: compToSave.showDetail ? "sub" : "single"
       };
 
-      if (targetCue.templateType === "REPORTER" || targetCue.templateType === "SOT") {
+      if (targetCue.templateType === "CREDITS") {
+        patchFields.creditList = draftToSave.creditList || "";
+        patchFields.closingText = draftToSave.closingText || "";
+        patchFields.totalDuration = draftToSave.totalDuration || "";
+        const parsed = parseCreditEntries(patchFields.creditList);
+        patchFields.headline = parsed[0]?.name || draftToSave.headline.trim();
+        patchFields.subline = parsed[0]?.role || draftToSave.subline.trim();
+      } else if (targetCue.templateType === "REPORTER" || targetCue.templateType === "SOT") {
         patchFields.name = draftToSave.headline.trim();
         patchFields.role = draftToSave.subline.trim() || (targetCue.templateType === "REPORTER" ? "REPORTER" : "");
         patchFields.headline = targetCue.templateType === "SOT" ? (targetCue.draftFields.headline || "") : draftToSave.headline.trim();
@@ -1579,95 +1592,148 @@ export function SimpleProductionEditor({
             </div>
           </div>
 
-          <div className="mini-editor-grid">
-            <div className="mini-input-group span-2">
-              <label htmlFor="quick-edit-headline">
-                {selectedCue?.templateType === "SOT"
-                  ? "Nama Narasumber"
-                  : selectedCue?.templateType === "REPORTER"
-                  ? "Nama Pembawa Berita / Reporter"
-                  : selectedCue?.templateType === "LOCATION"
-                  ? "Teks Lokasi"
-                  : "Headline Utama"}
-              </label>
-              <input
-                id="quick-edit-headline"
-                type="text"
-                autoFocus
-                placeholder={
-                  selectedCue?.templateType === "SOT"
-                    ? "Masukkan nama narasumber..."
+          {selectedCue?.templateType === "CREDITS" ? (
+            <div className="mini-editor-grid">
+              <div className="mini-input-group span-2">
+                <label htmlFor="quick-edit-credits">Daftar Kerabat Kerja (Format: Jabatan: Nama atau Jabatan | Nama)</label>
+                <textarea
+                  id="quick-edit-credits"
+                  rows={4}
+                  className="w-full bg-[#1e2330] border border-[#2d3748] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 font-mono"
+                  placeholder="Produser: Sandi Ardiansyah&#10;Pengarah Acara: Budi Santoso&#10;Kamerawan: Eko Prasetyo"
+                  value={miniDraft.creditList}
+                  onChange={(e) => handleMiniDraftChange("creditList", e.target.value)}
+                />
+              </div>
+              <div className="mini-input-group">
+                <label htmlFor="quick-edit-closing">Teks Akhiran / Penutup</label>
+                <input
+                  id="quick-edit-closing"
+                  type="text"
+                  placeholder={`PRODUKSI ${new Date().getFullYear()}`}
+                  value={miniDraft.closingText}
+                  onChange={(e) => handleMiniDraftChange("closingText", e.target.value)}
+                />
+              </div>
+              <div className="mini-input-group">
+                <label htmlFor="quick-edit-duration">Target Total Durasi (detik, opsional)</label>
+                <input
+                  id="quick-edit-duration"
+                  type="number"
+                  placeholder="Contoh: 30"
+                  value={miniDraft.totalDuration}
+                  onChange={(e) => handleMiniDraftChange("totalDuration", e.target.value)}
+                />
+              </div>
+              {(() => {
+                const entries = parseCreditEntries(miniDraft.creditList || "");
+                const hasClose = Boolean((miniDraft.closingText || `PRODUKSI ${new Date().getFullYear()}`).trim());
+                const calc = calculateCreditDurations({
+                  entryCount: entries.length,
+                  hasClosing: hasClose,
+                  totalDurationSec: miniDraft.totalDuration
+                });
+                return (
+                  <div className="span-2 text-[11px] text-[#a0aec0] bg-[#1a202c] p-2 rounded flex flex-wrap gap-4 border border-[#2d3748]">
+                    <span>Total Personil: <strong>{entries.length}</strong></span>
+                    <span>Durasi Per Orang: <strong>{calc.itemDurationSec}s</strong></span>
+                    <span>Durasi Copyright: <strong>{calc.closingDurationSec}s</strong></span>
+                    <span>Total Durasi: <strong>{calc.totalDurationSec}s</strong></span>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="mini-editor-grid">
+              <div className="mini-input-group span-2">
+                <label htmlFor="quick-edit-headline">
+                  {selectedCue?.templateType === "SOT"
+                    ? "Nama Narasumber"
                     : selectedCue?.templateType === "REPORTER"
-                    ? "Masukkan nama reporter..."
+                    ? "Nama Pembawa Berita / Reporter"
                     : selectedCue?.templateType === "LOCATION"
-                    ? "Masukkan nama lokasi siaran..."
-                    : selectedCue
-                    ? "Masukkan judul berita utama..."
-                    : "Pilih berita dari daftar untuk mengedit..."
-                }
-                maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE",
-                  selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" ? "name"
-                    : selectedCue?.templateType === "LOCATION" ? "location" : "headline")}
-                disabled={busy || !selectedCue}
-                value={miniDraft.headline}
-                onChange={(e) => handleMiniDraftChange("headline", e.target.value)}
-              />
-            </div>
+                    ? "Teks Lokasi"
+                    : "Headline Utama"}
+                </label>
+                <input
+                  id="quick-edit-headline"
+                  type="text"
+                  autoFocus
+                  placeholder={
+                    selectedCue?.templateType === "SOT"
+                      ? "Masukkan nama narasumber..."
+                      : selectedCue?.templateType === "REPORTER"
+                      ? "Masukkan nama reporter..."
+                      : selectedCue?.templateType === "LOCATION"
+                      ? "Masukkan nama lokasi siaran..."
+                      : selectedCue
+                      ? "Masukkan judul berita utama..."
+                      : "Pilih berita dari daftar untuk mengedit..."
+                  }
+                  maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE",
+                    selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" ? "name"
+                      : selectedCue?.templateType === "LOCATION" ? "location" : "headline")}
+                  disabled={busy || !selectedCue}
+                  value={miniDraft.headline}
+                  onChange={(e) => handleMiniDraftChange("headline", e.target.value)}
+                />
+              </div>
 
-            <div className="mini-input-group">
-              <label htmlFor="quick-edit-location">Lokasi Siaran · L</label>
-              <input
-                id="quick-edit-location"
-                type="text"
-                placeholder={selectedCue ? "Contoh: Jakarta Pusat" : "-"}
-                maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE", "location")}
-                disabled={busy || !selectedCue}
-                value={miniDraft.location}
-                onChange={(e) => handleMiniDraftChange("location", e.target.value)}
-              />
-            </div>
+              <div className="mini-input-group">
+                <label htmlFor="quick-edit-location">Lokasi Siaran · L</label>
+                <input
+                  id="quick-edit-location"
+                  type="text"
+                  placeholder={selectedCue ? "Contoh: Jakarta Pusat" : "-"}
+                  maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE", "location")}
+                  disabled={busy || !selectedCue}
+                  value={miniDraft.location}
+                  onChange={(e) => handleMiniDraftChange("location", e.target.value)}
+                />
+              </div>
 
-            <div className="mini-input-group">
-              <label htmlFor="quick-edit-kicker">Topik / Kicker (Atas)</label>
-              <input
-                id="quick-edit-kicker"
-                type="text"
-                placeholder={selectedCue ? "Contoh: BREAKING NEWS" : "-"}
-                maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE", "kicker")}
-                disabled={busy || !selectedCue || selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" || selectedCue?.templateType === "LOCATION"}
-                value={miniDraft.kicker}
-                onChange={(e) => handleMiniDraftChange("kicker", e.target.value)}
-              />
-            </div>
+              <div className="mini-input-group">
+                <label htmlFor="quick-edit-kicker">Topik / Kicker (Atas)</label>
+                <input
+                  id="quick-edit-kicker"
+                  type="text"
+                  placeholder={selectedCue ? "Contoh: BREAKING NEWS" : "-"}
+                  maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE", "kicker")}
+                  disabled={busy || !selectedCue || selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" || selectedCue?.templateType === "LOCATION"}
+                  value={miniDraft.kicker}
+                  onChange={(e) => handleMiniDraftChange("kicker", e.target.value)}
+                />
+              </div>
 
-            <div className="mini-input-group span-2">
-              <label htmlFor="quick-edit-subline">
-                {selectedCue?.templateType === "SOT"
-                  ? "Jabatan / Institusi Narasumber"
-                  : selectedCue?.templateType === "REPORTER"
-                  ? "Jabatan / Role"
-                  : "Detail / Subline Keterangan"}
-              </label>
-              <input
-                id="quick-edit-subline"
-                type="text"
-                placeholder={
-                  selectedCue?.templateType === "SOT"
-                    ? "Contoh: Kasie Ops Basarnas Banten"
+              <div className="mini-input-group span-2">
+                <label htmlFor="quick-edit-subline">
+                  {selectedCue?.templateType === "SOT"
+                    ? "Jabatan / Institusi Narasumber"
                     : selectedCue?.templateType === "REPORTER"
-                    ? "Contoh: REPORTER, PRESENTER..."
-                    : selectedCue
-                    ? "Penjelasan ringkas poin berita..."
-                    : "-"
-                }
-                maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE",
-                  selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" ? "role" : "subline")}
-                disabled={busy || !selectedCue || selectedCue?.templateType === "LOCATION"}
-                value={miniDraft.subline}
-                onChange={(e) => handleMiniDraftChange("subline", e.target.value)}
-              />
+                    ? "Jabatan / Role"
+                    : "Detail / Subline Keterangan"}
+                </label>
+                <input
+                  id="quick-edit-subline"
+                  type="text"
+                  placeholder={
+                    selectedCue?.templateType === "SOT"
+                      ? "Contoh: Kasie Ops Basarnas Banten"
+                      : selectedCue?.templateType === "REPORTER"
+                      ? "Contoh: REPORTER, PRESENTER..."
+                      : selectedCue
+                      ? "Penjelasan ringkas poin berita..."
+                      : "-"
+                  }
+                  maxLength={getGraphicFieldLimit(selectedCue?.templateType || "HEADLINE",
+                    selectedCue?.templateType === "REPORTER" || selectedCue?.templateType === "SOT" ? "role" : "subline")}
+                  disabled={busy || !selectedCue || selectedCue?.templateType === "LOCATION"}
+                  value={miniDraft.subline}
+                  onChange={(e) => handleMiniDraftChange("subline", e.target.value)}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>}
       </main>
     </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEydDetail } from "@newscg/shared";
+import { calculateCreditDurations, formatEydDetail, parseCreditEntries } from "@newscg/shared";
 
 describe("formatEydDetail", () => {
   it("converts uppercase detail and roles into EYD title case", () => {
@@ -64,5 +64,61 @@ describe("formatEydDetail", () => {
     expect(formatEydDetail(null)).toBe("");
     expect(formatEydDetail(undefined)).toBe("");
     expect(formatEydDetail("   ")).toBe("");
+  });
+});
+
+describe("parseCreditEntries", () => {
+  it("parses colon-separated and pipe-separated entries with EYD role and uppercase name", () => {
+    const raw = `
+      Produser: Sandi Ardiansyah
+      Pengarah Acara | Budi Santoso
+      Pimpinan Redaksi : Joko Widodo
+    `;
+    const entries = parseCreditEntries(raw);
+    expect(entries).toEqual([
+      { role: "Produser", name: "SANDI ARDIANSYAH" },
+      { role: "Pengarah Acara", name: "BUDI SANTOSO" },
+      { role: "Pimpinan Redaksi", name: "JOKO WIDODO" }
+    ]);
+  });
+
+  it("parses alternating lines (odd role, even name)", () => {
+    const raw = `
+      Produser Eksekutif
+      Sandi Ardiansyah
+      Kameramen Lapangan
+      Raka Pratama
+    `;
+    const entries = parseCreditEntries(raw);
+    expect(entries).toEqual([
+      { role: "Produser Eksekutif", name: "SANDI ARDIANSYAH" },
+      { role: "Kameramen Lapangan", name: "RAKA PRATAMA" }
+    ]);
+  });
+});
+
+describe("calculateCreditDurations", () => {
+  it("fits to a total duration like 30 seconds with 5-7s closing copyright", () => {
+    const config = calculateCreditDurations({
+      entryCount: 7,
+      hasClosing: true,
+      totalDurationSec: 30
+    });
+    // Closing should be between 5.0 and 7.0s
+    expect(config.closingDurationSec).toBeGreaterThanOrEqual(5.0);
+    expect(config.closingDurationSec).toBeLessThanOrEqual(7.0);
+    // Total should equal approximately 30s
+    expect(config.totalDurationSec).toBeCloseTo(30, 0);
+    expect(config.itemDurationSec).toBeGreaterThan(2.0);
+  });
+
+  it("uses default values when total duration is omitted", () => {
+    const config = calculateCreditDurations({
+      entryCount: 4,
+      hasClosing: true
+    });
+    expect(config.itemDurationSec).toBe(3.5);
+    expect(config.closingDurationSec).toBe(6.0);
+    expect(config.totalDurationSec).toBe(4 * 3.5 + 6.0); // 20.0s
   });
 });

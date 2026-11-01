@@ -5,6 +5,7 @@ import { BroadcastTicker } from "./BroadcastTicker";
 import { BroadcastClock } from "./BroadcastGraphic";
 import { useLayerPresence } from "./useLayerPresence";
 import { AutoSquishText } from "./AutoSquishText";
+import { CreditTitlePlate } from "./CreditTitlePlate";
 import { useBroadcastWeather, WeatherSymbol } from "./BroadcastWeather";
 
 const motionStyle = Object.fromEntries(
@@ -21,7 +22,8 @@ export function BccGraphic({
   contentKey = 0,
   exitAll = false,
   ghostPreview = false,
-  ghostFields = null
+  ghostFields = null,
+  onAutoClear
 }: BroadcastGraphicProps) {
   const graphicStyle = { ...motionStyle } as CSSProperties;
 
@@ -33,14 +35,15 @@ export function BccGraphic({
   const isBreaking = type === "BREAKING";
   const isReporter = type === "REPORTER";
   const isSot = type === "SOT";
+  const isCredits = type === "CREDITS";
   const isLocationOnly = type === "LOCATION";
 
   const effectiveFields = normalizeHeadlineTopicFields(type, fields || {});
-  const hasContent = !isLocationOnly && Boolean(type && fields && (fields.headline || fields.name || fields.location || fields.text));
+  const hasContent = !isLocationOnly && Boolean(type && fields && (isCredits || fields.creditList || fields.headline || fields.name || fields.location || fields.text));
 
   // Location tag di pojok kiri atas
   const hasLocation = Boolean(effectiveFields.location && effectiveFields.location.trim().length > 0);
-  const showLocationTag = isLocationOnly ? hasLocation : (hasLocation && effectiveFields.showLocation !== "false");
+  const showLocationTag = !isCredits && (isLocationOnly ? hasLocation : (hasLocation && effectiveFields.showLocation !== "false"));
 
   const locationLayer = useLayerPresence(showLocationTag && !isExiting, broadcastMotion.locationOutMs + 20);
   const [lastLocation, setLastLocation] = useState(effectiveFields.location || "");
@@ -52,6 +55,7 @@ export function BccGraphic({
   // Kicker Tab di atas bar judul
   const hasKicker = Boolean(effectiveFields.kicker && effectiveFields.kicker.trim().length > 0);
   const shouldShowKicker =
+    !isCredits &&
     effectiveFields.showKicker !== "false" &&
     contentMode === "headline" &&
     hasKicker;
@@ -195,65 +199,80 @@ export function BccGraphic({
             {/* Wrapper Kanan (Kicker Tab + Headline Plate + Subline Plate) */}
             <div className="cg-main-wrapper">
               {/* Kicker Tab di Atas Judul */}
-              {kickerLayer.present ? (
+              {!isCredits && kickerLayer.present ? (
                 <div className={`cg-kicker-tab ${kickerLayer.exiting ? "cg-kicker-out" : ""}`}>
                   <AutoSquishText text={effectiveFields.kicker || lastKicker || kickerText} minScale={0.7} />
                 </div>
-              ) : ghostKickerText ? (
+              ) : !isCredits && ghostKickerText ? (
                 <div className="cg-kicker-tab cg-ghost-element" title="Topik (Belum Aktif — Tekan T lalu TAKE / UPDATE)">
                   <span className="cg-ghost-pill">[T]</span>
                   <AutoSquishText text={ghostKickerText} minScale={0.7} />
                 </div>
               ) : null}
 
-              {/* Bar Judul Merah Marun (Headline Plate) */}
-              <div className={`cg-headline-plate ${isEffectiveSingleLayout ? "single-layout" : ""}`}>
-                <div className="cg-copy-motion" style={{ width: "100%" }}>
-                  <AutoSquishText
-                    text={headlineText}
-                    minScale={0.3}
-                    className={isEffectiveSingleLayout ? "cg-headline-row-single" : "cg-headline-row"}
+              {/* Konten Utama: Credit Title atau Bar Judul & Subline Biasa */}
+              {isCredits ? (
+                <div className="cg-headline-plate single-layout">
+                  <CreditTitlePlate
+                    fields={effectiveFields}
+                    isExiting={isExiting}
+                    isMini={isMini}
+                    onAutoClear={onAutoClear}
+                    className="bcc-credits"
                   />
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* Bar Judul Merah Marun (Headline Plate) */}
+                  <div className={`cg-headline-plate ${isEffectiveSingleLayout ? "single-layout" : ""}`}>
+                    <div className="cg-copy-motion" style={{ width: "100%" }}>
+                      <AutoSquishText
+                        text={headlineText}
+                        minScale={0.3}
+                        className={isEffectiveSingleLayout ? "cg-headline-row-single" : "cg-headline-row"}
+                      />
+                    </div>
+                  </div>
 
-              {/* Bar Subline / Narasumber Krem (Subline Plate) */}
-              {!isEffectiveSingleLayout && (
-                <div className={`cg-subline-plate ${isDetailPlateExiting ? "cg-detail-out" : ""}`}>
-                  {sotLayer.present ? (
-                    <div className={`cg-subline-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
-                      <div className="cg-copy-motion" style={{ width: "100%" }}>
-                        <AutoSquishText
-                          text={sublineText || lastSubline}
-                          minScale={0.45}
-                        />
-                      </div>
+                  {/* Bar Subline / Narasumber Krem (Subline Plate) */}
+                  {!isEffectiveSingleLayout && (
+                    <div className={`cg-subline-plate ${isDetailPlateExiting ? "cg-detail-out" : ""}`}>
+                      {sotLayer.present ? (
+                        <div className={`cg-subline-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
+                          <div className="cg-copy-motion" style={{ width: "100%" }}>
+                            <AutoSquishText
+                              text={sublineText || lastSubline}
+                              minScale={0.45}
+                            />
+                          </div>
+                        </div>
+                      ) : detailLayer.present ? (
+                        <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
+                          <div className="cg-copy-motion" style={{ width: "100%" }}>
+                            <AutoSquishText
+                              text={sublineText || lastSubline}
+                              minScale={0.45}
+                            />
+                          </div>
+                        </div>
+                      ) : socialLayer.present ? (
+                        <div className={`cg-social-row ${socialLayer.exiting ? "cg-detail-out" : ""}`}>
+                          <div className="cg-copy-motion" style={{ width: "100%" }}>
+                            <AutoSquishText
+                              text={socialText || lastSocialText}
+                              minScale={0.45}
+                            />
+                          </div>
+                        </div>
+                      ) : ghostSublineText ? (
+                        <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu TAKE / UPDATE)">
+                          <span className="cg-ghost-pill">[D]</span>
+                          <AutoSquishText text={ghostSublineText} minScale={0.45} />
+                        </div>
+                      ) : null}
                     </div>
-                  ) : detailLayer.present ? (
-                    <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
-                      <div className="cg-copy-motion" style={{ width: "100%" }}>
-                        <AutoSquishText
-                          text={sublineText || lastSubline}
-                          minScale={0.45}
-                        />
-                      </div>
-                    </div>
-                  ) : socialLayer.present ? (
-                    <div className={`cg-social-row ${socialLayer.exiting ? "cg-detail-out" : ""}`}>
-                      <div className="cg-copy-motion" style={{ width: "100%" }}>
-                        <AutoSquishText
-                          text={socialText || lastSocialText}
-                          minScale={0.45}
-                        />
-                      </div>
-                    </div>
-                  ) : ghostSublineText ? (
-                    <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu TAKE / UPDATE)">
-                      <span className="cg-ghost-pill">[D]</span>
-                      <AutoSquishText text={ghostSublineText} minScale={0.45} />
-                    </div>
-                  ) : null}
-                </div>
+                  )}
+                </>
               )}
             </div>
           </div>

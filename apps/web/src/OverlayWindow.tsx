@@ -48,6 +48,18 @@ export default function OverlayWindow() {
     };
   }, []);
 
+  const handleAutoClear = () => {
+    fetch("/api/live/clear", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `auto-clear-${Date.now()}`
+      }
+    }).catch((err) => {
+      console.error("Auto clear failed:", err);
+    });
+  };
+
   return (
     <div className="overlay-root">
       <div
@@ -68,6 +80,7 @@ export default function OverlayWindow() {
           isExiting={state.exiting}
           exitAll={state.exitAll}
           contentKey={state.animationKey}
+          onAutoClear={handleAutoClear}
         />}
       </div>
     </div>

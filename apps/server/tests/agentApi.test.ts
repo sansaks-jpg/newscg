@@ -122,7 +122,7 @@ describe("agent discovery and shared API contract", () => {
     const schemas = spec.components.schemas;
     expect(schemas.GraphicInput.oneOf).toHaveLength(templateTypes.length);
     for (const type of templateTypes) {
-      const required = type === "REPORTER" ? ["name"] : type === "LOCATION" ? ["location"] : type === "SOT" ? ["headline", "name"] : ["headline"];
+      const required = type === "REPORTER" ? ["name"] : type === "LOCATION" ? ["location"] : type === "SOT" ? ["headline", "name"] : type === "CREDITS" ? ["creditList"] : ["headline"];
       expect(schemas[`${type}Fields`].required).toEqual(required);
       for (const [key, limit] of Object.entries(graphicFieldLimits[type])) expect(schemas[`${type}Fields`].properties[key].maxLength).toBe(limit);
       expect(schemas[`${type}Fields`].additionalProperties).toEqual({ type: "string" });

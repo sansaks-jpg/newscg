@@ -12,6 +12,7 @@ import {
   rundownInputSchema, rundownItemInputSchema, rundownItemPatchSchema, rundownItemRecordSchema,
   rundownPatchSchema, rundownRecordSchema, rundownReorderInputSchema, settingsPatchSchema,
   storySaveInputSchema, templateTypes, tickerSpeedPolicy, weatherLocationSchema,
+  creditsBroadcastPreset,
   type AgentApiOperation
 } from "@newscg/shared";
 

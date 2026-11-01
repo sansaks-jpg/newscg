@@ -7,6 +7,7 @@ import { useLayerPresence } from "./useLayerPresence";
 import { AutoSquishText } from "./AutoSquishText";
 import { Liputan7Graphic } from "./Liputan7Graphic";
 import { BccGraphic } from "./BccGraphic";
+import { CreditTitlePlate } from "./CreditTitlePlate";
 import { useBroadcastWeather, WeatherSymbol } from "./BroadcastWeather";
 
 const motionStyle = Object.fromEntries(Object.entries(broadcastMotion).map(([name, milliseconds]) =>
@@ -30,7 +31,8 @@ function CnnGraphic({
   contentKey = 0,
   exitAll = false,
   ghostPreview = false,
-  ghostFields = null
+  ghostFields = null,
+  onAutoClear
 }: BroadcastGraphicProps) {
   const cnn = true;
   const colorTheme = getBroadcastColorTheme(master.colorTheme);
@@ -47,14 +49,15 @@ function CnnGraphic({
   const isBreaking = type === "BREAKING";
   const isReporter = type === "REPORTER";
   const isSot = type === "SOT";
+  const isCredits = type === "CREDITS";
   const isLocationOnly = type === "LOCATION";
 
   const effectiveFields = normalizeHeadlineTopicFields(type, fields || {});
-  const hasContent = !isLocationOnly && Boolean(type && fields && (fields.headline || fields.name || fields.location || fields.text));
+  const hasContent = !isLocationOnly && Boolean(type && fields && (isCredits || fields.creditList || fields.headline || fields.name || fields.location || fields.text));
 
   // Location tag di pojok kiri atas (otomatis tampil dinamis jika field lokasi diisi)
   const hasLocation = Boolean(effectiveFields.location && effectiveFields.location.trim().length > 0);
-  const showLocationTag = isLocationOnly ? hasLocation : (hasLocation && effectiveFields.showLocation !== "false");
+  const showLocationTag = !isCredits && (isLocationOnly ? hasLocation : (hasLocation && effectiveFields.showLocation !== "false"));
 
   const locationLayer = useLayerPresence(showLocationTag && !isExiting, broadcastMotion.locationOutMs + 20);
   const [lastLocation, setLastLocation] = useState(effectiveFields.location || "");
@@ -66,6 +69,7 @@ function CnnGraphic({
   // Kicker Tab: Tampil hanya jika sub topik diisi oleh pengguna (dinamis tanpa paksaan default)
   const hasKicker = Boolean(effectiveFields.kicker && effectiveFields.kicker.trim().length > 0);
   const shouldShowKicker =
+    !isCredits &&
     effectiveFields.showKicker !== "false" &&
     contentMode === "headline" &&
     hasKicker;
@@ -154,13 +158,13 @@ function CnnGraphic({
       >
         {/* Layer Konten (Kicker & Main Box) — Tampil jika ada materi ON AIR */}
         {hasContent && (
-          <div key={contentKey} className={`cg-content-layer ${kickerLayer.present ? "cg-has-topic" : ""} ${exitClass}`}>
+          <div key={contentKey} className={`cg-content-layer ${kickerLayer.present && !isCredits ? "cg-has-topic" : ""} ${exitClass}`}>
             {/* Kicker Tab di Atas Kotak Putih */}
-            {kickerLayer.present ? (
+            {!isCredits && kickerLayer.present ? (
               <div className={`cg-kicker-tab ${kickerLayer.exiting ? "cg-kicker-out" : ""}`}>
                 <AutoSquishText text={effectiveFields.kicker || lastKicker || kickerText} minScale={0.7} />
               </div>
-            ) : ghostKickerText ? (
+            ) : !isCredits && ghostKickerText ? (
               <div className="cg-kicker-tab cg-ghost-element" title="Topik (Belum Aktif — Tekan T lalu TAKE / UPDATE)">
                 <span className="cg-ghost-pill">[T]</span>
                 <AutoSquishText text={ghostKickerText} minScale={0.7} />
@@ -168,81 +172,93 @@ function CnnGraphic({
             ) : null}
 
             {/* Kotak Utama */}
-            <div className={`cg-main-box ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
-              <div className={`cg-text-area ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
-                {contentMode === "paragraph" ? (
-                  <div className="cg-paragraph-row">
-                    <div className="cg-copy-motion">
-                      <AutoSquishText
-                        text={headlineText}
-                        minScale={0.3}
-                        className="cg-paragraph-squish"
-                      />
-                    </div>
-                  </div>
-                ) : contentMode === "presenter" ? (
-                  <div className="cg-presenter-block">
-                    <div className="cg-presenter-row">
+            <div className={`cg-main-box ${isCredits ? "single-layout credits" : isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
+              {isCredits ? (
+                <div className="cg-text-area single-layout credits">
+                  <CreditTitlePlate
+                    fields={effectiveFields}
+                    isExiting={isExiting}
+                    isMini={isMini}
+                    onAutoClear={onAutoClear}
+                    className="cnn-credits"
+                  />
+                </div>
+              ) : (
+                <div className={`cg-text-area ${isEffectiveSingleLayout ? "single-layout" : ""} ${contentMode}`}>
+                  {contentMode === "paragraph" ? (
+                    <div className="cg-paragraph-row">
                       <div className="cg-copy-motion">
                         <AutoSquishText
                           text={headlineText}
-                          minScale={0.35}
-                          className="cg-presenter-squish"
+                          minScale={0.3}
+                          className="cg-paragraph-squish"
                         />
                       </div>
                     </div>
-                    {socialLayer.present && (
-                      <div className={`cg-social-row ${socialLayer.exiting ? "cg-detail-out" : ""}`}>
+                  ) : contentMode === "presenter" ? (
+                    <div className="cg-presenter-block">
+                      <div className="cg-presenter-row">
                         <div className="cg-copy-motion">
                           <AutoSquishText
-                            text={socialText || lastSocialText}
-                            minScale={0.5}
-                            className="cg-social-squish"
+                            text={headlineText}
+                            minScale={0.35}
+                            className="cg-presenter-squish"
                           />
                         </div>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className={isEffectiveSingleLayout ? "cg-headline-row-single" : "cg-headline-row"}>
-                      <div className="cg-copy-motion">
-                        <AutoSquishText text={headlineText} minScale={0.3} className="cg-headline-squish" />
-                      </div>
+                      {socialLayer.present && (
+                        <div className={`cg-social-row ${socialLayer.exiting ? "cg-detail-out" : ""}`}>
+                          <div className="cg-copy-motion">
+                            <AutoSquishText
+                              text={socialText || lastSocialText}
+                              minScale={0.5}
+                              className="cg-social-squish"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {sotLayer.present ? (
-                      <div className={`cg-subline-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
+                  ) : (
+                    <>
+                      <div className={isEffectiveSingleLayout ? "cg-headline-row-single" : "cg-headline-row"}>
                         <div className="cg-copy-motion">
+                          <AutoSquishText text={headlineText} minScale={0.3} className="cg-headline-squish" />
+                        </div>
+                      </div>
+                      {sotLayer.present ? (
+                        <div className={`cg-subline-row ${sotLayer.exiting ? "cg-detail-out" : ""}`}>
+                          <div className="cg-copy-motion">
+                            <AutoSquishText
+                              text={sublineText || lastSubline}
+                              minScale={0.45}
+                              className="cg-subline-squish"
+                            />
+                          </div>
+                        </div>
+                      ) : detailLayer.present ? (
+                        <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
+                          <div className="cg-copy-motion">
+                            <AutoSquishText
+                              text={sublineText || lastSubline}
+                              minScale={0.45}
+                              className="cg-subline-squish"
+                            />
+                          </div>
+                        </div>
+                      ) : ghostSublineText ? (
+                        <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu TAKE / UPDATE)">
+                          <span className="cg-ghost-pill">[D]</span>
                           <AutoSquishText
-                            text={sublineText || lastSubline}
+                            text={ghostSublineText}
                             minScale={0.45}
                             className="cg-subline-squish"
                           />
                         </div>
-                      </div>
-                    ) : detailLayer.present ? (
-                      <div className={`cg-subline-row ${detailLayer.exiting ? "cg-detail-out" : ""}`}>
-                        <div className="cg-copy-motion">
-                          <AutoSquishText
-                            text={sublineText || lastSubline}
-                            minScale={0.45}
-                            className="cg-subline-squish"
-                          />
-                        </div>
-                      </div>
-                    ) : ghostSublineText ? (
-                      <div className="cg-subline-row cg-ghost-element" title="Detail (Belum Aktif — Tekan D lalu TAKE / UPDATE)">
-                        <span className="cg-ghost-pill">[D]</span>
-                        <AutoSquishText
-                          text={ghostSublineText}
-                          minScale={0.45}
-                          className="cg-subline-squish"
-                        />
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Ruang kosong penahan di sebelah kanan agar headline berdampingan dengan logo box */}
               {logoLayer.present && (

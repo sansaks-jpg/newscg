@@ -19,6 +19,7 @@ Based on standard news broadcast design patterns:
 | Name strap / identifier | Presenter, reporter, or guest identification | `REPORTER`; name + role/affiliation |
 | SOT identifier | Speaker identity while retaining story headline | `SOT`; headline + speaker name + role |
 | Locator | Geographic location of report or visual | `LOCATION` or location field on cues |
+| Credit Title / End Credits | Production crew roles & names with auto-rotation | `CREDITS`; single plate, role on top, name on bottom, auto-clear on finish |
 | Station bug / LIVE / clock | Channel identity and broadcast status | Master logo, LIVE badge, clock/timezone |
 | Ticker / crawl | Rolling bottom text | Ticker per rundown schedule or global (BCC) |
 
@@ -77,3 +78,28 @@ Content-Type: application/json
 ```
 
 Material edits never alter Program snapshots or dispatch overlay events without explicit live operator commands.
+
+## Credit Title (`CREDITS`) Template & Operation
+
+The `CREDITS` template renders end-of-broadcast credits directly inside the template's standard single-plate headline CG (without tiered SOT subline bar):
+- **Top Row**: Crew Role / Jabatan (`Title Case`, EYD capitalized, regular weight).
+- **Bottom Row**: Crew Member Name (`UPPERCASE`, bold weight).
+- **Auto-Rotation**: Smoothly fades between entries automatically.
+- **Closing Tag**: Displays closing production year text (default: `PRODUKSI 2026` or current year).
+- **Fit-to-Duration**: If `totalDuration` is provided (e.g. `30` seconds), entry durations and closing display duration are calculated automatically to fill the requested window comfortably.
+- **Auto-Clear**: Once the playlist reaches the end, the overlay output automatically triggers an off-air `CLEAR` command (`POST /api/live/clear`).
+
+### Payload Example for AI Agent
+
+```json
+{
+  "templateType": "CREDITS",
+  "sortOrder": 99,
+  "draftFields": {
+    "creditList": "Produser Eksekutif: Sandi Ardiansyah\nProduser Pelaksana: Budi Santoso\nPengarah Acara: Eko Prasetyo\nEditor Audio Visual: Rian Hidayat",
+    "closingText": "PRODUKSI 2026",
+    "totalDuration": "30"
+  }
+}
+```
+

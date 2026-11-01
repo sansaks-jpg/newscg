@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { broadcastMotion, defaultMasterOverlayState, formatEydDetail, getLiputan7WeatherLocations, liputan7HeadlineFit, liputan7Motion, liputan7Palette, weatherIconAssets } from "@newscg/shared";
 import type { BroadcastGraphicProps, WeatherCondition, WeatherDisplay } from "@newscg/shared";
 import { AutoSquishText } from "./AutoSquishText";
+import { CreditTitlePlate } from "./CreditTitlePlate";
 import { BroadcastTicker } from "./BroadcastTicker";
 import { BroadcastClock } from "./BroadcastGraphic";
 import { useLayerPresence } from "./useLayerPresence";
@@ -20,21 +21,22 @@ function WeatherSymbol({ condition, isDaytime }: { condition: WeatherCondition; 
 }
 
 export function Liputan7Graphic({ type, fields, master = defaultMasterOverlayState, contentKey = 0,
-  isExiting = false, exitAll = false, ghostPreview = false, ghostFields }: BroadcastGraphicProps) {
+  isExiting = false, exitAll = false, ghostPreview = false, ghostFields, onAutoClear }: BroadcastGraphicProps) {
   const data = fields || {};
+  const isCredits = type === "CREDITS";
   const nameMode = type === "REPORTER" || (type === "SOT" && data.showSot !== "false") || data.contentMode === "presenter" || data.contentMode === "sot";
   const title = nameMode ? data.name || data.headline || "" : data.headline || data.text || "";
   const rawDetail = nameMode ? data.role || data.socialHandle || data.subline || "" : data.subline || "";
   const detail = formatEydDetail(rawDetail);
-  const hasContent = type && type !== "LOCATION" && Boolean(title);
-  const showDetail = Boolean(detail && (nameMode || (data.layoutStyle !== "single" && data.showDetail !== "false")));
+  const hasContent = type && type !== "LOCATION" && Boolean(isCredits || title || data.creditList);
+  const showDetail = !isCredits && Boolean(detail && (nameMode || (data.layoutStyle !== "single" && data.showDetail !== "false")));
   const detailLayer = useLayerPresence(showDetail && !isExiting, isExiting ? liputan7Motion.retainMs : liputan7Motion.copyOutMs + 20, contentKey);
-  const single = !showDetail && !detailLayer.present && !(ghostPreview && ghostFields?.subline);
+  const single = isCredits || (!showDetail && !detailLayer.present && !(ghostPreview && ghostFields?.subline));
   const [lastDetail, setLastDetail] = useState(detail);
   useEffect(() => { if (detail) setLastDetail(detail); }, [detail]);
 
   // Tab lokasi siaran di pojok kiri atas
-  const hasLocation = Boolean(data.location?.trim()) && (type === "LOCATION" || data.showLocation !== "false");
+  const hasLocation = !isCredits && Boolean(data.location?.trim()) && (type === "LOCATION" || data.showLocation !== "false");
   const locationLayer = useLayerPresence(hasLocation && !isExiting, liputan7Motion.locationInMs + 20, contentKey);
   const [lastLocation, setLastLocation] = useState(data.location || "");
   useEffect(() => { if (data.location) setLastLocation(data.location); }, [data.location]);
@@ -64,18 +66,43 @@ export function Liputan7Graphic({ type, fields, master = defaultMasterOverlaySta
   return <div className="liputan7-template" data-broadcast-template="liputan7" style={style}>
     {hasContent && <div key={contentKey} className={`l7-content ${isExiting ? "l7-out" : ""} ${nameMode ? "l7-anchor" : ""} ${single ? "l7-single" : ""} ${hasLocation ? "l7-has-location" : ""}`}>
       <div className="l7-panel-viewport">
-      <div className="l7-red-foundation"><div className="l7-endcap" /></div>
-      <div className="l7-title-plate"><div className="l7-title-surface" /><div className="l7-title-viewport"><div className="l7-title-copy"><AutoSquishText text={title}
-        minScale={nameMode ? 1 : liputan7HeadlineFit.minScale}
-        {...(!nameMode ? single ? liputan7HeadlineFit.single : liputan7HeadlineFit.detail : {})}
-        style={{ height: "100%" }} /></div></div></div>
-      <div className="l7-detail-plate">
-        <div className="l7-detail-surface" />
-        {detailLayer.present ? <div className={`l7-detail-viewport ${detailLayer.exiting ? "l7-detail-out" : ""}`}><div className="l7-detail-copy"><AutoSquishText text={detail || lastDetail} minScale={1} /></div></div>
-          : ghostPreview && ghostFields?.subline ? <AutoSquishText className="l7-ghost" text={formatEydDetail(ghostFields.subline)} minScale={1} /> : null}
+        <div className="l7-red-foundation"><div className="l7-endcap" /></div>
+        <div className="l7-title-plate">
+          <div className="l7-title-surface" />
+          <div className="l7-title-viewport">
+            {isCredits ? (
+              <CreditTitlePlate
+                fields={data}
+                isExiting={isExiting}
+                onAutoClear={onAutoClear}
+                className="l7-credits"
+              />
+            ) : (
+              <div className="l7-title-copy">
+                <AutoSquishText
+                  text={title}
+                  minScale={nameMode ? 1 : liputan7HeadlineFit.minScale}
+                  {...(!nameMode ? single ? liputan7HeadlineFit.single : liputan7HeadlineFit.detail : {})}
+                  style={{ height: "100%" }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        {!isCredits && (
+          <div className="l7-detail-plate">
+            <div className="l7-detail-surface" />
+            {detailLayer.present ? (
+              <div className={`l7-detail-viewport ${detailLayer.exiting ? "l7-detail-out" : ""}`}>
+                <div className="l7-detail-copy"><AutoSquishText text={detail || lastDetail} minScale={1} /></div>
+              </div>
+            ) : ghostPreview && ghostFields?.subline ? (
+              <AutoSquishText className="l7-ghost" text={formatEydDetail(ghostFields.subline)} minScale={1} />
+            ) : null}
+          </div>
+        )}
       </div>
-      </div>
-      {data.kicker && data.showKicker !== "false" && !nameMode && <div className="l7-topic"><AutoSquishText text={data.kicker} minScale={1} /></div>}
+      {data.kicker && data.showKicker !== "false" && !nameMode && !isCredits && <div className="l7-topic"><AutoSquishText text={data.kicker} minScale={1} /></div>}
     </div>}
     {locationLayer.present && type && fields ? <div key={`location-${contentKey}`} className={`l7-location ${isExiting || locationLayer.exiting ? "l7-out" : ""} ${type === "LOCATION" ? "l7-location-only" : ""}`}>
       <div className="l7-location-surface" /><div className="l7-location-copy"><AutoSquishText text={data.location || lastLocation} minScale={1} /></div>

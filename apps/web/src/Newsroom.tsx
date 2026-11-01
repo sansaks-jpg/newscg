@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EditableGraphic, GraphicItem, HeadlineDefaults, LiveState, MasterOverlayState, Rundown, RundownItem, TemplateType } from "@newscg/shared";
-import { getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, normalizeHeadlineTopicFields, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
+import { calculateCreditDurations, getGraphicFieldLimit, headlineBulletinPreset, headlineDefaultsSchema, headlinePresentationSchema, normalizeHeadlineTopicFields, parseCreditEntries, rundownInputSchema, rundownItemInputSchema } from "@newscg/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -990,7 +990,14 @@ function StoryEditor({
           templateType: type,
           sortOrder: newIndex,
             draftFields:
-            type === "REPORTER"
+            type === "CREDITS"
+              ? {
+                  creditList: "Produser: Sandi Ardiansyah\nPengarah Acara: Budi Santoso",
+                  closingText: `PRODUKSI ${new Date().getFullYear()}`,
+                  totalDuration: "30",
+                  visualTemplate: "cnn"
+                }
+              : type === "REPORTER"
               ? { name: "", role: "", contentMode: "presenter", layoutStyle: "sub", showLocation: "false", visualTemplate: "cnn" }
               : type === "SOT"
               ? { headline: base?.headline || title, name: "", role: "", contentMode: "sot", showLocation: "false", visualTemplate: "cnn" }
@@ -1259,6 +1266,9 @@ function StoryEditor({
                 <button type="button" onClick={() => add("LOCATION")}>
                   + Tambah Lokasi Saja
                 </button>
+                <button type="button" onClick={() => add("CREDITS")} title="Credit Title penutup siaran yang otomatis berganti nama dan keluar live">
+                  + Credit Title (Kredit)
+                </button>
                 <button
                   type="button"
                   className="btn-preset-tiered"
@@ -1283,6 +1293,8 @@ function StoryEditor({
                           ? "CG NAMA / REPORTER"
                           : g.templateType === "LOCATION"
                           ? "CG LOKASI"
+                          : g.templateType === "CREDITS"
+                          ? "CREDIT TITLE (KERABAT KERJA)"
                           : g.templateType === "BREAKING"
                           ? "BREAKING NEWS"
                           : g.draftFields.headlinePresentation === "bulletin"
@@ -1376,6 +1388,63 @@ function StoryEditor({
                             placeholder="Contoh: JAKARTA PUSAT"
                           />
                         </label>
+                      </div>
+                    ) : g.templateType === "CREDITS" ? (
+                      <div className="cue-fields-grid">
+                        <label className="field-full">
+                          <span>Daftar Kerabat Kerja (Format: Jabatan: Nama atau Jabatan | Nama per baris) <strong style={{ color: "#ef4444" }}>*</strong></span>
+                          <textarea
+                            required
+                            rows={6}
+                            style={{ width: "100%", padding: "10px", background: "#111827", border: "1px solid #374151", color: "#f9fafb", borderRadius: "4px", fontFamily: "monospace", fontSize: "12px", resize: "vertical" }}
+                            value={g.draftFields.creditList || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const parsed = parseCreditEntries(val);
+                              field(index, "creditList", val);
+                              if (parsed[0]) {
+                                field(index, "headline", parsed[0].name);
+                                field(index, "subline", parsed[0].role);
+                              }
+                            }}
+                            placeholder={"Contoh:\nProduser: Sandi Ardiansyah\nPengarah Acara: Budi Santoso\nPenata Kamera: Raka Pratama\nAudio & Musik: Ahmad Dahlan"}
+                          />
+                        </label>
+                        <label>
+                          <span>Teks Akhiran / Penutup</span>
+                          <input
+                            value={g.draftFields.closingText || ""}
+                            onChange={(e) => field(index, "closingText", e.target.value)}
+                            placeholder={`PRODUKSI ${new Date().getFullYear()}`}
+                          />
+                        </label>
+                        <label>
+                          <span>Target Total Durasi (Detik)</span>
+                          <input
+                            type="number"
+                            min={5}
+                            max={300}
+                            value={g.draftFields.totalDuration || ""}
+                            onChange={(e) => field(index, "totalDuration", e.target.value)}
+                            placeholder="30 (Otomatis disesuaikan jika diisi)"
+                          />
+                        </label>
+                        <div className="field-full" style={{ padding: "8px 12px", background: "#1f2937", border: "1px solid #374151", borderRadius: "4px", fontSize: "11px", color: "#9ca3af" }}>
+                          {(() => {
+                            const parsed = parseCreditEntries(g.draftFields.creditList);
+                            const hasClose = Boolean((g.draftFields.closingText || `PRODUKSI ${new Date().getFullYear()}`).trim());
+                            const calc = calculateCreditDurations({
+                              entryCount: parsed.length,
+                              hasClosing: hasClose,
+                              totalDurationSec: g.draftFields.totalDuration
+                            });
+                            return (
+                              <span>
+                                ⏱️ <b>{parsed.length} Kerabat Kerja</b> {hasClose ? "+ 1 Penutup" : ""} · Total: <b>{calc.totalDurationSec} detik</b> ({calc.itemDurationSec}s / orang, {calc.closingDurationSec}s closing)
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </div>
                     ) : (
                       <div className="cue-fields-grid">
@@ -1494,7 +1563,7 @@ function StoryEditor({
                         className={`preview-pill-btn ${previewIndex === i ? "active" : ""}`}
                         onClick={() => setPreviewIndex(i)}
                       >
-                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : g.templateType === "BREAKING" ? "Breaking" : g.draftFields.headlinePresentation === "bulletin" ? "Highlight" : "Headline"}
+                        #{i + 1} {g.templateType === "SOT" ? "SOT Narasumber" : g.templateType === "REPORTER" ? "Reporter" : g.templateType === "LOCATION" ? "Lokasi" : g.templateType === "CREDITS" ? "Credits" : g.templateType === "BREAKING" ? "Breaking" : g.draftFields.headlinePresentation === "bulletin" ? "Highlight" : "Headline"}
                       </button>
                     ))}
                   </div>
